@@ -18,6 +18,11 @@ Function.prototype.bind = (thisObj, var_args) ->
 log = if logfn then logfn.bind(logobj) else () -> return
 # }}}
 
+# debugging {{{
+dbg = log.bind(this, "DEBUG:")
+#dbg = () -> return
+# }}}
+
 # user agent # {{{
 userAgents =
     unknown:0
@@ -163,25 +168,125 @@ createLabel = (text) -># {{{
     return e
 # }}}
 
-draggable = (e, handle_e) -># {{{
+initDraggable = (e, handle_e) -># {{{
     if not handle_e
         handle_e = e
     return handle_e
       .css('cursor', "pointer")
-      .mouseup( () -> $(document).unbind("mousemove") )
       .mousedown (ev) ->
           if ev.button is 0
+              stop = false
+              $(document).one( "mouseup", () -> stop = true )
+
               ev.preventDefault()
               self = $(this)
               pos = e.offset()
               x = ev.pageX - pos.left
               y = ev.pageY - pos.top
-              $(document).mousemove( (ev) -> e.offset({left:ev.pageX-x, top:ev.pageY-y}) )
+
+              move = (ev) ->
+                  if stop
+                      $(document).unbind("mousemove.mokaDrag")
+                  else
+                      e.offset({left:ev.pageX-x, top:ev.pageY-y})
+              $(document).bind( "mousemove.mokaDrag", move)
+              move(ev)
+# }}}
+
+# dragScroll {{{
+tt = 0
+jQuery.extend( jQuery.easing,
+    easeOutCubic: (x, t, b, c, d) ->
+        # refresh preview every 30ms
+        if ( t>tt )
+            tt = t+30
+        return (t=t/1000-1)*t*t + 1
+)
+
+dragScroll = (ev) ->
+    wnd = ev.currentTarget
+    w = $(wnd)
+
+    start = t = ev.timeStamp
+    dt = 0
+    dx = 0
+    dy = 0
+
+    mouseX = ev.pageX
+    mouseY = ev.pageY
+    from_mouseX = w.scrollLeft() + mouseX
+    from_mouseY = w.scrollTop() + mouseY
+
+    stop = false
+    scrolling = false
+
+    continueDragScroll = (ev) ->
+        return if stop
+        scrolling = true
+
+        mouseX = ev.pageX
+        mouseY = ev.pageY
+
+        x = w.scrollLeft()
+        y = w.scrollTop()
+
+        # scroll
+        w.scrollLeft(from_mouseX-mouseX)
+        w.scrollTop(from_mouseY-mouseY)
+
+        start = t
+        t = ev.timeStamp
+        dx = w.scrollLeft()-x
+        dy = w.scrollTop()-y
+
+        $(window).one("mousemove", continueDragScroll)
+
+        ev.preventDefault()
+
+    stopDragScroll = (ev) ->
+        stop = true
+
+        # if not scrolled: try to focus target element
+        if not scrolling
+            ev.target.focus()
+            return
+
+        # TODO: better algorithm to determine scroll animation speed and amount
+        t = ev.timeStamp
+        dt = t-start
+        if 0 < dt < 90 and (dx > 0 or dy > 0)
+            accel = 200/dt
+            vx = dx*accel
+            vy = dy*accel
+
+            tt = 100
+            w.animate(
+                scrollLeft: w.scrollLeft()+vx+"px",
+                scrollTop: w.scrollTop()+vy+"px",
+                1000, "easeOutCubic")
+
+        return false
+
+    # stop animations
+    w.stop(true)
+
+    # Chromium bug: http://code.google.com/p/chromium/issues/detail?id=14204
+    # - scrollbar does not trigger mouseup
+    pos = w.offset()
+    if mouseX+24 > pos.left + w.width() or mouseY+24 > pos.top + w.outerHeight()
+        return
+
+    $(window).one("mouseup", stopDragScroll)
+             .one("mousemove", continueDragScroll)
+
+    ev.preventDefault()
+# }}}
 # }}}
 
 # GUI classes# {{{
 # only one widget can can be focused at a time
 focused_widget = $()
+focus_timestamp = 0
 
 focus_first = (e) -># {{{
     ee = e.find(".input:visible")
@@ -237,21 +342,37 @@ is_on_screen = (w, how) -># {{{
 ensure_visible = (w, wnd) -># {{{
     e = if w.e then w.e else w
 
-    container =
-        left:   wnd.scrollLeft()
-        top:    wnd.scrollTop()
-        width:  wnd.width()
-        height: wnd.height()
+    if not wnd
+        wnd = w.parent()
+    return if not wnd.length
 
-    pos = e.offset()
-    if (right = pos.left + e.width()) > container.left + container.width
-        wnd.scrollLeft(right - container.width + 16)
-    if pos.left < container.left
-        wnd.scrollLeft(pos.left - 16)
-    if (bottom = pos.top + e.height()) > container.top + container.height
-        wnd.scrollTop(bottom - container.height + 16)
-    if pos.top < container.top
-        wnd.scrollTop(pos.top - 16)
+    if wnd[0].scrollHeight > wnd[0].offsetHeight+4
+        pos = wnd.offset()
+        cpos = e.offset()
+        cleft   = cpos.left - pos.left
+        ctop    = cpos.top - pos.top
+        cright  = cleft + e.width()
+        cbottom = ctop + e.height()
+
+        left  = wnd.scrollLeft()
+        cleft += left
+        cright += left
+        right = left + wnd.width()
+        if cleft > left and cright > right
+            wnd.scrollLeft(if e.width() >= (w = wnd.width()) then cleft else cright - w)
+        else if cright < right and cleft < left
+            wnd.scrollLeft(if e.width() >= (w = wnd.width()) then cright-w else cleft)
+
+        top = wnd.scrollTop()
+        ctop += top
+        cbottom += top
+        bottom = top + wnd.height()
+        if ctop > top and cbottom > bottom
+            wnd.scrollTop(if e.height() >= (w = wnd.height()) then ctop else cbottom - w)
+        else if cbottom < bottom and ctop < top
+            wnd.scrollTop(if e.height() >= (w = wnd.height()) then cbottom-w else ctop)
+
+    return ensure_visible(w, wnd.parent())
 # }}}
 
 doKey = (keyname, keys, default_keys, object) -># {{{
@@ -269,10 +390,11 @@ init_GUI = () -># {{{
     $(".input")
         .live( "focus",
             (ev) ->
-                return if focused_widget is ev.target
+                return if focus_timestamp is ev.timeStamp
+                focus_timestamp = ev.timeStamp
                 focused_widget = $(ev.target)
-                                .trigger("mokaFocused")
-                ensure_visible( focused_widget, $(window) )
+                focused_widget.trigger("mokaFocused")
+                ensure_visible(focused_widget)
         )
         .live( "blur",
             () ->
@@ -309,13 +431,17 @@ class Widget# {{{
         return this
     # }}}
 
-    hide: -># {{{
+    hide: () -># {{{
         @e.hide()
         return this
     # }}}
 
     update: () -># {{{
         return this
+    # }}}
+
+    isLoaded: () -># {{{
+        return true
     # }}}
 
     keyPress: (ev) -># {{{
@@ -1065,7 +1191,7 @@ class Tabs extends Widget # {{{
 
             page = @pages[id]
             page.show()
-            
+
             tab = @tabs_e.children(".tab").eq(id)
                  .trigger("mokaSelected", [id])
             @current = id
@@ -1173,40 +1299,77 @@ class ImageView extends Widget# {{{
         super
         @e.addClass("imageview")
           .keydown( @keyPress.bind(this) )
-        @view = $("<img>", {class:"input", tabindex:0})
+        @view = $("<img>", {class:"input", tabindex:0, src:""})
                .appendTo(@e)
         @src = src
     # }}}
 
     show: () -># {{{
-        if not @view.attr("src")
-            @view.one("load", @e.trigger.bind(@e, "mokaLoaded") )
-                 .one("error", @e.trigger.bind(@e, "mokaError") )
-                 .attr("src", @src)
+        if @ok?
+            @e.trigger("mokaLoaded")
+            @e.trigger("mokaDone", [not @ok])
+            @zoom(@z, @zhow)
         else
-            @view.trigger("mokaLoaded")
+            @view.one( "load",
+                () =>
+                    e = @view[0]
+                    @width = if e.width then e.width else e.naturalWidth
+                    @height = if e.height then e.height else e.naturalHeight
+
+                    @ok = true
+                    @e.trigger("mokaLoaded")
+                    @e.trigger("mokaDone", [not @ok] )
+
+                    @zoom(@z, @zhow)
+            )
+            @view.one( "error",
+                () =>
+                    @width = @height = 0
+                    @ok = false
+                    @e.trigger("mokaError")
+                    @e.trigger("mokaDone", [not @ok] )
+            )
+            @view.attr("src", @src)
         @e.show()
         return this
     # }}}
 
     hide: () -># {{{
         @e.hide()
+        @ok = null
         @view.attr("src", "")
         return this
     # }}}
 
-    zoom: (how) -># {{{
+    isLoaded: () -># {{{
+        return @ok?
+    # }}}
+
+    zoom: (how, how2) -># {{{
         if how?
             @z = how
-            if how is "fit"
-                @view.css( "max-height", @e.parent().css("max-height") )
-            else
-                @view.css("max-height", "none")
-                @z = ""
+            @zhow = how2
+            if @ok?
+                w = h = mw = mh = ""
+                if how instanceof Array
+                    mw = how[0]
+                    mh = how[1]
+                else
+                    @z = parseFloat(how) or 1
+                    mw = Math.floor(@z*@width)
+                    mh = Math.floor(@z*@height)
+
+                if how2 isnt "fit"
+                    if @width/@height < mw/mh
+                        h = mh
+                    else
+                        w = mw
+
+                @view.css('max-width': mw, 'max-height':mh, width: w, height: h)
+
+            return this
         else
             return @z
-
-        return this
     # }}}
 
     keyPress: (ev) -># {{{
@@ -1220,10 +1383,6 @@ class ImageView extends Widget# {{{
     # }}}
 # }}}
 
-# TODO:
-#    * append a widget
-#    * layouts: horizontal, vertical, 1x1, 2x2, 2x3, ...
-#    * preload next widgets
 class Viewer extends Widget# {{{
     default_keys:# {{{
         RIGHT: -> is_on_screen(focused_widget, "right") and @next()
@@ -1242,13 +1401,15 @@ class Viewer extends Widget# {{{
                 z = @oldzoom
             else
                 lay = [1,1]
-                z = ""
+                z = 1
             @oldlay = @layout()
             @oldzoom = @zoom()
             @zoom(z)
             @layout(lay)
-        '*': -> @layout([1,1]); @zoom("")
-        '/': -> if @zoom() is "fit" then @zoom("") else @zoom("fit")
+        '*': -> @layout([1,1]); @zoom(1)
+        '/': -> if @zoom() is "fit" then @zoom(1) else @zoom("fit")
+        '+': -> @zoom("+")
+        'MINUS': -> @zoom("-")
         HOME: -> @select(0)
         END: -> @select(@length()-1)
         PAGEUP: ->
@@ -1269,15 +1430,38 @@ class Viewer extends Widget# {{{
         super
         @e.addClass("viewer")
           .keydown( @keyPress.bind(this) )
-        @table = $("<table>").appendTo(@e)
+          .resize( @update.bind(this) )
+          .one( "scroll.mokaViewerScroll", @onScroll.bind(this) )
+          .mousedown( (ev) -> if ev.button is 0 then dragScroll(ev) )
+          .css("cursor", "move")
+
+        @table = $("<table>", class:"table", cellSpacing:0, cellPadding:0).appendTo(@e)
+                .bind("mokaFocused",
+                    (ev) =>
+                        e = $(ev.target).parents(".view:last")
+                        return if not e.length
+                        @current = e.data("index")
+                        e.addClass("current")
+                         .attr('tabindex', -1)
+                )
+                .bind("mokaLostFocus",
+                    (ev) =>
+                        e = $(ev.target).parents(".view:last")
+                        return if @current isnt e.data("index")
+                        @current = -1
+                        e.removeClass("current")
+                         .attr('tabindex', -1)
+                )
+
         @cells = []
         @items = []
         @index = 0
         @current = -1
-        @preload = 2
+        @preload_count = 2
+        #@preload_count = 0
 
         @layout([1,1])
-        $(window).resize( @update.bind(this) )
+        @zoom(1)
     # }}}
 
     show: () -># {{{
@@ -1287,7 +1471,22 @@ class Viewer extends Widget# {{{
 
     update: -># {{{
         return if not @e.is(":visible")
+
+        if @current >= 0
+            id = @index + @current
+
+        if @lastlay isnt @lay
+            @lastlay = @lay
+            @updateTable()
+
         @view(@index)
+
+        if @zhow is "fit"
+            @zoom(@zhow)
+
+        @onScroll()
+
+        @select(id) if id?
 
         w = @items
         $.each( w, (i) -> if w[i].update then w[i].update?() )
@@ -1295,6 +1494,7 @@ class Viewer extends Widget# {{{
     # }}}
 
     append: (widget) -># {{{
+        id = @items.length
         @items.push(widget)
         @update()
 
@@ -1322,66 +1522,96 @@ class Viewer extends Widget# {{{
 
         flood = (from, to, i, dir) ->
             if i >= to or i < 0
-                @preloadNext()
+                @preload( [i...i+@preload_count] )
                 return
 
-            cell = @cells[i]
-            item = @items[from+i]
+            cell = @cell(i)
+            item = @at(from+i)
 
             cell.empty()
             if item
                 cell.attr("tabindex", 0)
                 e = if item.e then item.e else item
-                e.appendTo(cell)
-                self = this
-                nextflood = flood.bind(this, from, to, i+dir, dir)
-                item.e.one("mokaLoaded",
-                    (ev) =>
-                        $(ev.target).unbind()
-                        @zoom(@z, from+i)
-                        nextflood()
-                )
-                item.e.one("mokaError",
-                    (ev) =>
-                        $(ev.target).unbind()
+                container = $("<div>", {class:"container"})
+                           .css(width: @e.width(), height: @e.height())
+                           .appendTo(cell)
+                e.appendTo(container)
+
+                nextflood = (ev, error) =>
+                    if error
                         item.hide()
+                    else
+                        item.zoom(@z, @zhow) if item.zoom
+                    flood.apply(this, [from, to, i+dir, dir])
+
+                if @lay[0] > 0 and @lay[1] > 0
+                    if item.isLoaded()
+                        item.show()
                         nextflood()
-                )
-                item.show()
+                    else
+                        item.e.one("mokaDone", nextflood)
+                        item.show()
+                else
+                    item.e.hide()
+                    nextflood()
             else
                 cell.attr("tabindex", -1)
 
         len = @cells.length
+        return if not len
 
         # hide previous (removes resources from memory)
-        olditems = @items.slice(@index, @index+len)
-        for item in olditems
-            item.hide().e.remove()
+        #olditems = @items.slice(@index, @index+len)
+        #for item in olditems
+            #item.hide().e.remove()
 
         # show next
         @index = Math.floor(id/len)*len
-        flood.apply(this, [@index, len, id % len, 1])
-        flood.apply(this, [@index, len, id % len-1, -1])
+
+        i = id%len
+        dbg "displaying views",@index+".."+(@index+len-1)
+        flood.apply(this, [@index, len, i, 1])
+        flood.apply(this, [@index, len, i-1, -1])
 
         return this
     # }}}
 
-    preloadNext: () -># {{{
-        i = @index + @visibleItems()
-        len = Math.min(@length(), i+@preload)
-        while i < len
-            item = @items[i]
-            item.show() if item.show
-            ++i
+    preload: (indexes) -># {{{
+        preloader = (indexes) ->
+            return if indexes.length is 0
+
+            i = indexes[0]
+            next = preloader.bind(this, indexes.slice(1))
+            if 0 < i < @length()
+                item = @items[i]
+                if item.isLoaded()
+                    item.show()
+                    next()
+                else
+                    item.e.one( "mokaDone", next )
+                item.show()
+            else
+                return next()
+
+        (preloader.bind(this, indexes))()
+        return this
     # }}}
 
     select: (id) -># {{{
+        dbg "selecting view",id
+        return this if not @e.is(":visible")
         return this if id < 0 or id >= @length()
         count = @visibleItems()
         if id < @index or id >= @index+count
             @view(id)
-        cell = @cells[id % count]
+
+        @e.unbind("scroll.mokaViewerScroll")
+
+        # item should be visible before gaining focus
+        cell = @cell(id % count)
         focus_first(cell) or cell[0]?.focus()
+
+        @onScroll()
 
         return this
     # }}}
@@ -1390,51 +1620,66 @@ class Viewer extends Widget# {{{
         return @current
     # }}}
 
-    zoom: (how, index) -># {{{
+    zoom: (how) -># {{{
         if how?
-            @z = how
+            @zhow = how
+
             if how is "fit"
-                wnd = $(window)
-                pos = @table.offset()
-                w = (wnd.width()-pos.left)/@lay[0]-8+"px"
-                h = (wnd.height()-pos.top)/@lay[1]-8+"px"
+                layout = @layout()
+                if @lay[0] <= 0
+                    layout[0] = 1
+                else if @lay[1] <= 0
+                    layout[1] = 1
 
-                row_css = {'max-height':h, 'height':h}
-                cell_css = {'max-width':w, 'width':w, 'max-height':h, 'height':h}
-            else
-                @z = ""
-                row_css = cell_css =
-                    'max-width':"none"
-                    width:"auto"
-                    'max-height':"none"
-                    height:"auto"
-        else
-            return @z
+                wnd = @e.parent()
 
-        @table.find(".row").css(row_css)
-        @table.find(".view").css(cell_css)
+                offset = wnd.offset()
+                pos = @e.offset()
+                pos.top -= offset.top
+                pos.left -= offset.left
 
-        if index
-            i = index
-            len = index+1
-        else
+                w = (wnd.width()-pos.left)/layout[0]
+                h = (wnd.height()-pos.top)/layout[1]
+
+                for s in [@table.cellSpacing, @table.cellPadding, @table.border]
+                    if s
+                        w += layout[0]*s
+                        h += layout[0]*s
+
+                @z = [w,h]
+            else if how is "+" or how is "-"
+                d = 1.125
+                d = 1/d if how is "-"
+
+                if not @z
+                    @z = 1 * d
+                else if @z instanceof Array
+                    @z[0] *= d
+                    @z[1] *= d
+            else if not how instanceof Array
+                factor = parseFloat(how) or 1
+                @z = factor
+
             i = @index
             len =i+@visibleItems()
-        len = Math.min( len, @length() )
+            len = Math.min(len, @length())
+            dbg "zooming views ",i+".."+(len-1)," using method ",@zhow,@z
+            while i < len
+                item = @at(i)
+                item.zoom(@z, @zhow) if item.zoom
+                ++i
 
-        while i < len
-            item = @items[i]
-            item.zoom(how) if item.zoom
-            ++i
+            @onScroll()
 
-        @z = how
-
-        return this
+            return this
+        else
+            return @z
     # }}}
 
     visibleItems: () -># {{{
         # number of visible items
-        return @lay[0]*@lay[1]
+        layout = @layout()
+        return layout[0]*layout[1]
     # }}}
 
     next: () -># {{{
@@ -1448,12 +1693,12 @@ class Viewer extends Widget# {{{
     # }}}
 
     nextRow: () -># {{{
-        @select(@index + @indexOnPage() + @lay[0])
+        @select(@index + @indexOnPage() + @layout()[0])
         return this
     # }}}
 
     prevRow: () -># {{{
-        @select(@index + @indexOnPage() - @lay[0])
+        @select(@index + @indexOnPage() - @layout()[0])
         return this
     # }}}
 
@@ -1467,48 +1712,156 @@ class Viewer extends Widget# {{{
         return this
     # }}}
 
+    appendRow: () -># {{{
+        return $("<tr>", class:"row")
+               .hide()
+               .appendTo(@table)
+    # }}}
+
+    appendCell: (row) -># {{{
+        cell = $("<td>", {class:"widget input view"})
+              .data("index", @cells.length)
+              .hide()
+              .focus( () -> focus_first(cell) )
+              .appendTo(row)
+        @cells.push(cell)
+        return cell
+    # }}}
+
+    cell: (index) -># {{{
+        return @cells[index]
+    # }}}
+
     updateTable: () -># {{{
         @table.empty()
         @cells = []
-        ilen = @lay[0]
-        jlen = @lay[1]
-        n = 0
+
+        layout = @layout()
+        ilen = layout[0]
+        jlen = layout[1]
+
         j = 0
         while j < jlen
-            row = $("<tr>", class:"widget row")
+            row = @appendRow()
             i = 0
-            while i < ilen
-                cell = $("<td>", {class:"widget input view"})
-                      .focus( () -> focus_first($(this)) )
-                      .appendTo(row)
-                cell.bind("mokaFocused", ((e, n) ->
-                    @current = n
-                    e.addClass("current")
-                     .attr('tabindex', -1)
-                ).bind(this, cell, n) )
-                cell.bind("mokaLostFocus", ((e) ->
-                    @current = -1
-                    e.removeClass("current")
-                     .attr('tabindex', -1)
-                ).bind(this, cell) )
-                @cells.push(cell)
-                ++i
-                ++n
-            row.appendTo(@table)
+            while ++i <= ilen
+                cell = @appendCell(row)
+                cell.show()
+            row.show()
             ++j
-        if @current >= 0
-            id = @index + @current
-        @update()
-        @select(id) if id?
     # }}}
 
     layout: (layout) -># {{{
         if not layout
-            return @lay
+            i = @lay[0]
+            j = @lay[1]
+            if i <= 0
+                i = @length()
+                j = 1
+            else if j <= 0
+                i = 1
+                j = @length()
+            return [i, j]
+
+        dbg "setting layout",layout
         @lay = layout
-        @updateTable()
+        @update()
 
         return this
+    # }}}
+
+    showItem: (index) -># {{{
+        if @lay[0] <= 0
+            sz2 = "height"
+            scroll2 = "scrollTop"
+        else if @lay[1] <= 0
+            sz2 = "width"
+            scroll2 = "scrollLeft"
+        else
+            return
+
+        cell = @cells[index]
+        item = @at(index)
+
+        p = @table
+        h = p[sz2]()
+        # scrolling relative to middle
+        scrolld = h/2 - @e[scroll2]()
+
+        updateSize = () =>
+            dbg "item",index,"loaded in continuous layout"
+            if scrolld
+                h2 = p[sz2]()
+                if h < h2
+                    # keep the biggest size for table (all cells can be smaller)
+                    p[sz2](h2)
+                    # keep scroll offset after image is loaded
+                    @e[scroll2]( h2/2 - scrolld )
+
+            h = cell.outerHeight()
+            w = cell.outerWidth()
+
+            item.e.parent().css(width:"", height:"")
+
+            @onScroll()
+
+        if item.isLoaded()
+            item.show()
+            updateSize()
+        else
+            item.e.parent().css(width:"", height:"")
+            item.e.one( "mokaDone", updateSize )
+            item.show()
+    # }}}
+
+    hideItem: (index) -># {{{
+        item = @at(index)
+        cell = @cells[index % @visibleItems()]
+        if item.e.is(":visible")
+            dbg "hiding item",index,"in continuos view"
+            h = cell.outerHeight()
+            w = cell.outerWidth()
+            item.hide()
+            item.e.parent().css(width:w, height:h)
+    # }}}
+
+    onScroll: () -># {{{
+        @e.unbind("scroll.mokaViewerScroll")
+
+        if @lay[0] <= 0
+            dir = "left"
+            sz = "width"
+            scroll = "scrollLeft"
+        else if @lay[1] <= 0
+            dir = "top"
+            sz = "height"
+            scroll = "scrollTop"
+        else
+            @e.one( "scroll", @onScroll.bind(this) )
+            return
+
+        min = @e.offset()[dir]
+        i = 0
+        while (cell = @cells[i]) and (pos = cell.offset()[dir] + cell[sz]()) < min
+            if pos < min - @e.width()
+                @hideItem(@index+i)
+            ++i
+
+        max = min+@e[sz]()
+        preloaded = 0
+        while (cell = @cells[i]) and (((pos = cell.offset()[dir]) < max) or ++preloaded <= @preload_count)
+            item = @at(@index + i)
+            break if not item.e.is(":visible")
+            ++i
+
+        if cell and not item.e.is(":visible")
+            @showItem(i)
+            return
+        else
+            while cell = @cells[i]
+                @hideItem(@index+i)
+                ++i
+            @e.one( "scroll", @onScroll.bind(this) )
     # }}}
 
     keyPress: (ev) -># {{{
@@ -1523,7 +1876,10 @@ class Viewer extends Widget# {{{
 # }}}
 
 class Window extends Widget# {{{
-    default_keys: # {{{
+    default_keys: {}# {{{
+    # }}}
+
+    default_title_keys: # {{{
         LEFT: ->
             pos = @e.offset()
             pos.left -= 20
@@ -1566,42 +1922,91 @@ class Window extends Widget# {{{
 
     constructor: (title) -># {{{
         super
+        self = this
         @e.addClass("window")
           .keydown( @keyPress.bind(this) )
           .hide()
+
+        e = @container = $("<div>").css(width:"100%", height:"100%").appendTo(@e)
 
         $(window).resize( @update.bind(this) )
 
         # title
         @title = $("<div>", {'class':"title", 'html':title, tabindex:0})
                 .css('cursor', "pointer")
-                .appendTo(@e)
-                .keydown( @keyPress.bind(this) )
+                .keydown( @keyPressTitle.bind(this) )
+                .appendTo(e)
 
-        # close button
-        $("<div>", {'class':"close", 'html':
-            #"&#8855"
-            "&#8854"
-            #"&#8856"
-            #"&#8864"
-            #"&#8863"
-            #"&#8709"
-        })
+        # window title buttons
+        $("<div>", {'class':"window_control close"})
             .css('cursor', "pointer")
             .click( @hide.bind(this) )
+            .appendTo(@title)
+        $("<div>", {'class':"window_control maximize"})
+            .css('cursor', "pointer")
+            .click( @maximize.bind(this) )
             .appendTo(@title)
 
         # body
         @body = body = $("<div>", {class:"body"})
-                      .appendTo(@e)
+                      .appendTo(e)
 
         @title.dblclick( () -> body.toggle(); focus_first(body); return false )
-              .click( () -> focus_first(body); return false )
+              .click( () -> this.focus() )
               .mousedown( (ev) -> ev.preventDefault() ) # prevent selecting text when double-clicking
+
+        # window edges
+        edges =
+            n:  [1, 1, 0, 1, 0, 1, "n"]
+            e:  [1, 1, 1, 0, 1, 0, "e"]
+            s:  [0, 1, 1, 1, 0, 1, "s"]
+            w:  [1, 0, 1, 1, 1, 0, "w"]
+            ne: [1, 1, 0, 0, 1, 1, "ne"]
+            se: [0, 1, 1, 0, 1, 1, "se"]
+            sw: [0, 0, 1, 1, 1, 1, "sw"]
+            nw: [1, 0, 0, 1, 1, 1, "nw"]
+        for edge, s of edges
+            $("<div>", {class:"edge " + edge.split("").join(" ")})
+                .css(
+                    position:"absolute"
+                    top: s[0] and "-2px" or ""
+                    right: s[1] and "-2px" or ""
+                    bottom: s[2] and "-2px" or ""
+                    left: s[3] and "-2px" or ""
+                    width: s[4] and "8px" or ""
+                    height: s[5] and "8px" or ""
+                    cursor:s[6]+"-resize"
+                )
+                .appendTo(e)
+                .mousedown (ev) ->
+                    x = ev.pageX
+                    y = ev.pageY
+                    $this = $(this)
+                    $(document).bind("mousemove.mokaResize", (ev) ->
+                        dx = ev.pageX-x
+                        dy = ev.pageY-y
+                        x += dx
+                        y += dy
+                        pos = self.position()
+                        if $this.hasClass("n")
+                            body.height( body.height()-dy )
+                            pos.top += dy
+                        if $this.hasClass("e")
+                            body.width( body.width()+dx )
+                        if $this.hasClass("s")
+                            body.height( body.height()+dy )
+                        if $this.hasClass("w")
+                            body.width( body.width()-dx )
+                            pos.left += dx
+                        self.position(pos.left, pos.top)
+                        self.update()
+                    )
+                    $(document).one("mouseup", () -> $(document).unbind("mousemove.mokaResize"))
+                    return false
 
         @widgets = []
 
-        draggable(@e, @title)
+        initDraggable(@e, @title)
         $(window).load( (() -> @update()).bind(this) )
     # }}}
 
@@ -1649,6 +2054,35 @@ class Window extends Widget# {{{
 
     focus: () -># {{{
         @title[0].focus()
+        return this
+    # }}}
+
+    position: (x,y) -># {{{
+        if x?
+            pos = @e.parent().offset()
+            @e.offset({left:pos.left+x, top:pos.top+y})
+            return this
+        else
+            return @e.offset()
+    # }}}
+
+    resize: (w, h) -># {{{
+        @body.width(w).height(h)
+        @update()
+        return this
+    # }}}
+
+    maximize: () -># {{{
+        # FIXME: maximum size is incorrect
+        @position(0, 0)
+        p = @e.parent()
+        pos = @body.offset()
+        pos2 = p.offset()
+        pos.left += pos2.left
+        pos.top += pos2.top
+        @resize( p.width()-pos.left, p.height()-pos.top )
+
+        return this
     # }}}
 
     nextWindow: (left_or_top, direction) -># {{{
@@ -1678,9 +2112,13 @@ class Window extends Widget# {{{
 
         if doKey(keyname, @keys, @default_keys, this)
             return false
+    # }}}
 
-        # all key-presses are local to the current window
-        #ev.stopPropagation()
+    keyPressTitle: (ev) -># {{{
+        keyname = getKeyName(ev)
+
+        if doKey(keyname, @keys, @default_title_keys, this)
+            return false
     # }}}
 # }}}
 # }}}

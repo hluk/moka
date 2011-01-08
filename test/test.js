@@ -1,5 +1,5 @@
 (function() {
-  var Button, ButtonBox, CheckBox, ImageView, Selection, Tabs, TextEdit, Viewer, Widget, WidgetList, Window, createLabel, doKey, draggable, ensure_position, ensure_visible, focus_first, focused_widget, getKeyName, init_GUI, is_on_screen, keyHintFocus, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, onLoad, test, userAgent, userAgents, wnd_count;
+  var Button, ButtonBox, CheckBox, ImageView, Selection, Tabs, TextEdit, Viewer, Widget, WidgetList, Window, createLabel, dbg, doKey, dragScroll, ensure_position, ensure_visible, focus_first, focus_timestamp, focused_widget, getKeyName, initDraggable, init_GUI, is_on_screen, keyHintFocus, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, onLoad, test, tt, userAgent, userAgents, wnd_count;
   var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -26,6 +26,7 @@
   log = logfn ? logfn.bind(logobj) : function() {
     return;
   };
+  dbg = log.bind(this, "DEBUG:");
   userAgents = {
     unknown: 0,
     webkit: 1,
@@ -168,30 +169,110 @@
     e.css("cursor", "pointer");
     return e;
   };
-  draggable = function(e, handle_e) {
+  initDraggable = function(e, handle_e) {
     if (!handle_e) {
       handle_e = e;
     }
-    return handle_e.css('cursor', "pointer").mouseup(function() {
-      return $(document).unbind("mousemove");
-    }).mousedown(function(ev) {
-      var pos, self, x, y;
+    return handle_e.css('cursor', "pointer").mousedown(function(ev) {
+      var move, pos, self, stop, x, y;
       if (ev.button === 0) {
+        stop = false;
+        $(document).one("mouseup", function() {
+          return stop = true;
+        });
         ev.preventDefault();
         self = $(this);
         pos = e.offset();
         x = ev.pageX - pos.left;
         y = ev.pageY - pos.top;
-        return $(document).mousemove(function(ev) {
-          return e.offset({
-            left: ev.pageX - x,
-            top: ev.pageY - y
-          });
-        });
+        move = function(ev) {
+          if (stop) {
+            return $(document).unbind("mousemove.mokaDrag");
+          } else {
+            return e.offset({
+              left: ev.pageX - x,
+              top: ev.pageY - y
+            });
+          }
+        };
+        $(document).bind("mousemove.mokaDrag", move);
+        return move(ev);
       }
     });
   };
+  tt = 0;
+  jQuery.extend(jQuery.easing, {
+    easeOutCubic: function(x, t, b, c, d) {
+      if (t > tt) {
+        tt = t + 30;
+      }
+      return (t = t / 1000 - 1) * t * t + 1;
+    }
+  });
+  dragScroll = function(ev) {
+    var continueDragScroll, dt, dx, dy, from_mouseX, from_mouseY, mouseX, mouseY, pos, scrolling, start, stop, stopDragScroll, t, w, wnd;
+    wnd = ev.currentTarget;
+    w = $(wnd);
+    start = t = ev.timeStamp;
+    dt = 0;
+    dx = 0;
+    dy = 0;
+    mouseX = ev.pageX;
+    mouseY = ev.pageY;
+    from_mouseX = w.scrollLeft() + mouseX;
+    from_mouseY = w.scrollTop() + mouseY;
+    stop = false;
+    scrolling = false;
+    continueDragScroll = function(ev) {
+      var x, y;
+      if (stop) {
+        return;
+      }
+      scrolling = true;
+      mouseX = ev.pageX;
+      mouseY = ev.pageY;
+      x = w.scrollLeft();
+      y = w.scrollTop();
+      w.scrollLeft(from_mouseX - mouseX);
+      w.scrollTop(from_mouseY - mouseY);
+      start = t;
+      t = ev.timeStamp;
+      dx = w.scrollLeft() - x;
+      dy = w.scrollTop() - y;
+      $(window).one("mousemove", continueDragScroll);
+      return ev.preventDefault();
+    };
+    stopDragScroll = function(ev) {
+      var accel, vx, vy;
+      stop = true;
+      if (!scrolling) {
+        ev.target.focus();
+        return;
+      }
+      t = ev.timeStamp;
+      dt = t - start;
+      if ((0 < dt && dt < 90) && (dx > 0 || dy > 0)) {
+        accel = 200 / dt;
+        vx = dx * accel;
+        vy = dy * accel;
+        tt = 100;
+        w.animate({
+          scrollLeft: w.scrollLeft() + vx + "px",
+          scrollTop: w.scrollTop() + vy + "px"
+        }, 1000, "easeOutCubic");
+      }
+      return false;
+    };
+    w.stop(true);
+    pos = w.offset();
+    if (mouseX + 24 > pos.left + w.width() || mouseY + 24 > pos.top + w.outerHeight()) {
+      return;
+    }
+    $(window).one("mouseup", stopDragScroll).one("mousemove", continueDragScroll);
+    return ev.preventDefault();
+  };
   focused_widget = $();
+  focus_timestamp = 0;
   focus_first = function(e) {
     var ee;
     ee = e.find(".input:visible");
@@ -235,27 +316,41 @@
     return x >= min && x <= max;
   };
   ensure_visible = function(w, wnd) {
-    var bottom, container, e, pos, right;
+    var bottom, cbottom, cleft, cpos, cright, ctop, e, left, pos, right, top;
     e = w.e ? w.e : w;
-    container = {
-      left: wnd.scrollLeft(),
-      top: wnd.scrollTop(),
-      width: wnd.width(),
-      height: wnd.height()
-    };
-    pos = e.offset();
-    if ((right = pos.left + e.width()) > container.left + container.width) {
-      wnd.scrollLeft(right - container.width + 16);
+    if (!wnd) {
+      wnd = w.parent();
     }
-    if (pos.left < container.left) {
-      wnd.scrollLeft(pos.left - 16);
+    if (!wnd.length) {
+      return;
     }
-    if ((bottom = pos.top + e.height()) > container.top + container.height) {
-      wnd.scrollTop(bottom - container.height + 16);
+    if (wnd[0].scrollHeight > wnd[0].offsetHeight + 4) {
+      pos = wnd.offset();
+      cpos = e.offset();
+      cleft = cpos.left - pos.left;
+      ctop = cpos.top - pos.top;
+      cright = cleft + e.width();
+      cbottom = ctop + e.height();
+      left = wnd.scrollLeft();
+      cleft += left;
+      cright += left;
+      right = left + wnd.width();
+      if (cleft > left && cright > right) {
+        wnd.scrollLeft(e.width() >= (w = wnd.width()) ? cleft : cright - w);
+      } else if (cright < right && cleft < left) {
+        wnd.scrollLeft(e.width() >= (w = wnd.width()) ? cright - w : cleft);
+      }
+      top = wnd.scrollTop();
+      ctop += top;
+      cbottom += top;
+      bottom = top + wnd.height();
+      if (ctop > top && cbottom > bottom) {
+        wnd.scrollTop(e.height() >= (w = wnd.height()) ? ctop : cbottom - w);
+      } else if (cbottom < bottom && ctop < top) {
+        wnd.scrollTop(e.height() >= (w = wnd.height()) ? cbottom - w : ctop);
+      }
     }
-    if (pos.top < container.top) {
-      return wnd.scrollTop(pos.top - 16);
-    }
+    return ensure_visible(w, wnd.parent());
   };
   doKey = function(keyname, keys, default_keys, object) {
     var fn;
@@ -271,11 +366,13 @@
   init_GUI = function() {
     var ensure_fns, ensure_position_tmp;
     $(".input").live("focus", function(ev) {
-      if (focused_widget === ev.target) {
+      if (focus_timestamp === ev.timeStamp) {
         return;
       }
-      focused_widget = $(ev.target).trigger("mokaFocused");
-      return ensure_visible(focused_widget, $(window));
+      focus_timestamp = ev.timeStamp;
+      focused_widget = $(ev.target);
+      focused_widget.trigger("mokaFocused");
+      return ensure_visible(focused_widget);
     }).live("blur", function() {
       focused_widget = $();
       return $(this).trigger("mokaLostFocus");
@@ -320,6 +417,9 @@
     };
     Widget.prototype.update = function() {
       return this;
+    };
+    Widget.prototype.isLoaded = function() {
+      return true;
     };
     Widget.prototype.keyPress = function(ev) {
       var keyname;
@@ -1237,37 +1337,80 @@
       this.e.addClass("imageview").keydown(this.keyPress.bind(this));
       this.view = $("<img>", {
         "class": "input",
-        tabindex: 0
+        tabindex: 0,
+        src: ""
       }).appendTo(this.e);
       this.src = src;
     }
     ImageView.prototype.show = function() {
-      if (!this.view.attr("src")) {
-        this.view.one("load", this.e.trigger.bind(this.e, "mokaLoaded")).one("error", this.e.trigger.bind(this.e, "mokaError")).attr("src", this.src);
+      if (this.ok != null) {
+        this.e.trigger("mokaLoaded");
+        this.e.trigger("mokaDone", [!this.ok]);
+        this.zoom(this.z, this.zhow);
       } else {
-        this.view.trigger("mokaLoaded");
+        this.view.one("load", __bind(function() {
+          var e;
+          e = this.view[0];
+          this.width = e.width ? e.width : e.naturalWidth;
+          this.height = e.height ? e.height : e.naturalHeight;
+          this.ok = true;
+          this.e.trigger("mokaLoaded");
+          this.e.trigger("mokaDone", [!this.ok]);
+          return this.zoom(this.z, this.zhow);
+        }, this));
+        this.view.one("error", __bind(function() {
+          this.width = this.height = 0;
+          this.ok = false;
+          this.e.trigger("mokaError");
+          return this.e.trigger("mokaDone", [!this.ok]);
+        }, this));
+        this.view.attr("src", this.src);
       }
       this.e.show();
       return this;
     };
     ImageView.prototype.hide = function() {
       this.e.hide();
+      this.ok = null;
       this.view.attr("src", "");
       return this;
     };
-    ImageView.prototype.zoom = function(how) {
+    ImageView.prototype.isLoaded = function() {
+      return this.ok != null;
+    };
+    ImageView.prototype.zoom = function(how, how2) {
+      var h, mh, mw, w;
       if (how != null) {
         this.z = how;
-        if (how === "fit") {
-          this.view.css("max-height", this.e.parent().css("max-height"));
-        } else {
-          this.view.css("max-height", "none");
-          this.z = "";
+        this.zhow = how2;
+        if (this.ok != null) {
+          w = h = mw = mh = "";
+          if (how instanceof Array) {
+            mw = how[0];
+            mh = how[1];
+          } else {
+            this.z = parseFloat(how) || 1;
+            mw = Math.floor(this.z * this.width);
+            mh = Math.floor(this.z * this.height);
+          }
+          if (how2 !== "fit") {
+            if (this.width / this.height < mw / mh) {
+              h = mh;
+            } else {
+              w = mw;
+            }
+          }
+          this.view.css({
+            'max-width': mw,
+            'max-height': mh,
+            width: w,
+            height: h
+          });
         }
+        return this;
       } else {
         return this.z;
       }
-      return this;
     };
     ImageView.prototype.keyPress = function(ev) {
       var keyname;
@@ -1322,7 +1465,7 @@
           z = this.oldzoom;
         } else {
           lay = [1, 1];
-          z = "";
+          z = 1;
         }
         this.oldlay = this.layout();
         this.oldzoom = this.zoom();
@@ -1331,14 +1474,20 @@
       },
       '*': function() {
         this.layout([1, 1]);
-        return this.zoom("");
+        return this.zoom(1);
       },
       '/': function() {
         if (this.zoom() === "fit") {
-          return this.zoom("");
+          return this.zoom(1);
         } else {
           return this.zoom("fit");
         }
+      },
+      '+': function() {
+        return this.zoom("+");
+      },
+      'MINUS': function() {
+        return this.zoom("-");
       },
       HOME: function() {
         return this.select(0);
@@ -1367,26 +1516,64 @@
     };
     function Viewer() {
       Viewer.__super__.constructor.apply(this, arguments);
-      this.e.addClass("viewer").keydown(this.keyPress.bind(this));
-      this.table = $("<table>").appendTo(this.e);
+      this.e.addClass("viewer").keydown(this.keyPress.bind(this)).resize(this.update.bind(this)).one("scroll.mokaViewerScroll", this.onScroll.bind(this)).mousedown(function(ev) {
+        if (ev.button === 0) {
+          return dragScroll(ev);
+        }
+      }).css("cursor", "move");
+      this.table = $("<table>", {
+        "class": "table",
+        cellSpacing: 0,
+        cellPadding: 0
+      }).appendTo(this.e).bind("mokaFocused", __bind(function(ev) {
+        var e;
+        e = $(ev.target).parents(".view:last");
+        if (!e.length) {
+          return;
+        }
+        this.current = e.data("index");
+        return e.addClass("current").attr('tabindex', -1);
+      }, this)).bind("mokaLostFocus", __bind(function(ev) {
+        var e;
+        e = $(ev.target).parents(".view:last");
+        if (this.current !== e.data("index")) {
+          return;
+        }
+        this.current = -1;
+        return e.removeClass("current").attr('tabindex', -1);
+      }, this));
       this.cells = [];
       this.items = [];
       this.index = 0;
       this.current = -1;
-      this.preload = 2;
+      this.preload_count = 2;
       this.layout([1, 1]);
-      $(window).resize(this.update.bind(this));
+      this.zoom(1);
     }
     Viewer.prototype.show = function() {
       this.e.show();
       return this.update();
     };
     Viewer.prototype.update = function() {
-      var w;
+      var id, w;
       if (!this.e.is(":visible")) {
         return;
       }
+      if (this.current >= 0) {
+        id = this.index + this.current;
+      }
+      if (this.lastlay !== this.lay) {
+        this.lastlay = this.lay;
+        this.updateTable();
+      }
       this.view(this.index);
+      if (this.zhow === "fit") {
+        this.zoom(this.zhow);
+      }
+      this.onScroll();
+      if (id != null) {
+        this.select(id);
+      }
       w = this.items;
       $.each(w, function(i) {
         var _base;
@@ -1397,6 +1584,8 @@
       return this;
     };
     Viewer.prototype.append = function(widget) {
+      var id;
+      id = this.items.length;
       this.items.push(widget);
       this.update();
       return this;
@@ -1415,7 +1604,7 @@
       return this.items.length;
     };
     Viewer.prototype.view = function(id) {
-      var flood, item, len, olditems, _i, _len;
+      var flood, i, len;
       if (id >= this.length()) {
         return this;
       }
@@ -1423,62 +1612,96 @@
         id = 0;
       }
       flood = function(from, to, i, dir) {
-        var cell, e, item, nextflood, self;
+        var cell, container, e, item, nextflood, _i, _ref, _results;
         if (i >= to || i < 0) {
-          this.preloadNext();
+          this.preload((function() {
+            _results = [];
+            for (var _i = i, _ref = i + this.preload_count; i <= _ref ? _i < _ref : _i > _ref; i <= _ref ? _i += 1 : _i -= 1){ _results.push(_i); }
+            return _results;
+          }).call(this));
           return;
         }
-        cell = this.cells[i];
-        item = this.items[from + i];
+        cell = this.cell(i);
+        item = this.at(from + i);
         cell.empty();
         if (item) {
           cell.attr("tabindex", 0);
           e = item.e ? item.e : item;
-          e.appendTo(cell);
-          self = this;
-          nextflood = flood.bind(this, from, to, i + dir, dir);
-          item.e.one("mokaLoaded", __bind(function(ev) {
-            $(ev.target).unbind();
-            this.zoom(this.z, from + i);
+          container = $("<div>", {
+            "class": "container"
+          }).css({
+            width: this.e.width(),
+            height: this.e.height()
+          }).appendTo(cell);
+          e.appendTo(container);
+          nextflood = __bind(function(ev, error) {
+            if (error) {
+              item.hide();
+            } else {
+              if (item.zoom) {
+                item.zoom(this.z, this.zhow);
+              }
+            }
+            return flood.apply(this, [from, to, i + dir, dir]);
+          }, this);
+          if (this.lay[0] > 0 && this.lay[1] > 0) {
+            if (item.isLoaded()) {
+              item.show();
+              return nextflood();
+            } else {
+              item.e.one("mokaDone", nextflood);
+              return item.show();
+            }
+          } else {
+            item.e.hide();
             return nextflood();
-          }, this));
-          item.e.one("mokaError", __bind(function(ev) {
-            $(ev.target).unbind();
-            item.hide();
-            return nextflood();
-          }, this));
-          return item.show();
+          }
         } else {
           return cell.attr("tabindex", -1);
         }
       };
       len = this.cells.length;
-      olditems = this.items.slice(this.index, this.index + len);
-      for (_i = 0, _len = olditems.length; _i < _len; _i++) {
-        item = olditems[_i];
-        item.hide().e.remove();
+      if (!len) {
+        return;
       }
       this.index = Math.floor(id / len) * len;
-      flood.apply(this, [this.index, len, id % len, 1]);
-      flood.apply(this, [this.index, len, id % len - 1, -1]);
+      i = id % len;
+      dbg("displaying views", this.index + ".." + (this.index + len - 1));
+      flood.apply(this, [this.index, len, i, 1]);
+      flood.apply(this, [this.index, len, i - 1, -1]);
       return this;
     };
-    Viewer.prototype.preloadNext = function() {
-      var i, item, len, _results;
-      i = this.index + this.visibleItems();
-      len = Math.min(this.length(), i + this.preload);
-      _results = [];
-      while (i < len) {
-        item = this.items[i];
-        if (item.show) {
-          item.show();
+    Viewer.prototype.preload = function(indexes) {
+      var preloader;
+      preloader = function(indexes) {
+        var i, item, next;
+        if (indexes.length === 0) {
+          return;
         }
-        _results.push(++i);
-      }
-      return _results;
+        i = indexes[0];
+        next = preloader.bind(this, indexes.slice(1));
+        if ((0 < i && i < this.length())) {
+          item = this.items[i];
+          if (item.isLoaded()) {
+            item.show();
+            next();
+          } else {
+            item.e.one("mokaDone", next);
+          }
+          return item.show();
+        } else {
+          return next();
+        }
+      };
+      (preloader.bind(this, indexes))();
+      return this;
     };
     Viewer.prototype.select = function(id) {
       var cell, count, _ref;
+      dbg("selecting view", id);
+      if (!this.e.is(":visible")) {
+        return this;
+      }
       if (id < 0 || id >= this.length()) {
         return this;
       }
@@ -1486,66 +1709,78 @@
       if (id < this.index || id >= this.index + count) {
         this.view(id);
       }
-      cell = this.cells[id % count];
+      this.e.unbind("scroll.mokaViewerScroll");
+      cell = this.cell(id % count);
       focus_first(cell) || ((_ref = cell[0]) != null ? _ref.focus() : void 0);
+      this.onScroll();
       return this;
     };
     Viewer.prototype.indexOnPage = function() {
       return this.current;
     };
-    Viewer.prototype.zoom = function(how, index) {
-      var cell_css, h, i, item, len, pos, row_css, w, wnd;
+    Viewer.prototype.zoom = function(how) {
+      var d, factor, h, i, item, layout, len, offset, pos, s, w, wnd, _i, _len, _ref;
       if (how != null) {
-        this.z = how;
+        this.zhow = how;
         if (how === "fit") {
-          wnd = $(window);
-          pos = this.table.offset();
-          w = (wnd.width() - pos.left) / this.lay[0] - 8 + "px";
-          h = (wnd.height() - pos.top) / this.lay[1] - 8 + "px";
-          row_css = {
-            'max-height': h,
-            'height': h
-          };
-          cell_css = {
-            'max-width': w,
-            'width': w,
-            'max-height': h,
-            'height': h
-          };
-        } else {
-          this.z = "";
-          row_css = cell_css = {
-            'max-width': "none",
-            width: "auto",
-            'max-height': "none",
-            height: "auto"
-          };
+          layout = this.layout();
+          if (this.lay[0] <= 0) {
+            layout[0] = 1;
+          } else if (this.lay[1] <= 0) {
+            layout[1] = 1;
+          }
+          wnd = this.e.parent();
+          offset = wnd.offset();
+          pos = this.e.offset();
+          pos.top -= offset.top;
+          pos.left -= offset.left;
+          w = (wnd.width() - pos.left) / layout[0];
+          h = (wnd.height() - pos.top) / layout[1];
+          _ref = [this.table.cellSpacing, this.table.cellPadding, this.table.border];
+          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+            s = _ref[_i];
+            if (s) {
+              w += layout[0] * s;
+              h += layout[0] * s;
+            }
+          }
+          this.z = [w, h];
+        } else if (how === "+" || how === "-") {
+          d = 1.125;
+          if (how === "-") {
+            d = 1 / d;
+          }
+          if (!this.z) {
+            this.z = 1 * d;
+          } else if (this.z instanceof Array) {
+            this.z[0] *= d;
+            this.z[1] *= d;
+          }
+        } else if (!how instanceof Array) {
+          factor = parseFloat(how) || 1;
+          this.z = factor;
         }
+        i = this.index;
+        len = i + this.visibleItems();
+        len = Math.min(len, this.length());
+        dbg("zooming views ", i + ".." + (len - 1), " using method ", this.zhow, this.z);
+        while (i < len) {
+          item = this.at(i);
+          if (item.zoom) {
+            item.zoom(this.z, this.zhow);
+          }
+          ++i;
+        }
+        this.onScroll();
+        return this;
       } else {
         return this.z;
       }
-      this.table.find(".row").css(row_css);
-      this.table.find(".view").css(cell_css);
-      if (index) {
-        i = index;
-        len = index + 1;
-      } else {
-        i = this.index;
-        len = i + this.visibleItems();
-      }
-      len = Math.min(len, this.length());
-      while (i < len) {
-        item = this.items[i];
-        if (item.zoom) {
-          item.zoom(how);
-        }
-        ++i;
-      }
-      this.z = how;
-      return this;
     };
     Viewer.prototype.visibleItems = function() {
-      return this.lay[0] * this.lay[1];
+      var layout;
+      layout = this.layout();
+      return layout[0] * layout[1];
     };
     Viewer.prototype.next = function() {
       this.select(this.index + this.current + 1);
@@ -1556,11 +1791,11 @@
       return this;
     };
     Viewer.prototype.nextRow = function() {
-      this.select(this.index + this.indexOnPage() + this.lay[0]);
+      this.select(this.index + this.indexOnPage() + this.layout()[0]);
       return this;
     };
     Viewer.prototype.prevRow = function() {
-      this.select(this.index + this.indexOnPage() - this.lay[0]);
+      this.select(this.index + this.indexOnPage() - this.layout()[0]);
       return this;
     };
     Viewer.prototype.nextPage = function() {
@@ -1571,55 +1806,167 @@
       this.select(this.index - this.visibleItems());
       return this;
     };
+    Viewer.prototype.appendRow = function() {
+      return $("<tr>", {
+        "class": "row"
+      }).hide().appendTo(this.table);
+    };
+    Viewer.prototype.appendCell = function(row) {
+      var cell;
+      cell = $("<td>", {
+        "class": "widget input view"
+      }).data("index", this.cells.length).hide().focus(function() {
+        return focus_first(cell);
+      }).appendTo(row);
+      this.cells.push(cell);
+      return cell;
+    };
+    Viewer.prototype.cell = function(index) {
+      return this.cells[index];
+    };
     Viewer.prototype.updateTable = function() {
-      var cell, i, id, ilen, j, jlen, n, row;
+      var cell, i, ilen, j, jlen, layout, row, _results;
       this.table.empty();
       this.cells = [];
-      ilen = this.lay[0];
-      jlen = this.lay[1];
-      n = 0;
+      layout = this.layout();
+      ilen = layout[0];
+      jlen = layout[1];
       j = 0;
+      _results = [];
       while (j < jlen) {
-        row = $("<tr>", {
-          "class": "widget row"
-        });
+        row = this.appendRow();
         i = 0;
-        while (i < ilen) {
-          cell = $("<td>", {
-            "class": "widget input view"
-          }).focus(function() {
-            return focus_first($(this));
-          }).appendTo(row);
-          cell.bind("mokaFocused", (function(e, n) {
-            this.current = n;
-            return e.addClass("current").attr('tabindex', -1);
-          }).bind(this, cell, n));
-          cell.bind("mokaLostFocus", (function(e) {
-            this.current = -1;
-            return e.removeClass("current").attr('tabindex', -1);
-          }).bind(this, cell));
-          this.cells.push(cell);
-          ++i;
-          ++n;
+        while (++i <= ilen) {
+          cell = this.appendCell(row);
+          cell.show();
         }
-        row.appendTo(this.table);
-        ++j;
+        row.show();
+        _results.push(++j);
       }
-      if (this.current >= 0) {
-        id = this.index + this.current;
-      }
-      this.update();
-      if (id != null) {
-        return this.select(id);
-      }
+      return _results;
     };
     Viewer.prototype.layout = function(layout) {
+      var i, j;
       if (!layout) {
-        return this.lay;
+        i = this.lay[0];
+        j = this.lay[1];
+        if (i <= 0) {
+          i = this.length();
+          j = 1;
+        } else if (j <= 0) {
+          i = 1;
+          j = this.length();
+        }
+        return [i, j];
       }
+      dbg("setting layout", layout);
       this.lay = layout;
-      this.updateTable();
+      this.update();
       return this;
+    };
+    Viewer.prototype.showItem = function(index) {
+      var cell, h, item, p, scroll2, scrolld, sz2, updateSize;
+      if (this.lay[0] <= 0) {
+        sz2 = "height";
+        scroll2 = "scrollTop";
+      } else if (this.lay[1] <= 0) {
+        sz2 = "width";
+        scroll2 = "scrollLeft";
+      } else {
+        return;
+      }
+      cell = this.cells[index];
+      item = this.at(index);
+      p = this.table;
+      h = p[sz2]();
+      scrolld = h / 2 - this.e[scroll2]();
+      updateSize = __bind(function() {
+        var h2, w;
+        dbg("item", index, "loaded in continuous layout");
+        if (scrolld) {
+          h2 = p[sz2]();
+          if (h < h2) {
+            p[sz2](h2);
+            this.e[scroll2](h2 / 2 - scrolld);
+          }
+        }
+        h = cell.outerHeight();
+        w = cell.outerWidth();
+        item.e.parent().css({
+          width: "",
+          height: ""
+        });
+        return this.onScroll();
+      }, this);
+      if (item.isLoaded()) {
+        item.show();
+        return updateSize();
+      } else {
+        item.e.parent().css({
+          width: "",
+          height: ""
+        });
+        item.e.one("mokaDone", updateSize);
+        return item.show();
+      }
+    };
+    Viewer.prototype.hideItem = function(index) {
+      var cell, h, item, w;
+      item = this.at(index);
+      cell = this.cells[index % this.visibleItems()];
+      if (item.e.is(":visible")) {
+        dbg("hiding item", index, "in continuos view");
+        h = cell.outerHeight();
+        w = cell.outerWidth();
+        item.hide();
+        return item.e.parent().css({
+          width: w,
+          height: h
+        });
+      }
+    };
+    Viewer.prototype.onScroll = function() {
+      var cell, dir, i, item, max, min, pos, preloaded, scroll, sz;
+      this.e.unbind("scroll.mokaViewerScroll");
+      if (this.lay[0] <= 0) {
+        dir = "left";
+        sz = "width";
+        scroll = "scrollLeft";
+      } else if (this.lay[1] <= 0) {
+        dir = "top";
+        sz = "height";
+        scroll = "scrollTop";
+      } else {
+        this.e.one("scroll", this.onScroll.bind(this));
+        return;
+      }
+      min = this.e.offset()[dir];
+      i = 0;
+      while ((cell = this.cells[i]) && (pos = cell.offset()[dir] + cell[sz]()) < min) {
+        if (pos < min - this.e.width()) {
+          this.hideItem(this.index + i);
+        }
+        ++i;
+      }
+      max = min + this.e[sz]();
+      preloaded = 0;
+      while ((cell = this.cells[i]) && (((pos = cell.offset()[dir]) < max) || ++preloaded <= this.preload_count)) {
+        item = this.at(this.index + i);
+        if (!item.e.is(":visible")) {
+          break;
+        }
+        ++i;
+      }
+      if (cell && !item.e.is(":visible")) {
+        this.showItem(i);
+        return;
+      } else {
+        while (cell = this.cells[i]) {
+          this.hideItem(this.index + i);
+          ++i;
+        }
+        return this.e.one("scroll", this.onScroll.bind(this));
+      }
     };
     Viewer.prototype.keyPress = function(ev) {
       var keyname;
@@ -1634,7 +1981,8 @@
   })();
   Window = (function() {
     __extends(Window, Widget);
-    Window.prototype.default_keys = {
+    Window.prototype.default_keys = {};
+    Window.prototype.default_title_keys = {
       LEFT: function() {
         var pos;
         pos = this.e.offset();
@@ -1703,34 +2051,98 @@
       }
     };
     function Window(title) {
-      var body;
+      var body, e, edge, edges, s, self;
       Window.__super__.constructor.apply(this, arguments);
+      self = this;
       this.e.addClass("window").keydown(this.keyPress.bind(this)).hide();
+      e = this.container = $("<div>").css({
+        width: "100%",
+        height: "100%"
+      }).appendTo(this.e);
       $(window).resize(this.update.bind(this));
       this.title = $("<div>", {
         'class': "title",
         'html': title,
         tabindex: 0
-      }).css('cursor', "pointer").appendTo(this.e).keydown(this.keyPress.bind(this));
+      }).css('cursor', "pointer").keydown(this.keyPressTitle.bind(this)).appendTo(e);
       $("<div>", {
-        'class': "close",
-        'html': "&#8854"
+        'class': "window_control close"
       }).css('cursor', "pointer").click(this.hide.bind(this)).appendTo(this.title);
+      $("<div>", {
+        'class': "window_control maximize"
+      }).css('cursor', "pointer").click(this.maximize.bind(this)).appendTo(this.title);
       this.body = body = $("<div>", {
         "class": "body"
-      }).appendTo(this.e);
+      }).appendTo(e);
       this.title.dblclick(function() {
         body.toggle();
         focus_first(body);
         return false;
       }).click(function() {
-        focus_first(body);
-        return false;
+        return this.focus();
       }).mousedown(function(ev) {
         return ev.preventDefault();
       });
+      edges = {
+        n: [1, 1, 0, 1, 0, 1, "n"],
+        e: [1, 1, 1, 0, 1, 0, "e"],
+        s: [0, 1, 1, 1, 0, 1, "s"],
+        w: [1, 0, 1, 1, 1, 0, "w"],
+        ne: [1, 1, 0, 0, 1, 1, "ne"],
+        se: [0, 1, 1, 0, 1, 1, "se"],
+        sw: [0, 0, 1, 1, 1, 1, "sw"],
+        nw: [1, 0, 0, 1, 1, 1, "nw"]
+      };
+      for (edge in edges) {
+        s = edges[edge];
+        $("<div>", {
+          "class": "edge " + edge.split("").join(" ")
+        }).css({
+          position: "absolute",
+          top: s[0] && "-2px" || "",
+          right: s[1] && "-2px" || "",
+          bottom: s[2] && "-2px" || "",
+          left: s[3] && "-2px" || "",
+          width: s[4] && "8px" || "",
+          height: s[5] && "8px" || "",
+          cursor: s[6] + "-resize"
+        }).appendTo(e).mousedown(function(ev) {
+          var $this, x, y;
+          x = ev.pageX;
+          y = ev.pageY;
+          $this = $(this);
+          $(document).bind("mousemove.mokaResize", function(ev) {
+            var dx, dy, pos;
+            dx = ev.pageX - x;
+            dy = ev.pageY - y;
+            x += dx;
+            y += dy;
+            pos = self.position();
+            if ($this.hasClass("n")) {
+              body.height(body.height() - dy);
+              pos.top += dy;
+            }
+            if ($this.hasClass("e")) {
+              body.width(body.width() + dx);
+            }
+            if ($this.hasClass("s")) {
+              body.height(body.height() + dy);
+            }
+            if ($this.hasClass("w")) {
+              body.width(body.width() - dx);
+              pos.left += dx;
+            }
+            self.position(pos.left, pos.top);
+            return self.update();
+          });
+          $(document).one("mouseup", function() {
+            return $(document).unbind("mousemove.mokaResize");
+          });
+          return false;
+        });
+      }
       this.widgets = [];
-      draggable(this.e, this.title);
+      initDraggable(this.e, this.title);
       $(window).load((function() {
         return this.update();
       }).bind(this));
@@ -1771,7 +2183,37 @@
       return this;
     };
     Window.prototype.focus = function() {
-      return this.title[0].focus();
+      this.title[0].focus();
+      return this;
+    };
+    Window.prototype.position = function(x, y) {
+      var pos;
+      if (x != null) {
+        pos = this.e.parent().offset();
+        this.e.offset({
+          left: pos.left + x,
+          top: pos.top + y
+        });
+        return this;
+      } else {
+        return this.e.offset();
+      }
+    };
+    Window.prototype.resize = function(w, h) {
+      this.body.width(w).height(h);
+      this.update();
+      return this;
+    };
+    Window.prototype.maximize = function() {
+      var p, pos, pos2;
+      this.position(0, 0);
+      p = this.e.parent();
+      pos = this.body.offset();
+      pos2 = p.offset();
+      pos.left += pos2.left;
+      pos.top += pos2.top;
+      this.resize(p.width() - pos.left, p.height() - pos.top);
+      return this;
     };
     Window.prototype.nextWindow = function(left_or_top, direction) {
       var d, e, wnds, x, _ref;
@@ -1800,6 +2242,13 @@
         return false;
       }
       if (doKey(keyname, this.keys, this.default_keys, this)) {
+        return false;
+      }
+    };
+    Window.prototype.keyPressTitle = function(ev) {
+      var keyname;
+      keyname = getKeyName(ev);
+      if (doKey(keyname, this.keys, this.default_title_keys, this)) {
         return false;
       }
     };
@@ -1849,17 +2298,28 @@
     return wnd.focus();
   };
   onLoad = function() {
-    var item, items, onLoad, v, _i, _len;
+    var item, items, map, onLoad, v, wnd, _i, _len;
     onLoad = void 0;
     init_GUI();
-    items = ["file:///home/lukas/Pictures/drawings/Arantza/arantza001.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza002.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza003.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza004.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza005.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza006.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza007.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza009.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza010.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza011.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza012.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza013.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza014.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza015.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza016.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza017.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza018.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza021.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza022.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza023.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza024.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza025.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza026.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza027.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza028.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza030.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza031.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza032.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza033.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza034.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza035.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza036.jpg", "file:///home/lukas/Pictures/drawings/Arantza/arantza037.jpg"];
-    v = new Viewer().layout([2, 1]).zoom("");
+    items = ["file:///home/lukas/Pictures/paintings/Andrew Gonzales/AlbedoSublimis.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AeternaSaltatus.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/amore.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Magia of the Heart.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Aura Gloriae.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/In The Wake of the.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Sapientia.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Seraphim Awakening.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/SirensDream.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Soror Mystica.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Telluric Womb.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Angel of Nekyia.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Breath of Dakini.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Love of Souls.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Oracle of the Pearl.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Summoning of the Muse.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Visitation.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/UnioMystica.jpg", "file:///home/lukas/Pictures/paintings/blackeri/_Color_Me_Blood_Red__by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/Eros_Psyche_by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/_Kohtalo_.jpg", "file:///home/lukas/Pictures/paintings/blackeri/_MoonGoddess__by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/_Seven_Deadly_Sins__ENVY__by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__AVARICE_by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__LUST_by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__VANITY_by_blackeri.jpg"];
+    map = {};
+    location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m, key, value) {
+      return map[key] = value;
+    });
+    v = new Viewer().layout(map.layout.split("x"));
     for (_i = 0, _len = items.length; _i < _len; _i++) {
       item = items[_i];
       v.append(new ImageView(item));
     }
-    v.e.appendTo("body");
-    return v.show();
+    wnd = new Window("HELP").append(v).resize(500, 300).show();
+    wnd.e.appendTo("body");
+    wnd.focus();
+    wnd = new Window("HELP").append(createLabel("Double click on the button to add new window!")).append(new Button("Add _New Window", test)).show();
+    wnd.e.css({
+      right: 0,
+      bottom: 0
+    }).appendTo("body");
+    return v.zoom("fit");
   };
   $(document).ready(onLoad);
 }).call(this);

@@ -19,7 +19,7 @@ input, textarea, .tabs, .input, .close, .title {
 
 .window .title:hover, .tab:hover, .tabs:hover, .widgetlistitem:hover, .button:hover, .viewer .view:hover {
   color: black;
-  background-color: rgba(0, 170, 255, 0.1); }
+  background-color: rgba(0, 170, 255, 0.3); }
 
 .keyhint {
   text-decoration: underline; }
@@ -262,17 +262,21 @@ input, textarea, .tabs, .input, .close, .title {
   .widgetlistitem.focused, .widgetlistitem:nth-child(even).focused {
     background-color: rgba(0, 170, 255, 0.7); }
   .widgetlistitem:hover, .widgetlistitem:nth-child(even):hover {
-    background-color: rgba(0, 170, 255, 0.1); }
+    background-color: rgba(0, 170, 255, 0.3); }
 
-.viewer table {
+.viewer {
   width: 100%;
-  height: 100%; }
+  height: 100%;
+  overflow: auto; }
 
 .viewer .view {
   overflow: auto;
   text-align: center; }
 
-.imageview {
+.viewer .table {
+  margin: auto; }
+
+.view .container {
   margin: auto; }
 
 .window {
@@ -294,11 +298,15 @@ input, textarea, .tabs, .input, .close, .title {
   border-radius: 0px;
   -moz-border-radius: 0px;
   -webkit-border-radius: 0px; }
+  .window .body {
+    max-width: 100%;
+    max-height: 100%;
+    overflow: auto; }
   .window .title, .window .body {
     margin: 3px 3px; }
   .window .title {
     font: 11pt "Molengo", sans-serif;
-    padding: 0.1em 2em;
+    padding: 0.1em 0.5em;
     color: rgba(0, 0, 0, 0.8);
     background-color: #cccccc;
     border-radius: 0px;
@@ -319,12 +327,16 @@ input, textarea, .tabs, .input, .close, .title {
       .window.focused .title:focus {
         color: black;
         background-color: rgba(0, 255, 255, 0.7); }
-  .window .close {
-    position: absolute;
-    top: 1px;
-    left: 6px;
-    font-size: 1.3em;
-    padding: 0 4px; }
-  .window .close:hover, .window .close:focus {
-    color: white;
-    text-shadow: #ddd 0 0 7px; }
+  .window .window_control {
+    opacity: 0.5;
+    float: left; }
+    .window .window_control:hover, .window .window_control:focus {
+      opacity: 1;
+      color: white;
+      text-shadow: #ddd 0 0 7px; }
+  .window .close:before {
+    content: '\2297'; }
+  .window .maximize {
+    padding-right: 0.5em; }
+    .window .maximize:before {
+      content: '\2299'; }

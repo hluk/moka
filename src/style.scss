@@ -37,7 +37,7 @@ $widget_current_fg: black;
 $widget_current_bg:  transparentize(#6af, 0.3);
 // hover
 $widget_hover_fg: black;
-$widget_hover_bg: transparentize($widget_selected_bg, 0.6);
+$widget_hover_bg: transparentize($widget_selected_bg, 0.4);
 
 // button
 $button_selected_fg: black;
@@ -378,7 +378,6 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
 }
 .pages {
     float: left;
-    //display: inline;
 }
 .widgetlist {
     margin:auto;
@@ -415,15 +414,17 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         }
     }
 }
-.viewer table {
+.viewer {
     width: 100%;
     height: 100%;
+    overflow: auto;
 }
 .viewer .view {
     overflow: auto;
     text-align: center;
 }
-.imageview {margin:auto}
+.viewer .table {margin:auto}
+.view .container {margin:auto}
 .window {
 	color: transparentize(white, 0.6);
 
@@ -435,12 +436,17 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     @include rounded(5px);
     @include outset();
     @include rounded($window_radius);
+    .body {
+        max-width: 100%;
+        max-height: 100%;
+        overflow: auto;
+    }
     .title, .body {
         margin: 3px 3px;
     }
     .title {
         font: $font_header;
-        padding: 0.1em 2em;
+        padding: 0.1em 0.5em;
 
         color: transparentize($widget_fg, 0.2);
         background-color: $widget_bg;
@@ -459,17 +465,26 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
             }
         }
     }
-    .close {
-        position:absolute;
-        top:1px;
-        left:6px;
-        font-size: 1.3em;
-
-        padding: 0 4px;
+    // button characters at: http://www.utf8-chartable.de/unicode-utf8-table.pl
+    .window_control {
+        opacity: 0.5;
+        float: left;
+        &:hover, &:focus {
+            opacity: 1;
+            color: white;
+            text-shadow: #ddd 0 0 7px;
+        }
     }
-    .close:hover, .close:focus {
-        color: white;
-        text-shadow: #ddd 0 0 7px;
+    .close {
+        &:before {
+          content: '\2297';
+        }
+    }
+    .maximize {
+        padding-right: 0.5em;
+        &:before {
+          content: '\2299';
+        }
     }
 }
 

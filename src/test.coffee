@@ -71,40 +71,34 @@ onLoad = () -># {{{
 
     init_GUI()
 
+    # vim cmd: .!cd ??? && ls|sed 's_^_        "file://'"$PWD"'/_;s/$/",/g'
     items = [
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza001.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza002.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza003.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza004.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza005.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza006.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza007.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza009.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza010.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza011.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza012.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza013.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza014.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza015.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza016.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza017.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza018.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza021.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza022.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza023.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza024.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza025.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza026.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza027.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza028.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza030.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza031.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza032.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza033.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza034.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza035.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza036.jpg",
-        "file:///home/lukas/Pictures/drawings/Arantza/arantza037.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AlbedoSublimis.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AeternaSaltatus.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/amore.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Magia of the Heart.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Aura Gloriae.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/In The Wake of the.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Sapientia.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Seraphim Awakening.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/SirensDream.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Soror Mystica.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Telluric Womb.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Angel of Nekyia.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Breath of Dakini.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Love of Souls.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Oracle of the Pearl.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Summoning of the Muse.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Visitation.jpg",
+        "file:///home/lukas/Pictures/paintings/Andrew Gonzales/UnioMystica.jpg",
+        "file:///home/lukas/Pictures/paintings/blackeri/_Color_Me_Blood_Red__by_blackeri.jpg",
+        "file:///home/lukas/Pictures/paintings/blackeri/Eros_Psyche_by_blackeri.jpg",
+        "file:///home/lukas/Pictures/paintings/blackeri/_Kohtalo_.jpg",
+        "file:///home/lukas/Pictures/paintings/blackeri/_MoonGoddess__by_blackeri.jpg",
+        "file:///home/lukas/Pictures/paintings/blackeri/_Seven_Deadly_Sins__ENVY__by_blackeri.jpg",
+        "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__AVARICE_by_blackeri.jpg",
+        "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__LUST_by_blackeri.jpg",
+        "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__VANITY_by_blackeri.jpg",
         #"http://th00.deviantart.net/fs71/150/f/2010/291/f/4/emoticon_complete_set_by_deviantwear-d2eyuej.jpg",
         #"BAD.PNG"
         #"http://fc02.deviantart.net/fs70/i/2011/004/2/6/hand_study_by_moni158-d36ghy8.png",
@@ -147,19 +141,33 @@ onLoad = () -># {{{
         #"http://th08.deviantart.net/fs70/150/i/2010/118/d/b/Acrylic_training_3_by_Pendalune.jpg",
     ]
 
-    v = new Viewer()
-       .layout([2,1])
-       .zoom("")
-    v.append( new ImageView(item) ) for item in items
-    v.e.appendTo("body")
-    v.show()
+    map = {}
+    location.search.replace( /[?&]+([^=&]+)=([^&]*)/gi,
+        (m,key,value) -> map[key] = value )
 
-    #wnd = new Window("HELP")
-         #.append( createLabel("Double click on the button to add new window!") )
-         #.append( new Button("Add _New Window", test) )
-         #.show()
-    #wnd.e.css({'right':0, 'bottom':0}).appendTo("body")
+    v = new Viewer()
+       .layout(map.layout.split("x"))
+       #.layout([2,1])
+       #.layout([0,1])
+    v.append( new ImageView(item) ) for item in items
+    #v.e.appendTo("body")
+    #v.show()
+
+    wnd = new Window("HELP")
+         .append(v)
+         .resize(500, 300)
+         .show()
+    wnd.e.appendTo("body")
+    wnd.focus()
+
+    wnd = new Window("HELP")
+         .append( createLabel("Double click on the button to add new window!") )
+         .append( new Button("Add _New Window", test) )
+         .show()
+    wnd.e.css(right:0, bottom:0).appendTo("body")
     #wnd.focus()
+
+    v.zoom("fit")
 # }}}
 
 $(document).ready(onLoad)
