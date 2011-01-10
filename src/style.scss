@@ -1,4 +1,4 @@
-$remote_files: 1;
+$remote_files: 0;
 
 /* serif */
 @if $remote_files == 1 {
@@ -64,8 +64,12 @@ $linenumber_fg: transparentize($edit_fg, 0.5);
 $linenumber_bg: transparent;
 $linenumber_current_fg: #a40;
 
+$imageview_padding: 4px;
+
 $window_layer:3;
 $top_window_layer:9999;
+$window_opacity: 0.5;
+$top_window_opacity: 1;
 
 $tab_radius: 2px;
 $item_radius: 3px;
@@ -141,20 +145,20 @@ body {
 
 input, textarea, .tabs, .input, .close, .title {outline: 0}
 
-.window .title, .tab, .widgetlistitem, .button, .viewer .view {
+.window .title, .tab, .widgetlistitem, .button, .imageview {
     &.focused {
         color: $widget_selected_fg;
         background-color: $widget_selected_bg;
     }
 }
 // hover
-.window .title, .tab, .tabs, .widgetlistitem, .button, .viewer .view {
+.window .title, .tab, .tabs, .widgetlistitem, .button, .imageviewer {
     &:hover {
         color: $widget_hover_fg;
         background-color: $widget_hover_bg;
     }
 }
-.keyhint {
+.focused .keyhint {
     text-decoration: underline;
 }
 .label {
@@ -414,19 +418,22 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         }
     }
 }
-.viewer {
+.viewer, .viewer table {
     width: 100%;
     height: 100%;
     overflow: auto;
 }
 .viewer .view {
-    overflow: auto;
     text-align: center;
 }
+.viewer .imageview {
+    display:inline-block;
+}
+.imageview img {padding:$imageview_padding}
 .viewer .table {margin:auto}
-.view .container {margin:auto}
 .window {
 	color: transparentize(white, 0.6);
+    opacity: $window_opacity;
 
 	z-index: $window_layer; /* on top */
 
@@ -456,6 +463,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     // focused window on top
     &.focused {
         z-index: $top_window_layer;
+        opacity: $top_window_opacity;
         .title {
             color: $widget_selected_fg;
             background-color: $widget_selected_bg;

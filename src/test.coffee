@@ -145,20 +145,29 @@ onLoad = () -># {{{
     location.search.replace( /[?&]+([^=&]+)=([^&]*)/gi,
         (m,key,value) -> map[key] = value )
 
+    # Viewer test {{{
     v = new Viewer()
        .layout(map.layout.split("x"))
        #.layout([2,1])
        #.layout([0,1])
+    #v.append(
+        #new ButtonBox().append("Button _1", () -> alert "click 1!")
+                       #.append("Button _2", () -> alert "click 2!")
+    #)
     v.append( new ImageView(item) ) for item in items
-    #v.e.appendTo("body")
-    #v.show()
 
-    wnd = new Window("HELP")
-         .append(v)
-         .resize(500, 300)
-         .show()
-    wnd.e.appendTo("body")
-    wnd.focus()
+    # Viwer in document
+    v.e.appendTo("body")
+    v.show()
+
+    # Viewer in window
+    #wnd = new Window("Viewer")
+         #.append(v)
+         #.resize(500, 300)
+         #.show()
+    #wnd.e.appendTo("body")
+    #wnd.focus()
+    # }}}
 
     wnd = new Window("HELP")
          .append( createLabel("Double click on the button to add new window!") )
@@ -167,7 +176,7 @@ onLoad = () -># {{{
     wnd.e.css(right:0, bottom:0).appendTo("body")
     #wnd.focus()
 
-    v.zoom("fit")
+    v.zoom(map.zoom)
 # }}}
 
 $(document).ready(onLoad)

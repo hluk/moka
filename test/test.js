@@ -1,5 +1,5 @@
 (function() {
-  var Button, ButtonBox, CheckBox, ImageView, Selection, Tabs, TextEdit, Viewer, Widget, WidgetList, Window, createLabel, dbg, doKey, dragScroll, ensure_position, ensure_visible, focus_first, focus_timestamp, focused_widget, getKeyName, initDraggable, init_GUI, is_on_screen, keyHintFocus, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, onLoad, test, tt, userAgent, userAgents, wnd_count;
+  var Button, ButtonBox, CheckBox, ImageView, Selection, Tabs, TextEdit, Viewer, Widget, WidgetList, Window, createLabel, dbg, doKey, dragScroll, ensure_position, ensure_visible, focus, focus_first, focus_timestamp, focused_widget, getKeyName, initDraggable, init_GUI, is_on_screen, keyHintFocus, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, onLoad, test, tt, userAgent, userAgents, wnd_count;
   var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -251,7 +251,7 @@
       }
       t = ev.timeStamp;
       dt = t - start;
-      if ((0 < dt && dt < 90) && (dx > 0 || dy > 0)) {
+      if ((0 < dt && dt < 90) && (dx !== 0 || dy !== 0)) {
         accel = 200 / dt;
         vx = dx * accel;
         vy = dy * accel;
@@ -273,11 +273,18 @@
   };
   focused_widget = $();
   focus_timestamp = 0;
+  focus = function(e) {
+    if (e.length) {
+      return window.setTimeout((function() {
+        return e[0].focus();
+      }), 0);
+    }
+  };
   focus_first = function(e) {
     var ee;
-    ee = e.find(".input:visible");
+    ee = e.find(".input:first");
     if (ee.length) {
-      ee[0].focus();
+      focus(ee);
       return true;
     } else {
       return false;
@@ -371,11 +378,12 @@
       }
       focus_timestamp = ev.timeStamp;
       focused_widget = $(ev.target);
-      focused_widget.trigger("mokaFocused");
-      return ensure_visible(focused_widget);
+      focused_widget.addClass("focused").trigger("mokaFocused");
+      ensure_visible(focused_widget);
+      return dbg("focused element", focused_widget);
     }).live("blur", function() {
       focused_widget = $();
-      return $(this).trigger("mokaLostFocus");
+      return $(this).removeClass("focused").trigger("mokaLostFocus");
     });
     $(".widget").live("focusin", function() {
       return $(this).addClass("focused");
@@ -1344,29 +1352,30 @@
     }
     ImageView.prototype.show = function() {
       if (this.ok != null) {
+        this.e.show();
+        this.zoom(this.z, this.zhow);
         this.e.trigger("mokaLoaded");
         this.e.trigger("mokaDone", [!this.ok]);
-        this.zoom(this.z, this.zhow);
       } else {
         this.view.one("load", __bind(function() {
           var e;
+          this.ok = true;
           e = this.view[0];
           this.width = e.width ? e.width : e.naturalWidth;
           this.height = e.height ? e.height : e.naturalHeight;
-          this.ok = true;
+          this.zoom(this.z, this.zhow);
           this.e.trigger("mokaLoaded");
-          this.e.trigger("mokaDone", [!this.ok]);
-          return this.zoom(this.z, this.zhow);
+          return this.e.trigger("mokaDone", [!this.ok]);
         }, this));
         this.view.one("error", __bind(function() {
-          this.width = this.height = 0;
           this.ok = false;
+          this.width = this.height = 0;
           this.e.trigger("mokaError");
           return this.e.trigger("mokaDone", [!this.ok]);
         }, this));
+        this.e.show();
         this.view.attr("src", this.src);
       }
-      this.e.show();
       return this;
     };
     ImageView.prototype.hide = function() {
@@ -1379,22 +1388,24 @@
       return this.ok != null;
     };
     ImageView.prototype.zoom = function(how, how2) {
-      var h, mh, mw, w;
+      var h, height, mh, mw, w, width;
       if (how != null) {
         this.z = how;
         this.zhow = how2;
         if (this.ok != null) {
+          width = this.view.outerWidth();
+          height = this.view.outerHeight();
           w = h = mw = mh = "";
           if (how instanceof Array) {
-            mw = how[0];
-            mh = how[1];
+            mw = how[0] - width + this.view.width();
+            mh = how[1] - height + this.view.height();
           } else {
             this.z = parseFloat(how) || 1;
             mw = Math.floor(this.z * this.width);
             mh = Math.floor(this.z * this.height);
           }
           if (how2 !== "fit") {
-            if (this.width / this.height < mw / mh) {
+            if (width / height < mw / mh) {
               h = mh;
             } else {
               w = mw;
@@ -1486,7 +1497,7 @@
       '+': function() {
         return this.zoom("+");
       },
-      'MINUS': function() {
+      MINUS: function() {
         return this.zoom("-");
       },
       HOME: function() {
@@ -1497,7 +1508,7 @@
       },
       PAGEUP: function() {
         var c;
-        c = this.visibleItems();
+        c = this.cellCount();
         if (this.current % c === 0) {
           return this.select(this.index - c);
         } else {
@@ -1506,17 +1517,29 @@
       },
       PAGEDOWN: function() {
         var c;
-        c = this.visibleItems();
+        c = this.cellCount();
         if ((this.current + 1) % c === 0) {
           return this.select(this.index + c);
         } else {
           return this.select(this.index + c - 1);
         }
+      },
+      H: function() {
+        return this.layout([this.lay[0] + 1, this.lay[1]]);
+      },
+      V: function() {
+        return this.layout([this.lay[0], this.lay[1] + 1]);
+      },
+      'S-H': function() {
+        return this.layout([this.lay[0] - 1, this.lay[1]]);
+      },
+      'S-V': function() {
+        return this.layout([this.lay[0], this.lay[1] - 1]);
       }
     };
     function Viewer() {
       Viewer.__super__.constructor.apply(this, arguments);
-      this.e.addClass("viewer").keydown(this.keyPress.bind(this)).resize(this.update.bind(this)).one("scroll.mokaViewerScroll", this.onScroll.bind(this)).mousedown(function(ev) {
+      this.e.addClass("viewer").keydown(this.keyPress.bind(this)).resize(this.update.bind(this)).bind("scroll.mokaViewerScroll", this.onScroll.bind(this)).mousedown(function(ev) {
         if (ev.button === 0) {
           return dragScroll(ev);
         }
@@ -1532,7 +1555,7 @@
           return;
         }
         this.current = e.data("index");
-        return e.addClass("current").attr('tabindex', -1);
+        return e.addClass("current");
       }, this)).bind("mokaLostFocus", __bind(function(ev) {
         var e;
         e = $(ev.target).parents(".view:last");
@@ -1540,8 +1563,9 @@
           return;
         }
         this.current = -1;
-        return e.removeClass("current").attr('tabindex', -1);
+        return e.removeClass("current");
       }, this));
+      this.updateTimestamp = 0;
       this.cells = [];
       this.items = [];
       this.index = 0;
@@ -1555,25 +1579,11 @@
       return this.update();
     };
     Viewer.prototype.update = function() {
-      var id, w;
+      var w;
       if (!this.e.is(":visible")) {
         return;
       }
-      if (this.current >= 0) {
-        id = this.index + this.current;
-      }
-      if (this.lastlay !== this.lay) {
-        this.lastlay = this.lay;
-        this.updateTable();
-      }
       this.view(this.index);
-      if (this.zhow === "fit") {
-        this.zoom(this.zhow);
-      }
-      this.onScroll();
-      if (id != null) {
-        this.select(id);
-      }
       w = this.items;
       $.each(w, function(i) {
         var _base;
@@ -1587,6 +1597,9 @@
       var id;
       id = this.items.length;
       this.items.push(widget);
+      if (this.lay[0] <= 0 || this.lay[1] <= 0) {
+        this.updateTable();
+      }
       this.update();
       return this;
     };
@@ -1604,71 +1617,34 @@
       return this.items.length;
     };
     Viewer.prototype.view = function(id) {
-      var flood, i, len;
+      var cell, i, item, len;
       if (id >= this.length()) {
         return this;
       }
       if (id < 0) {
         id = 0;
       }
-      flood = function(from, to, i, dir) {
-        var cell, container, e, item, nextflood, _i, _ref, _results;
-        if (i >= to || i < 0) {
-          this.preload((function() {
-            _results = [];
-            for (var _i = i, _ref = i + this.preload_count; i <= _ref ? _i < _ref : _i > _ref; i <= _ref ? _i += 1 : _i -= 1){ _results.push(_i); }
-            return _results;
-          }).call(this));
-          return;
-        }
+      i = 0;
+      len = this.cells.length;
+      this.index = Math.floor(id / len) * len;
+      dbg("displaying views", this.index + ".." + (this.index + len - 1));
+      while (i < len) {
         cell = this.cell(i);
-        item = this.at(from + i);
-        cell.empty();
+        item = this.at(this.index + i);
+        cell.children().detach();
         if (item) {
-          cell.attr("tabindex", 0);
-          e = item.e ? item.e : item;
-          container = $("<div>", {
-            "class": "container"
-          }).css({
+          cell.attr("tabindex", 1).css({
             width: this.e.width(),
             height: this.e.height()
-          }).appendTo(cell);
-          e.appendTo(container);
-          nextflood = __bind(function(ev, error) {
-            if (error) {
-              item.hide();
-            } else {
-              if (item.zoom) {
-                item.zoom(this.z, this.zhow);
-              }
-            }
-            return flood.apply(this, [from, to, i + dir, dir]);
-          }, this);
-          if (this.lay[0] > 0 && this.lay[1] > 0) {
-            if (item.isLoaded()) {
-              item.show();
-              return nextflood();
-            } else {
-              item.e.one("mokaDone", nextflood);
-              return item.show();
-            }
-          } else {
-            item.e.hide();
-            return nextflood();
-          }
+          });
+          item.e.hide().appendTo(cell);
         } else {
-          return cell.attr("tabindex", -1);
+          cell.attr("tabindex", "");
         }
-      };
-      len = this.cells.length;
-      if (!len) {
-        return;
+        ++i;
       }
-      this.index = Math.floor(id / len) * len;
-      i = id % len;
-      dbg("displaying views", this.index + ".." + (this.index + len - 1));
-      flood.apply(this, [this.index, len, i, 1]);
-      flood.apply(this, [this.index, len, i - 1, -1]);
+      this.zoom(this.zhow);
+      this.updateVisible(true);
       return this;
     };
     Viewer.prototype.preload = function(indexes) {
@@ -1697,26 +1673,23 @@
       return this;
     };
     Viewer.prototype.select = function(id) {
-      var cell, count, _ref;
-      dbg("selecting view", id);
+      var cell, count;
       if (!this.e.is(":visible")) {
         return this;
       }
       if (id < 0 || id >= this.length()) {
         return this;
       }
-      count = this.visibleItems();
+      dbg("selecting view", id);
+      count = this.cellCount();
+      this.current = id % count;
       if (id < this.index || id >= this.index + count) {
         this.view(id);
       }
-      this.e.unbind("scroll.mokaViewerScroll");
       cell = this.cell(id % count);
-      focus_first(cell) || ((_ref = cell[0]) != null ? _ref.focus() : void 0);
-      this.onScroll();
+      ensure_visible(this.at(id).e);
+      focus(cell);
       return this;
-    };
-    Viewer.prototype.indexOnPage = function() {
-      return this.current;
     };
     Viewer.prototype.zoom = function(how) {
       var d, factor, h, i, item, layout, len, offset, pos, s, w, wnd, _i, _len, _ref;
@@ -1736,6 +1709,7 @@
           pos.left -= offset.left;
           w = (wnd.width() - pos.left) / layout[0];
           h = (wnd.height() - pos.top) / layout[1];
+          log(w, h);
           _ref = [this.table.cellSpacing, this.table.cellPadding, this.table.border];
           for (_i = 0, _len = _ref.length; _i < _len; _i++) {
             s = _ref[_i];
@@ -1751,19 +1725,23 @@
             d = 1 / d;
           }
           if (!this.z) {
-            this.z = 1 * d;
-          } else if (this.z instanceof Array) {
+            this.z = 1;
+          }
+          if (this.z instanceof Array) {
             this.z[0] *= d;
             this.z[1] *= d;
+          } else {
+            this.z *= d;
+            log(this.z, d);
           }
-        } else if (!how instanceof Array) {
+        } else if (!(how instanceof Array)) {
           factor = parseFloat(how) || 1;
           this.z = factor;
         }
         i = this.index;
-        len = i + this.visibleItems();
+        len = i + this.cellCount();
         len = Math.min(len, this.length());
-        dbg("zooming views ", i + ".." + (len - 1), " using method ", this.zhow, this.z);
+        dbg("zooming views", i + ".." + (len - 1), "using method", this.z, this.zhow);
         while (i < len) {
           item = this.at(i);
           if (item.zoom) {
@@ -1771,16 +1749,17 @@
           }
           ++i;
         }
-        this.onScroll();
+        if (this.current >= 0) {
+          ensure_visible(this.at(this.index + this.current).e);
+        }
+        this.updateVisible();
         return this;
       } else {
         return this.z;
       }
     };
-    Viewer.prototype.visibleItems = function() {
-      var layout;
-      layout = this.layout();
-      return layout[0] * layout[1];
+    Viewer.prototype.cellCount = function() {
+      return this.cells.length;
     };
     Viewer.prototype.next = function() {
       this.select(this.index + this.current + 1);
@@ -1791,19 +1770,19 @@
       return this;
     };
     Viewer.prototype.nextRow = function() {
-      this.select(this.index + this.indexOnPage() + this.layout()[0]);
+      this.select(this.index + this.current + this.layout()[0]);
       return this;
     };
     Viewer.prototype.prevRow = function() {
-      this.select(this.index + this.indexOnPage() - this.layout()[0]);
+      this.select(this.index + this.current - this.layout()[0]);
       return this;
     };
     Viewer.prototype.nextPage = function() {
-      this.select(this.index + this.visibleItems());
+      this.select(this.index + this.cellCount());
       return this;
     };
     Viewer.prototype.prevPage = function() {
-      this.select(this.index - this.visibleItems());
+      this.select(this.index - this.cellCount());
       return this;
     };
     Viewer.prototype.appendRow = function() {
@@ -1812,12 +1791,13 @@
       }).hide().appendTo(this.table);
     };
     Viewer.prototype.appendCell = function(row) {
-      var cell;
-      cell = $("<td>", {
+      var cell, td;
+      td = $("<td>").appendTo(row);
+      cell = $("<div>", {
         "class": "widget input view"
-      }).data("index", this.cells.length).hide().focus(function() {
+      }).data("index", this.cells.length).focus(function() {
         return focus_first(cell);
-      }).appendTo(row);
+      }).appendTo(td);
       this.cells.push(cell);
       return cell;
     };
@@ -1825,7 +1805,12 @@
       return this.cells[index];
     };
     Viewer.prototype.updateTable = function() {
-      var cell, i, ilen, j, jlen, layout, row, _results;
+      var cell, i, ilen, j, jlen, layout, row, _i, _len, _ref, _results;
+      _ref = this.cells;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        cell = _ref[_i];
+        cell.children().detach();
+      }
       this.table.empty();
       this.cells = [];
       layout = this.layout();
@@ -1837,8 +1822,7 @@
         row = this.appendRow();
         i = 0;
         while (++i <= ilen) {
-          cell = this.appendCell(row);
-          cell.show();
+          this.appendCell(row);
         }
         row.show();
         _results.push(++j);
@@ -1846,127 +1830,162 @@
       return _results;
     };
     Viewer.prototype.layout = function(layout) {
-      var i, j;
-      if (!layout) {
+      var i, id, j, x, y;
+      if (layout) {
+        x = Math.max(0, Number(layout[0]));
+        y = Math.max(0, Number(layout[1]));
+        if (this.lay && x === this.lay[0] && y === this.lay[1]) {
+          return;
+        }
+        if (this.lay) {
+          this.e.removeClass("layout_" + this.lay.join("x"));
+        }
+        this.lay = [x, y];
+        this.e.addClass("layout_" + this.lay.join("x"));
+        dbg("setting layout", this.lay);
+        id = this.index + this.current;
+        this.updateTable();
+        this.update();
+        this.select(id);
+        return this;
+      } else {
         i = this.lay[0];
         j = this.lay[1];
         if (i <= 0) {
           i = this.length();
-          j = 1;
         } else if (j <= 0) {
-          i = 1;
           j = this.length();
         }
         return [i, j];
-      }
-      dbg("setting layout", layout);
-      this.lay = layout;
-      this.update();
-      return this;
-    };
-    Viewer.prototype.showItem = function(index) {
-      var cell, h, item, p, scroll2, scrolld, sz2, updateSize;
-      if (this.lay[0] <= 0) {
-        sz2 = "height";
-        scroll2 = "scrollTop";
-      } else if (this.lay[1] <= 0) {
-        sz2 = "width";
-        scroll2 = "scrollLeft";
-      } else {
-        return;
-      }
-      cell = this.cells[index];
-      item = this.at(index);
-      p = this.table;
-      h = p[sz2]();
-      scrolld = h / 2 - this.e[scroll2]();
-      updateSize = __bind(function() {
-        var h2, w;
-        dbg("item", index, "loaded in continuous layout");
-        if (scrolld) {
-          h2 = p[sz2]();
-          if (h < h2) {
-            p[sz2](h2);
-            this.e[scroll2](h2 / 2 - scrolld);
-          }
-        }
-        h = cell.outerHeight();
-        w = cell.outerWidth();
-        item.e.parent().css({
-          width: "",
-          height: ""
-        });
-        return this.onScroll();
-      }, this);
-      if (item.isLoaded()) {
-        item.show();
-        return updateSize();
-      } else {
-        item.e.parent().css({
-          width: "",
-          height: ""
-        });
-        item.e.one("mokaDone", updateSize);
-        return item.show();
       }
     };
     Viewer.prototype.hideItem = function(index) {
       var cell, h, item, w;
       item = this.at(index);
-      cell = this.cells[index % this.visibleItems()];
+      cell = this.cells[index % this.cellCount()];
       if (item.e.is(":visible")) {
-        dbg("hiding item", index, "in continuos view");
+        dbg("hiding item", index);
         h = cell.outerHeight();
         w = cell.outerWidth();
         item.hide();
-        return item.e.parent().css({
+        return cell.css({
           width: w,
           height: h
         });
       }
     };
-    Viewer.prototype.onScroll = function() {
-      var cell, dir, i, item, max, min, pos, preloaded, scroll, sz;
-      this.e.unbind("scroll.mokaViewerScroll");
-      if (this.lay[0] <= 0) {
-        dir = "left";
-        sz = "width";
-        scroll = "scrollLeft";
-      } else if (this.lay[1] <= 0) {
-        dir = "top";
-        sz = "height";
-        scroll = "scrollTop";
-      } else {
-        this.e.one("scroll", this.onScroll.bind(this));
-        return;
-      }
-      min = this.e.offset()[dir];
+    Viewer.prototype.updateSizes = function() {
+      var cell, i, item, len, _results;
       i = 0;
-      while ((cell = this.cells[i]) && (pos = cell.offset()[dir] + cell[sz]()) < min) {
-        if (pos < min - this.e.width()) {
-          this.hideItem(this.index + i);
-        }
-        ++i;
-      }
-      max = min + this.e[sz]();
-      preloaded = 0;
-      while ((cell = this.cells[i]) && (((pos = cell.offset()[dir]) < max) || ++preloaded <= this.preload_count)) {
+      len = this.cellCount();
+      _results = [];
+      while (i < len) {
         item = this.at(this.index + i);
-        if (!item.e.is(":visible")) {
-          break;
-        }
-        ++i;
-      }
-      if (cell && !item.e.is(":visible")) {
-        this.showItem(i);
-        return;
-      } else {
-        while (cell = this.cells[i]) {
-          this.hideItem(this.index + i);
+        if (!item || item.isLoaded()) {
           ++i;
+          continue;
         }
-        return this.e.one("scroll", this.onScroll.bind(this));
+        cell = this.cell(i);
+        if (cell.width() <= 1) {
+          cell.width(this.e.width());
+        }
+        if (cell.height() <= 1) {
+          cell.height(this.e.height());
+        }
+        _results.push(++i);
       }
+      return _results;
+    };
+    Viewer.prototype.updateVisible = function(now) {
+      var cell, current_item, pos, updateItems, wndbottom, wndleft, wndright, wndtop, _i, _len, _ref;
+      if (!now) {
+        if (this.t_update) {
+          window.clearTimeout(this.t_update);
+        }
+        this.t_update = window.setTimeout(this.updateVisible.bind(this, true), 100);
+        return;
+      }
+      pos = this.e.offset();
+      wndleft = pos.left;
+      wndtop = pos.top;
+      wndright = wndleft + this.e.width();
+      wndbottom = wndtop + this.e.height();
+      if (this.current >= 0) {
+        current_item = this.at(this.index + this.current).e;
+      }
+      updateItems = __bind(function(index, direction) {
+        var cell, h, item, loaded, next, p, w;
+        next = updateItems.bind(this, index + direction, direction);
+        cell = this.cells[index - this.index];
+        item = this.at(index);
+        if (!item || !cell) {
+          this.updateSizes();
+          return;
+        }
+        if (item.e.is(":visible")) {
+          return next();
+        }
+        p = cell.parent();
+        w = p.width();
+        h = p.height();
+        pos = cell.parent().offset();
+        if (pos.left + w < wndleft || pos.left > wndright || pos.top + h < wndtop || pos.top > wndbottom) {
+          return next();
+        }
+        loaded = __bind(function() {
+          var hh, left, top, ww;
+          dbg("view", index, "loaded");
+          cell.css({
+            width: "",
+            height: ""
+          });
+          left = this.e.scrollLeft();
+          top = this.e.scrollTop();
+          if (left || top) {
+            ww = p.width();
+            hh = p.height();
+            if (current_item) {
+              log("XXX");
+              ensure_visible(current_item);
+            } else {
+              if (pos.left < wndleft + this.e.width() / 2 && ww > w) {
+                log("SCROLL", (ww - w) / 2);
+                this.e.scrollLeft(left + (ww - w) / 2);
+              }
+              if (pos.top < wndtop + this.e.height() / 2 && hh > h) {
+                log("SCROLL", (hh - h) / 2);
+                this.e.scrollTop(top + (hh - h) / 2);
+              }
+            }
+          }
+          return next();
+        }, this);
+        dbg("loading view", index);
+        if (item.isLoaded()) {
+          item.show();
+          return next();
+        } else {
+          item.e.one("mokaDone", loaded);
+          return item.show();
+        }
+      }, this);
+      _ref = this.cells;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        cell = _ref[_i];
+        cell.css({
+          width: "",
+          height: ""
+        });
+      }
+      if (this.current >= 0) {
+        updateItems(this.index + this.current, 1);
+        return updateItems(this.index + this.current, -1);
+      } else {
+        return updateItems(this.index, 1);
+      }
+    };
+    Viewer.prototype.onScroll = function(ev) {
+      return this.updateVisible();
     };
     Viewer.prototype.keyPress = function(ev) {
       var keyname;
@@ -1981,7 +2000,11 @@
   })();
   Window = (function() {
     __extends(Window, Widget);
-    Window.prototype.default_keys = {};
+    Window.prototype.default_keys = {
+      F4: function() {
+        return this.close();
+      }
+    };
     Window.prototype.default_title_keys = {
       LEFT: function() {
         var pos;
@@ -2054,15 +2077,15 @@
       var body, e, edge, edges, s, self;
       Window.__super__.constructor.apply(this, arguments);
       self = this;
-      this.e.addClass("window").keydown(this.keyPress.bind(this)).hide();
+      this.e.addClass("window").attr("tabindex", -1).keydown(this.keyPress.bind(this)).hide();
       e = this.container = $("<div>").css({
         width: "100%",
         height: "100%"
       }).appendTo(this.e);
       $(window).resize(this.update.bind(this));
       this.title = $("<div>", {
-        'class': "title",
-        'html': title,
+        "class": "title",
+        html: title,
         tabindex: 0
       }).css('cursor', "pointer").keydown(this.keyPressTitle.bind(this)).appendTo(e);
       $("<div>", {
@@ -2170,7 +2193,7 @@
       return this;
     };
     Window.prototype.hide = function() {
-      this.e.remove();
+      this.e.detach();
       return this;
     };
     Window.prototype.append = function(widget) {
@@ -2183,7 +2206,7 @@
       return this;
     };
     Window.prototype.focus = function() {
-      this.title[0].focus();
+      focus(this.title);
       return this;
     };
     Window.prototype.position = function(x, y) {
@@ -2230,7 +2253,7 @@
           return d = dd;
         }
       });
-      return (_ref = e.children(".title")[0]) != null ? _ref.focus() : void 0;
+      return (_ref = e.find(".title:first")[0]) != null ? _ref.focus() : void 0;
     };
     Window.prototype.close = function() {
       return this.e.remove();
@@ -2311,15 +2334,14 @@
       item = items[_i];
       v.append(new ImageView(item));
     }
-    wnd = new Window("HELP").append(v).resize(500, 300).show();
-    wnd.e.appendTo("body");
-    wnd.focus();
+    v.e.appendTo("body");
+    v.show();
     wnd = new Window("HELP").append(createLabel("Double click on the button to add new window!")).append(new Button("Add _New Window", test)).show();
     wnd.e.css({
       right: 0,
       bottom: 0
     }).appendTo("body");
-    return v.zoom("fit");
+    return v.zoom(map.zoom);
   };
   $(document).ready(onLoad);
 }).call(this);
