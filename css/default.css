@@ -3,7 +3,7 @@
 /* monospace */
 /* helper functions {{{ */
 body {
-  background: #444444 url("bg.png") repeat;
+  background: #444444 url("../img/bg.png") repeat;
   margin: 0;
   padding: 0; }
 

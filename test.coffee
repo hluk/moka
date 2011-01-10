@@ -1,52 +1,52 @@
 wnd_count = 0
 test = () -># {{{
-    wnd = new Window("Widget Test - Window #{++wnd_count}")
+    wnd = new Moka.Window("Widget Test - Window #{++wnd_count}")
 
-    p0 = new WidgetList()
+    p0 = new Moka.WidgetList()
 
-    p1 = new WidgetList()
-        .append( new TextEdit("text _edit widget:", "type some text\nhere", true) )
-        .append( new TextEdit("text _edit widget:", "type some text here") )
-        .append( new Button("_Button", () -> alert "CLICKED") )
-        .append( new CheckBox("_Checkbox") )
-        .append( new CheckBox("C_heckbox", true) )
+    p1 = new Moka.WidgetList()
+        .append( new Moka.TextEdit("text _edit widget:", "type some text\nhere", true) )
+        .append( new Moka.TextEdit("text _edit widget:", "type some text here") )
+        .append( new Moka.Button("_Button", () -> alert "CLICKED") )
+        .append( new Moka.CheckBox("_Checkbox") )
+        .append( new Moka.CheckBox("C_heckbox", true) )
 
-    p2 = new ButtonBox()
+    p2 = new Moka.ButtonBox()
         .append("Button_1", () -> alert "1 CLICKED")
         .append("Button_2", () -> alert "2 CLICKED")
         .append("Button_3", () -> alert "3 CLICKED")
         .append("Button_4", () -> alert "4 CLICKED")
 
-    p3_2_1 = new Tabs()
+    p3_2_1 = new Moka.Tabs()
           .setVertical()
           .append("page _U", $("<div>"))
           .append("page _V", $("<div>"))
           .append("page _W", $("<div>"))
-    p3_1 = new Tabs()
+    p3_1 = new Moka.Tabs()
           .setVertical()
           .append("page _1", $("<div>"))
           .append("page _2", p3_2_1)
           .append("page _3", $("<div>"))
-    p3 = new Tabs()
+    p3 = new Moka.Tabs()
        .setVertical()
        .append("page _X", p3_1)
        .append("page _Y", $("<div>"))
        .append("page _Z", $("<div>"))
 
-    p4_2_1 = new Tabs()
+    p4_2_1 = new Moka.Tabs()
           .append("page _U", $("<div>"))
           .append("page _V", $("<div>"))
           .append("page _W", $("<div>"))
-    p4_1 = new Tabs()
+    p4_1 = new Moka.Tabs()
           .append("page _1", $("<div>"))
           .append("page _2", p4_2_1)
           .append("page _3", $("<div>"))
-    p4 = new Tabs()
+    p4 = new Moka.Tabs()
        .append("page _X", p4_1)
        .append("page _Y", $("<div>"))
        .append("page _Z", $("<div>"))
 
-    w = new Tabs()
+    w = new Moka.Tabs()
        .setVertical()
        .append("page _A", p1)
        .append("page _B", p2)
@@ -68,8 +68,6 @@ test = () -># {{{
 
 onLoad = () -># {{{
     onLoad = undefined
-
-    init_GUI()
 
     # vim cmd: .!cd ??? && ls|sed 's_^_        "file://'"$PWD"'/_;s/$/",/g'
     items = [
@@ -146,7 +144,7 @@ onLoad = () -># {{{
         (m,key,value) -> map[key] = value )
 
     # Viewer test {{{
-    v = new Viewer()
+    v = new Moka.Viewer()
        .layout(map.layout.split("x"))
        #.layout([2,1])
        #.layout([0,1])
@@ -154,7 +152,7 @@ onLoad = () -># {{{
         #new ButtonBox().append("Button _1", () -> alert "click 1!")
                        #.append("Button _2", () -> alert "click 2!")
     #)
-    v.append( new ImageView(item) ) for item in items
+    v.append( new Moka.ImageView(item) ) for item in items
 
     # Viwer in document
     v.e.appendTo("body")
@@ -169,12 +167,12 @@ onLoad = () -># {{{
     #wnd.focus()
     # }}}
 
-    wnd = new Window("HELP")
-         .append( createLabel("Double click on the button to add new window!") )
-         .append( new Button("Add _New Window", test) )
+    wnd = new Moka.Window("HELP")
+         .append( Moka.createLabel("Double click on the button to add new window!") )
+         .append( new Moka.Button("Add _New Window", test) )
          .show()
     wnd.e.css(right:0, bottom:0).appendTo("body")
-    #wnd.focus()
+    wnd.focus()
 
     v.zoom(map.zoom)
 # }}}

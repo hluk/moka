@@ -1,3 +1,5 @@
+window.Moka = {}
+
 # bind# {{{
 Function.prototype.bind = (thisObj, var_args) ->
   self = this
@@ -130,10 +132,10 @@ keyHintFocus = (keyname, root) -># {{{
                             e.trigger("click")
                         else if parent.hasClass("input")
                             e = parent
-                            e[0]?.focus()
+                            Moka.focus(e)
                         else
                             e = parent.find(".input").eq(0)
-                            e[0]?.focus()
+                            Moka.focus(e)
 
                         if e.length
                             return false #break
@@ -143,7 +145,7 @@ keyHintFocus = (keyname, root) -># {{{
 # }}}
 # }}}
 
-createLabel = (text) -># {{{
+Moka.createLabel = (text) -># {{{
     e = $("<div>", {'class':"widget label"})
 
     # replace _x with underlined character and assign x key
@@ -249,7 +251,7 @@ dragScroll = (ev) ->
 
         # if not scrolled: try to focus target element
         if not scrolling
-            ev.target.focus()
+            Moka.focus( ev.target )
             return
 
         # TODO: better algorithm to determine scroll animation speed and amount
@@ -289,15 +291,17 @@ dragScroll = (ev) ->
 focused_widget = $()
 focus_timestamp = 0
 
-focus = (e) -># {{{
-    if e.length
-        window.setTimeout( (() -> e[0].focus()), 0 )
+Moka.focus = (e) -># {{{
+    log e
+    return if not e
+    ee = if e.length then e[0] else e
+    window.setTimeout( (() -> ee.focus()), 0 )
 # }}}
 
 focus_first = (e) -># {{{
     ee = e.find(".input:first")
     if ee.length
-        focus(ee)
+        Moka.focus(ee)
         return true
     else
         return false
@@ -391,28 +395,28 @@ doKey = (keyname, keys, default_keys, object) -># {{{
     return false
 # }}}
 
-init_GUI = () -># {{{
+Moka.lostFocus = () ->
+    $(this).removeClass("focused")
+           .trigger("mokaBlurred")
+    dbg "blurred element",focused_widget
+
+Moka.gainFocus = (ev) ->
+    return if focus_timestamp is ev.timeStamp
+    focus_timestamp = ev.timeStamp
+    focused_widget = $(ev.target)
+    focused_widget.addClass("focused")
+                  .trigger("mokaFocused")
+    ensure_visible(focused_widget)
+    dbg "focused element",focused_widget
+
+Moka.init = () -># {{{
     # init widgets
     $(".input")
-        .live( "focus",
-            (ev) ->
-                return if focus_timestamp is ev.timeStamp
-                focus_timestamp = ev.timeStamp
-                focused_widget = $(ev.target)
-                focused_widget.addClass("focused")
-                              .trigger("mokaFocused")
-                ensure_visible(focused_widget)
-                dbg "focused element",focused_widget
-        )
-        .live( "blur",
-            () ->
-                focused_widget = $()
-                $(this).removeClass("focused")
-                       .trigger("mokaLostFocus")
-        )
+        .live( "focus.mokaFocus", Moka.gainFocus)
+        .live( "blur.mokaBlur",   Moka.lostFocus)
     $(".widget")
-        .live( "focusin",  () -> $(this).addClass("focused") )
-        .live( "focusout", () -> $(this).removeClass("focused") )
+        .live( "mokaFocused",  () -> $(this).addClass("focused") )
+        .live( "mokaBlurred",  () -> $(this).removeClass("focused") )
 
     # wait before document loaded
     ensure_fns = []
@@ -427,7 +431,7 @@ init_GUI = () -># {{{
         fn() for fn in ensure_fns
 # }}}
 
-class Widget# {{{
+class Moka.Widget# {{{
     default_keys: {}
 
     constructor: () -># {{{
@@ -465,7 +469,7 @@ class Widget# {{{
     # }}}
 # }}}
 
-class Selection extends Widget# {{{
+class Moka.Selection extends Moka.Widget# {{{
     constructor: (@parent) -># {{{
         super
         @e.css({position:"absolute", 'z-index':-2})
@@ -493,7 +497,7 @@ class Selection extends Widget# {{{
     # }}}
 # }}}
 
-class CheckBox extends Widget# {{{
+class Moka.CheckBox extends Moka.Widget# {{{
     default_keys:# {{{
         SPACE: -> @value(not @value())
         ENTER: -> @value(not @value())
@@ -501,7 +505,7 @@ class CheckBox extends Widget# {{{
 
     constructor: (text, checked) -># {{{
         super
-        label = createLabel(text)
+        label = Moka.createLabel(text)
 
         @e.css("cursor","pointer")
           .keydown( @keyPress.bind(this) )
@@ -515,7 +519,6 @@ class CheckBox extends Widget# {{{
             () ->
                 if not checkbox.attr('disabled')
                     checkbox
-                        .focus()
                         .attr( "checked", if checkbox.is(':checked') then 0 else 1 )
         ).appendTo(@e)
 
@@ -537,415 +540,32 @@ class CheckBox extends Widget# {{{
     # }}}
 # }}}
 
-class TextEdit extends Widget# {{{
-    default_keys:# {{{
-        # movement
-        LEFT:  -> @moveCursor(-1, 0)
-        RIGHT: -> @moveCursor(1, 0)
-        UP:    -> @moveCursor(0, -1)
-        DOWN:  -> @moveCursor(0, 1)
-        HOME: ->
-            e = @getChars().eq(@pos).parent().children(".c").eq(0)
-            @moveCursor(@index(e)-@pos, 0)
-        END: ->
-            e = @getChars().eq(@pos).parent().children(".c").eq(-1)
-            @moveCursor(@index(e)-@pos, 0)
-            # if cursor moves to other line it stays on the end
-            @left = 999999
-
-        # character deletion
-        DELETE: ->
-            if @sel1 is @sel2
-                @removeChars(@sel1, @sel1+1)
-            else
-                @removeChars(@sel1, @sel2)
-            @selection(@sel1, @sel1)
-        BACKSPACE: ->
-            if @sel1 is @sel2
-                pos = @sel1-1
-                @removeChars(pos, @sel1)
-            else
-                pos = @sel1
-                @removeChars(@sel1, @sel2)
-            @selection(pos, pos)
-
-        # selection
-        'S-LEFT':  -> @moveCursor(-1, 0, true)
-        'S-RIGHT': -> @moveCursor(1, 0, true)
-        'S-UP':    -> @moveCursor(0, -1, true)
-        'S-DOWN':  -> @moveCursor(0, 1, true)
-        'S-HOME': ->
-            e = @getChars().eq(@pos).parent().children(".c").eq(0)
-            @moveCursor(@index(e)-@pos, 0, true)
-        'S-END': ->
-            e = @getChars().eq(@pos).parent().children(".c").eq(-1)
-            @moveCursor(@index(e)-@pos, 0, true)
-        'C-A': -> @selection(0, @text.length)
+class Moka.TextEdit extends Moka.Widget# {{{
+    default_keys: {}# {{{
     # }}}
 
-    constructor: (label_text, text, @multiline) -># {{{
+    constructor: (label_text, text) -># {{{
         super
-        self = this
-
-        @keys = {}
-        if @multiline
-            edit = @edit = $("<textarea>")
-        else
-            edit = @edit = $("<input>")
-            @keys.UP = @keys.DOWN = @keys['S-UP'] = @keys['S-DOWN'] = () -> return
-
-        edit.addClass("input value")
-            .keydown( @keyPress.bind(this) )
-            .blur( @blur.bind(this) )
-
         @e.addClass("textedit")
-
-        if label_text
-            # clicking on option selects input text or toggles checkbox
-            label = createLabel(label_text)
-                   .mousedown( (ev) -> edit[0]?.focus() if not edit.is(":focus"); ev.preventDefault() )
-                   .appendTo(@e)
-
-        editor = @editor = $("<div>")
-        editor.addClass( (if @multiline then "multi" else "") + "lineedit" )
-        editor.mousedown (ev) ->
-            return if ev.button isnt 0
-
-            edit[0]?.focus() if not edit.is(":focus")
-
-            index = (e) ->
-                if e.hasClass("l")
-                    e = e.children(".c").eq(-1)
-                else if e.hasClass("linenumber")
-                    e = e.next()
-                return self.index(e)
-
-            from = index( $(ev.target) )
-            return if from is -1
-            self.select(from, from)
-
-            editor.mousemove (ev) ->
-                to = index( $(ev.target) )
-                return if to is -1
-                self.select(from, to)
-            $(document).one( "mouseup",
-                (ev) -> editor.unbind("mousemove") if ev.button is 0
-            )
-            ev.preventDefault()
-        editor.dblclick (ev) ->
-            e = $(ev.target)
-            nbsp = String.fromCharCode(160)
-            # double click on line -> select line
-            if e.hasClass("l")
-                chars = e.children(".c")
-                from = self.index( chars.eq(0) )
-                to = self.index( chars.eq(-1) )
-            # double click on a char -> select word
-            else
-                chars = self.chars.children(".l").children(".c")
-                if e.hasClass("linenumber")
-                    chars = e.parent().children(".c")
-                    from = self.index( chars.eq(0) )
-                    to = self.index( chars.eq(-1) )
-                else
-                    e = chars.eq(self.sel1)
-                    if e.text() != nbsp
-                        ee = e
-                        while ee.length and ee.text()[0] isnt nbsp
-                            to = self.index(ee)
-                            ee = ee.next()
-                        ++to
-                        ee = e
-                        while ee.length and ee.text()[0] isnt nbsp
-                            from = self.index(ee)
-                            ee = ee.prev()
-            self.select(from, to)
-
-            ev.preventDefault()
-        editor.appendTo(label)
-
-        cursor = @cursor = $("<div>", {class:"cursor"}).css({position:"absolute"})
-                .css({'cursor':"text"})
-                .mousedown( (ev) -> ev.preventDefault() )
-                .hide()
-                .appendTo(editor)
-
-        edit.css({opacity:0, position:"absolute", left:"-10000px", tabindex:100000})
-            .focus( () -> cursor.show(); self.selection(); editor.addClass("focused") )
-            .blur( () -> cursor.hide(); editor.removeClass("focused") )
-            .appendTo(label)
-
-        # characters in editor
-        @chars = $("<div>", {class:"cs"})
-                .appendTo(editor)
-
-        @value(if text then text else "")
-        @sel1 = @sel2 = 0
-    # }}}
-
-    dirty: () -># {{{
-        @lines = @characters = null
-    # }}}
-
-    getLines: () -># {{{
-        if not @lines
-            @lines = @chars.children(".l")
-        return @lines
-    # }}}
-
-    getChars: () -># {{{
-        if not @characters
-            @characters = @getLines().children(".c")
-        return @characters
-    # }}}
-
-    index: (e) -># {{{
-        # return character element index
-        return @getChars().index(e)
-    # }}}
-
-    indexOnLine: (e) -># {{{
-        # return character element index on line
-        return e.parent().children(".c").index(e)
-    # }}}
-
-    appendLine: () -># {{{
-        l = $("<div>", {class:"l"})
-            .css("min-height", "1em")
-            .hide()
-        $("<span>", {class:"linenumber"}).appendTo(l)
-        l.appendTo(@chars)
-
-        @characters = null
-
-        return l
-    # }}}
-
-    char: (c) -># {{{
-        # return char element
-        ce = $("<span>", {class:"c"})
-            .css("cursor","text")
-
-        if c is ' '
-            ce.html("&nbsp;")
-        else if c is '\n'
-            ce.html("&nbsp;").addClass("eol")
-        else if c is null
-            ce.html("&nbsp;").addClass("eof")
-        else if c is '\t'
-            ce.html("&nbsp;&nbsp;&nbsp;&nbsp;")
-        else
-            ce.text(c)
-
-        return ce
-    # }}}
-
-    appendChar: (c, line) -># {{{
-        @characters = null
-        return @char(c).appendTo(line)
-    # }}}
-
-    insertChars: (text, to) -># {{{
-        target = @getChars().eq(to)
-        i = 0
-        len = text.length
-        while i < len
-            e = @char( text[i++] )
-            e.insertBefore(target)
-            if e.hasClass("eol")
-                p = e.parent()
-                newline = @appendLine().insertAfter(p)
-                e.nextAll( p.children(".c") ).appendTo(newline)
-        @dirty()
-        if newline
-            @updateLines()
-    # }}}
-
-    remove: (ce) -># {{{
-        if ce.hasClass("eol")
-            nextline = ce.parent().next()
-            nextline.children(".c").insertAfter(ce)
-            nextline.remove()
-        ce.remove()
-    # }}}
-
-    replaceChars: (from, to, replacement) -># {{{
-        return if from < 0 or to < 0 or from > to
-        @text = @text.slice(0, from) + replacement + @text.slice(to)
-
-        i = 0
-        len = replacement.length
-        self = this
-        @getChars().slice(from, to).each () -> self.remove($(this))
-
-        @insertChars(replacement, to)
-    # }}}
-
-    removeChars: (from, to) -># {{{
-        @replaceChars(from, to, "")
-    # }}}
-
-    updateText: () -># {{{
-        @chars.empty()
-
-        i = 0
-        len = @text.length
-        l = null
-        while i < len
-            # line element
-            l = @appendLine() if l is null
-
-            c = @text[i]
-            @appendChar(c, l)
-
-            if c is '\n'
-                l = null
-            ++i
-        # last empty line
-        l = @appendLine() if l is null
-
-        # end of input character
-        @appendChar(null, l)
-
-        @updateLines()
-
-        @selection(0, 0)
-
-        return true
-    # }}}
-
-    updateLines: () -># {{{
-        lines = @getLines()
-        ln = lines.children(":first-child")
-        len = ln.length
-        i = 0
-        j = 1
-        padding = new Array( Math.floor(Math.log(len)/2.3)+1 ).join("&nbsp;")
-
-        while i < len
-            num = String(i+1)
-            if j < num.length
-                padding = padding.slice(6)
-                ++j
-            num = padding+num
-            e = ln[i]
-            e.innerHTML = num if e.innerHTML isnt num
-            ++i
-        lines.show()
-    # }}}
-
-    moveCursor: (dx, dy, anchored) -># {{{
-        pos = @pos
-        if dx
-            chars = @getChars().eq(pos).parent().children(".c")
-            a = @index( chars.eq(0) )
-            b = @index( chars.eq(-1) )
-            pos += dx
-            if pos > b
-                pos = b
-            else if pos < a
-                pos = a
-            @left = @getChars().eq(pos).offset().left
-        if dy
-            char = @getChars().eq(pos)
-            ln = char.parent()
-            if dy > 0
-                line = ln while ( ln = ln.next() ) and (--dy) >= 0
-            else
-                line = ln while ( ln = ln.prev() ) and (++dy) <= 0
-
-            left = char.offset().left
-            if not @left or left > @left
-                @left = left
-            else
-                left = @left
-
-            ch = line.children(".c").eq(0)
-            while ch.length and left >= ch.offset().left
-                char = ch
-                ch = ch.next()
-            pos = @index(char)
-
-        if pos >= 0
-            if anchored
-                if @pos is @sel1
-                    @selection(@sel2, pos)
-                else
-                    @selection(@sel1, pos)
-            else
-                @selection(pos, pos)
-    # }}}
-
-    selection: (from, to) -># {{{
-        return if from < 0 or to < 0 or not @cursor.is(":visible")
-        from = @sel1 if from is undefined
-        to = @sel2 if to is undefined
-
-        # cursor position
-        #@pos = if to is @sel2 then from else to
-        @pos = to
-
-        # selection
-        chars = @getChars()
-        chars.eq(@sel1).parent().removeClass("current")
-        chars.eq(@sel2).parent().removeClass("current")
-        chars.slice(@sel1, @sel2)
-             .each( () -> $(this).removeClass("selected") )
-        if from <= to
-            @sel1 = from
-            @sel2 = to
-        else
-            @sel1 = to
-            @sel2 = from
-        chars.slice(@sel1, @sel2).each( () -> $(this).addClass("selected") )
-
-        c = chars.eq(@pos)
-        c.parent().addClass("current")
-
-        # scroll to current char
-        c_pos = c.offset()
-        pos = @chars.offset()
-
-        c_s = c.height()+16
-        s = @chars.innerHeight()
-        d = c_pos.top - pos.top
-        scroll = @chars.scrollTop()
-        if d-c_s < 0
-            @chars.scrollTop(scroll + d-c_s)
-        else if d+2*c_s > s
-            @chars.scrollTop(scroll + d + 2*c_s - s)
-
-        c_s = c.width()+16
-        s = @chars.innerWidth()
-        d = c_pos.left - pos.left
-        scroll = @chars.scrollLeft()
-        if d-c_s < 0
-            @chars.scrollLeft(scroll + d-c_s)
-        else if d+2*c_s > s
-            @chars.scrollLeft(scroll + d + 2*c_s - s)
-
-        ensure_position(@cursor, c, true)
-
-        window.clearTimeout(@size_t) if @size_t?
-        @size_t = window.setTimeout( ( () ->
-            @size_t = null
-            w = @e.width()
-            h = @e.height()
-            if @w isnt w or @h isnt h
-                @w = w
-                @h = h
-                @e.trigger("mokaSizeChanged")
-        ).bind(this), 200)
+          .keydown( @keyPress.bind(this) )
+        @create = true
     # }}}
 
     update: () -># {{{
-        @selection()
-        return this
-    # }}}
+        if @create and @e.is(":visible")
+            @create = false
 
-    blur: () -># {{{
-        @e.removeClass('focused')
-        @edit.removeClass('focused')
+            @editor = new CodeMirror(@e[0],
+                height: "dynamic",
+                parserfile: "parsedummy.js",
+                #stylesheet: "deps/codemirror/css/jscolors.css",
+                path: "deps/codemirror/js/"
+            )
+
+            edit = $(@editor.wrapping)
+            $(@editor.win).focus (ev) ->
+                Moka.gainFocus(ev)
+                edit.trigger("mokaFocused")
     # }}}
 
     keyPress: (ev) -># {{{
@@ -962,44 +582,16 @@ class TextEdit extends Widget# {{{
            ( @multiline and keyname is "ENTER" ) or # multilineedit keys
            ( keyname is "C-V" or keyname is "C-C" or keyname is "C-X" or
              keyname is "S-INSERT" or keyname is "S-DELETE" ) # clipboard access keys
-            @edit.trigger("keyup")
-
-            # set textarea text before default textarea action
-            if @sel1 isnt @sel2
-                @edit.attr("value", @text.slice(@sel1, @sel2)).select()
-            else
-                @edit.attr("value", "")
-
-            # update text on keyup
-            @edit.one("keyup", ( () ->
-                text = @edit.attr("value")
-                e = @edit[0]
-                if (@sel1 is @sel2 and text) or
-                   (text.slice(e.selectionStart, e.selectionEnd) isnt @text.slice(@sel1, @sel2))
-                    len = text.length
-                    @replaceChars(@sel1, @sel2, text)
-                    pos = @sel1+len
-                    @selection(pos, pos)
-            ).bind(this) )
-
             ev.stopPropagation()
     # }}}
 
-    value: (val) -># {{{
-        if val?
-            @text = val
-            @updateText()
-            return this
-        else
-            return @text
-    # }}}
 # }}}
 
 # TODO: add button icon
-class Button extends Widget # {{{
+class Moka.Button extends Moka.Widget # {{{
     constructor: (label_text, onclick) -># {{{
         super
-        @e = createLabel(label_text) # $("<div>")
+        @e = Moka.createLabel(label_text) # $("<div>")
              .addClass("widget input button").attr("tabindex", 0)
              .click(onclick)
              .keydown( @keyPress.bind(this) )
@@ -1014,14 +606,14 @@ class Button extends Widget # {{{
     # }}}
 # }}}
 
-class WidgetList extends Widget # {{{
+class Moka.WidgetList extends Moka.Widget # {{{
     constructor: -># {{{
         super
         @e.addClass("widgetlist")
           .keydown( @keyPress.bind(this) )
         @widgets = []
         @items = []
-        @selection = sel = new Selection(@e)
+        @selection = sel = new Moka.Selection(@e)
         @.current = -1
     # }}}
 
@@ -1050,7 +642,7 @@ class WidgetList extends Widget # {{{
                 e = item.filter(".input")
                 if not e.length
                     e = item.find(".input")
-                e[0]?.focus()
+                Moka.focus(e)
 
             @updateSelection()
 
@@ -1111,7 +703,7 @@ class WidgetList extends Widget # {{{
     # }}}
 # }}}
 
-class ButtonBox extends WidgetList # {{{
+class Moka.ButtonBox extends Moka.WidgetList # {{{
     constructor: -># {{{
         super
         @e
@@ -1123,7 +715,7 @@ class ButtonBox extends WidgetList # {{{
     # }}}
 
     append: (label_text, onclick) -># {{{
-        widget = new Button(label_text, onclick)
+        widget = new Moka.Button(label_text, onclick)
         super widget
         widget.e.removeClass("widgetlistitem")
 
@@ -1131,7 +723,7 @@ class ButtonBox extends WidgetList # {{{
     # }}}
 # }}}
 
-class Tabs extends Widget # {{{
+class Moka.Tabs extends Moka.Widget # {{{
     constructor: -># {{{
         super
         @e.addClass("tabs_widget")
@@ -1161,7 +753,7 @@ class Tabs extends Widget # {{{
 
         @pages = []
         @current = -1
-        @selection = new Selection(@tabs_e)
+        @selection = new Moka.Selection(@tabs_e)
 
         @setVertical(false)
     # }}}
@@ -1190,7 +782,7 @@ class Tabs extends Widget # {{{
     # }}}
 
     select: (id) -># {{{
-        @tabs_e[0]?.focus()
+        Moka.focus(@tabs_e)
         old_id = @current
 
         if old_id != id
@@ -1223,7 +815,7 @@ class Tabs extends Widget # {{{
         @pages.push(widget)
         page = if widget.e then widget.e else widget
 
-        tab = createLabel(tabname)
+        tab = Moka.createLabel(tabname)
         tab.addClass("tab")
         tab.appendTo(@tabs_e)
 
@@ -1271,17 +863,17 @@ class Tabs extends Widget # {{{
                 go_focus_down = true
 
         if go_next or go_prev or go_focus_up or go_focus_down
-            @tabs_e[0]?.focus()
+            Moka.focus(@tabs_e)
             if go_next
                 @next()
             else if go_prev
                 @prev()
             else if go_focus_up
-                @e.parents().children(".input").eq(-1)[0]?.focus()
+                Moka.focus( @e.parents().children(".input").eq(-1) )
             else
                 page = @pages[@current]
                 page = page.e if page.e?
-                page.find(".input")[0]?.focus()
+                Moka.focus( page.find(".input") )
 
             return false
 
@@ -1300,7 +892,7 @@ class Tabs extends Widget # {{{
     # }}}
 # }}}
 
-class ImageView extends Widget# {{{
+class Moka.ImageView extends Moka.Widget# {{{
     default_keys = {}# {{{
     # }}}
 
@@ -1402,7 +994,7 @@ class ImageView extends Widget# {{{
     # }}}
 # }}}
 
-class Viewer extends Widget# {{{
+class Moka.Viewer extends Moka.Widget# {{{
     default_keys:# {{{
         RIGHT: -> is_on_screen(focused_widget, "right") and @next()
         LEFT: -> is_on_screen(focused_widget, "left") and @prev()
@@ -1470,7 +1062,7 @@ class Viewer extends Widget# {{{
                         @current = e.data("index")
                         e.addClass("current")
                 )
-                .bind("mokaLostFocus",
+                .bind("mokaBlurred",
                     (ev) =>
                         e = $(ev.target).parents(".view:last")
                         return if @current isnt e.data("index")
@@ -1601,7 +1193,7 @@ class Viewer extends Widget# {{{
 
         cell = @cell(id%count)
         ensure_visible( @at(id).e )
-        focus(cell)
+        Moka.focus(cell)
 
         return this
     # }}}
@@ -1897,7 +1489,7 @@ class Viewer extends Widget# {{{
     # }}}
 # }}}
 
-class Window extends Widget# {{{
+class Moka.Window extends Moka.Widget# {{{
     default_keys: # {{{
         F4: -> @close()
     # }}}
@@ -1956,7 +1548,7 @@ class Window extends Widget# {{{
         $(window).resize( @update.bind(this) )
 
         # title
-        @title = $("<div>", {class:"title", html:title, tabindex:0})
+        @title = $("<div>", {class:"input title", html:title, tabindex:0})
                 .css('cursor', "pointer")
                 .keydown( @keyPressTitle.bind(this) )
                 .appendTo(e)
@@ -2077,7 +1669,7 @@ class Window extends Widget# {{{
     # }}}
 
     focus: () -># {{{
-        focus(@title)
+        Moka.focus(@title)
         return this
     # }}}
 
@@ -2120,7 +1712,7 @@ class Window extends Widget# {{{
             if (d < 0 and dd >= 0) or (dd > 0 and dd < d)
                 e = $this
                 d = dd
-        e.find(".title:first")[0]?.focus()
+        Moka.focus( e.find(".title:first") )
     # }}}
 
     close: () -># {{{
@@ -2147,5 +1739,5 @@ class Window extends Widget# {{{
 # }}}
 # }}}
 
-$(document).ready(init_GUI)
+$(document).ready(Moka.init)
 

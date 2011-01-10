@@ -1,44 +1,50 @@
-# requirements: inotify-tools, sass, coffee-script
+# requirements: sass, coffee-script, inotify-tools
 NAME = test
-DEST = test
+CSS = default
+DEST = $(PWD)
 SRC = src
-LIB  = $(SRC)/moka.coffee
-CSS  = style
+LIB = moka
 
 INOTIFY = inotifywait
 
 DIV='********************************************************************************'
 
-.PHONY:all js css
+.PHONY:all js css deps
 
 all: js css
 
-js: $(DEST)/$(NAME).js
+js: $(DEST)/$(NAME).js $(SRC)/$(LIB).js
 
-css: $(DEST)/$(CSS).css
+css: css/$(CSS).css
 
-$(DEST)/$(NAME).js: $(LIB) $(SRC)/$(NAME).coffee
+# TODO: fetch dependencies (git or download and unpack)
+deps:
+
+%.js: %.coffee
 	@echo $(DIV)
-	coffee -c -j -o $(DEST) $^
+	coffee -c -o $(DEST) $^
 	@echo $(DIV)
-	mv $(DEST)/concatenation.js $@
 
-$(DEST)/$(CSS).css: $(SRC)/$(CSS).scss
+%.css: %.scss
 	@echo $(DIV)
 	sass $^:$@
 	@echo $(DIV)
 
-$(SRC)/$(CSS).scss:
-$(SRC)/$(NAME).coffee:
-$(LIB):
-	while [ ! -f $@ ]; do sleep 0.1; done
+
+.PHONY:watch watch.%.scss watch.%.coffee
 
 watch:
-	$(MAKE) -j2 watch_css watch_js
+	$(MAKE) -j3 $(SRC)/$(LIB).coffee.watch $(NAME).coffee.watch css/$(CSS).scss.watch
 
-watch_css:
-	$(MAKE) css; while true; do $(INOTIFY) $(SRC)/$(CSS).scss && $(MAKE) css; done
+%.scss.watch: %.scss
+	while true; do \
+		while [ ! -f $^ ]; do sleep 0.1; done && \
+		$(MAKE) $(^:.scss=.css); \
+		$(INOTIFY) $^; done
 
-watch_js:
-	$(MAKE) js; while true; do $(INOTIFY) $(LIB) $(SRC)/$(NAME).coffee && $(MAKE) js; done
+%.coffee.watch: %.coffee
+	while true; do \
+		while [ ! -f $^ ]; do sleep 0.1; done && \
+		$(MAKE) $(^:.coffee=.js); \
+		$(INOTIFY) $^; done
 
