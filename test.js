@@ -17,13 +17,13 @@
     }).append("Button_4", function() {
       return alert("4 CLICKED");
     });
-    p3_2_1 = new Moka.Tabs().setVertical().append("page _U", $("<div>")).append("page _V", $("<div>")).append("page _W", $("<div>"));
-    p3_1 = new Moka.Tabs().setVertical().append("page _1", $("<div>")).append("page _2", p3_2_1).append("page _3", $("<div>"));
-    p3 = new Moka.Tabs().setVertical().append("page _X", p3_1).append("page _Y", $("<div>")).append("page _Z", $("<div>"));
+    p3_2_1 = new Moka.Tabs().vertical(true).append("page _U", $("<div>")).append("page _V", $("<div>")).append("page _W", $("<div>"));
+    p3_1 = new Moka.Tabs().vertical(true).append("page _1", $("<div>")).append("page _2", p3_2_1).append("page _3", $("<div>"));
+    p3 = new Moka.Tabs().vertical(true).append("page _X", p3_1).append("page _Y", $("<div>")).append("page _Z", $("<div>"));
     p4_2_1 = new Moka.Tabs().append("page _U", $("<div>")).append("page _V", $("<div>")).append("page _W", $("<div>"));
     p4_1 = new Moka.Tabs().append("page _1", $("<div>")).append("page _2", p4_2_1).append("page _3", $("<div>"));
     p4 = new Moka.Tabs().append("page _X", p4_1).append("page _Y", $("<div>")).append("page _Z", $("<div>"));
-    w = new Moka.Tabs().setVertical().append("page _A", p1).append("page _B", p2).append("page _C", p3).append("page _D", p4);
+    w = new Moka.Tabs().vertical(true).append("page _A", p1).append("page _B", p2).append("page _C", p3).append("page _D", p4);
     wnd.append(w);
     $(".value").css({
       'font-family': "monospace"
@@ -45,12 +45,12 @@
   onLoad = function() {
     var item, items, map, onLoad, v, wnd, _i, _len;
     onLoad = void 0;
-    items = ["file:///home/lukas/Pictures/paintings/Andrew Gonzales/AlbedoSublimis.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AeternaSaltatus.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/amore.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Magia of the Heart.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Aura Gloriae.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/In The Wake of the.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Sapientia.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Seraphim Awakening.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/SirensDream.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Soror Mystica.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Telluric Womb.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Angel of Nekyia.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Breath of Dakini.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Love of Souls.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Oracle of the Pearl.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Summoning of the Muse.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Visitation.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/UnioMystica.jpg", "file:///home/lukas/Pictures/paintings/blackeri/_Color_Me_Blood_Red__by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/Eros_Psyche_by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/_Kohtalo_.jpg", "file:///home/lukas/Pictures/paintings/blackeri/_MoonGoddess__by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/_Seven_Deadly_Sins__ENVY__by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__AVARICE_by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__LUST_by_blackeri.jpg", "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__VANITY_by_blackeri.jpg"];
+    items = ["file:///home/lukas/Pictures/paintings/Andrew Gonzales/AlbedoSublimis.jpg", "BAD.png", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AeternaSaltatus.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/amore.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Magia of the Heart.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Aura Gloriae.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/In The Wake of the.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Sapientia.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Seraphim Awakening.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/SirensDream.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Soror Mystica.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Telluric Womb.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Angel of Nekyia.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Breath of Dakini.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Love of Souls.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Oracle of the Pearl.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Summoning of the Muse.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Visitation.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/UnioMystica.jpg"];
     map = {};
     location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m, key, value) {
       return map[key] = value;
     });
-    v = new Moka.Viewer().layout(map.layout.split("x"));
+    v = new Moka.Viewer().layout(map.layout.split("x")).orientation(map.o ? map.o : "lt");
     for (_i = 0, _len = items.length; _i < _len; _i++) {
       item = items[_i];
       v.append(new Moka.ImageView(item));

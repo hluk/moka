@@ -21,9 +21,9 @@ log = if logfn then logfn.bind(logobj) else () -> return
 # }}}
 
 # debugging {{{
-dbg = log.bind(this, "DEBUG:")
+#dbg = log.bind(this, "DEBUG:")
+dbg = () -> return
 #dbg = () -> alert("DEBUG: "+Array.prototype.join.call(arguments, " "))
-#dbg = () -> return
 # }}}
 
 # user agent # {{{
@@ -145,8 +145,10 @@ keyHintFocus = (keyname, root) -># {{{
 # }}}
 # }}}
 
-Moka.createLabel = (text) -># {{{
-    e = $("<div>", {'class':"widget label"})
+Moka.createLabel = (text, e) -># {{{
+    if not e
+        e = $("<div>")
+    e.addClass("label")
 
     # replace _x with underlined character and assign x key
     i=0
@@ -189,10 +191,10 @@ initDraggable = (e, handle_e) -># {{{
 
               move = (ev) ->
                   if stop
-                      $(document).unbind("mousemove.mokaDrag")
+                      $(document).unbind("mousemove.moka")
                   else
                       e.offset({left:ev.pageX-x, top:ev.pageY-y})
-              $(document).bind( "mousemove.mokaDrag", move)
+              $(document).bind( "mousemove.moka", move)
               move(ev)
 # }}}
 
@@ -284,7 +286,6 @@ dragScroll = (ev) ->
 
     ev.preventDefault()
 # }}}
-# }}}
 
 # GUI classes# {{{
 # only one widget can can be focused at a time
@@ -292,14 +293,17 @@ focused_widget = $()
 focus_timestamp = 0
 
 Moka.focus = (e) -># {{{
-    log e
     return if not e
     ee = if e.length then e[0] else e
-    window.setTimeout( (() -> ee.focus()), 0 )
+    #window.setTimeout( (() -> ee.focus()), 0 )
+    ee.focus()
 # }}}
 
-focus_first = (e) -># {{{
-    ee = e.find(".input:first")
+Moka.focus_first = (e) -># {{{
+    if e.hasClass("input")
+        ee = e
+    else
+        ee = e.find(".input:first")
     if ee.length
         Moka.focus(ee)
         return true
@@ -333,6 +337,11 @@ is_on_screen = (w, how) -># {{{
     return false if not w
     e = if w.e then w.e else w
 
+    pos = e.offset()
+    return false if not pos
+    pos.right = pos.left + e.width()
+    pos.bottom = pos.top + e.height()
+
     wnd = $(window)
     if how is "right" or how is "left"
         min = wnd.scrollLeft()
@@ -340,10 +349,6 @@ is_on_screen = (w, how) -># {{{
     else
         min = wnd.scrollTop()
         max = min + wnd.height()
-
-    pos = e.offset()
-    pos.right = pos.left + e.width()
-    pos.bottom = pos.top + e.height()
 
     x = pos[how]
     return x >= min and x <= max
@@ -395,10 +400,12 @@ doKey = (keyname, keys, default_keys, object) -># {{{
     return false
 # }}}
 
-Moka.lostFocus = () ->
-    $(this).removeClass("focused")
-           .trigger("mokaBlurred")
-    dbg "blurred element",focused_widget
+# widget focusing # {{{
+Moka.lostFocus = (ev) ->
+    focused_widget.removeClass("focused")
+                  .trigger("mokaBlurred")
+    focused_widget = $()
+    #dbg "blurred element",focused_widget
 
 Moka.gainFocus = (ev) ->
     return if focus_timestamp is ev.timeStamp
@@ -407,17 +414,10 @@ Moka.gainFocus = (ev) ->
     focused_widget.addClass("focused")
                   .trigger("mokaFocused")
     ensure_visible(focused_widget)
-    dbg "focused element",focused_widget
+    #dbg "focused element",focused_widget
+# }}}
 
 Moka.init = () -># {{{
-    # init widgets
-    $(".input")
-        .live( "focus.mokaFocus", Moka.gainFocus)
-        .live( "blur.mokaBlur",   Moka.lostFocus)
-    $(".widget")
-        .live( "mokaFocused",  () -> $(this).addClass("focused") )
-        .live( "mokaBlurred",  () -> $(this).removeClass("focused") )
-
     # wait before document loaded
     ensure_fns = []
 
@@ -432,10 +432,10 @@ Moka.init = () -># {{{
 # }}}
 
 class Moka.Widget# {{{
-    default_keys: {}
-
     constructor: () -># {{{
         @e = $("<div>", {'class':"widget"})
+            .bind( "mokaFocused",  () -> $(this).addClass("focused") )
+            .bind( "mokaBlurred",  () -> $(this).removeClass("focused") )
     # }}}
 
     show: -># {{{
@@ -456,20 +456,31 @@ class Moka.Widget# {{{
     isLoaded: () -># {{{
         return true
     # }}}
+# }}}
 
-    keyPress: (ev) -># {{{
-        keyname = getKeyName(ev)
+class Moka.Input extends Moka.Widget # {{{
+    constructor: () -># {{{
+        super
+        @e.addClass("input")
+          .attr("tabindex", 0)
+          .css("cursor","pointer")
 
-        if doKey(keyname, @keys, @default_keys, this)
-            return false
+          .bind("focus.moka", Moka.gainFocus)
+          .bind("blur.moka",   Moka.lostFocus)
+          .click( () -> Moka.focus(this) )
 
-        # keyhints
-        if keyHintFocus(keyname, @body)
-            return false
+          .focus( (ev) => @focus?(ev) )
+          .blur( (ev) => @blur?(ev) )
+          .click( (ev) => @click?(ev) )
+          .dblclick( (ev) => @dblclick?(ev) )
+          .mouseup( (ev) => @mouseup?(ev) )
+          .mousedown( (ev) => @mousedown?(ev) )
+          .keydown( (ev) => @keydown?(ev) )
+          .keyup( (ev) => @keyup?(ev) )
     # }}}
 # }}}
 
-class Moka.Selection extends Moka.Widget# {{{
+class Moka.Selection extends Moka.Widget # {{{
     constructor: (@parent) -># {{{
         super
         @e.css({position:"absolute", 'z-index':-2})
@@ -484,45 +495,137 @@ class Moka.Selection extends Moka.Widget# {{{
     # }}}
 
     select: (e) -># {{{
-        pos = e.offset()
-        @e
-            .width( e.outerWidth() )
-            .height( e.outerHeight() )
-            .offset({top:pos.top, left:pos.left})
+        @current.removeClass("current") if @current
 
-        if @current then @current.removeClass("current")
-        @current = e.addClass("current")
-
-        ensure_position(this.e, e, true)
+        if e?
+            pos = e.offset()
+            @e.show()
+              .width( e.outerWidth() )
+              .height( e.outerHeight() )
+              .offset({top:pos.top, left:pos.left})
+            @current = e.addClass("current")
+            ensure_position(this.e, e, true)
+        else
+            @e.hide()
     # }}}
 # }}}
 
-class Moka.CheckBox extends Moka.Widget# {{{
+class Moka.Container extends Moka.Input# {{{
+    constructor: () -># {{{
+        super
+        @e.addClass("container")
+
+        @widgets = []
+        @current = -1
+        @selection = new Moka.Selection(@e)
+    # }}}
+
+    update: -># {{{
+        w = @widgets
+        $.each( w, (i) -> w[i].update() )
+        @updateSelection()
+        return this
+    # }}}
+
+    updateSelection: -># {{{
+        @selection.select( if @current >= 0 then @widgets[@current].e else null )
+    # }}}
+
+    focus: () -># {{{
+        @select(if @current >= 0 then @current else 0)
+        return this
+    # }}}
+
+    length: () -># {{{
+        return @widgets.length
+    # }}}
+
+    at: (index) -># {{{
+        return @widgets[index]
+    # }}}
+
+    itemClass: (cls) -># {{{
+        if cls
+            @itemcls = cls
+            return this
+        else
+            return @itemcls
+    # }}}
+
+    append: (widget) -># {{{
+        id = @length()
+        @widgets.push(widget)
+        e = widget.e
+
+        # first & last
+        if id is 0
+            e.addClass("first")
+        else
+            @widgets[id-1].e.removeClass("last")
+
+        e.addClass(@itemcls+" last")
+        e.bind( "mokaFocused", () =>
+            if @current >= 0
+                e.trigger("mokaDeselected", [@current])
+            @current = id
+            e.trigger("mokaSelected", [id])
+            @updateSelection()
+        )
+
+        e.appendTo(@e)
+          .bind("mokaSizeChanged", @update.bind(this) )
+          #.children().focus( @update.bind(this) )
+
+        return this
+    # }}}
+
+    next: -># {{{
+        @select(if @current >= 0 and @current < @length()-1 then @current+1 else 0)
+    # }}}
+
+    prev: -># {{{
+        l = @length()
+        @select(if @current >= 1 && @current < l then @current-1 else l-1)
+    # }}}
+
+    select: (id) -># {{{
+        if id >= 0
+            @current = id
+            w = @widgets[id]
+            Moka.focus_first(w.e)
+        else
+            @current = -1
+
+        @updateSelection()
+    # }}}
+# }}}
+
+class Moka.CheckBox extends Moka.Input # {{{
     default_keys:# {{{
-        SPACE: -> @value(not @value())
-        ENTER: -> @value(not @value())
+        SPACE: -> @toggle()
+        ENTER: -> @toggle()
     # }}}
 
     constructor: (text, checked) -># {{{
         super
-        label = Moka.createLabel(text)
+        @e.addClass("checkbox")
+        Moka.createLabel(text, @e)
 
-        @e.css("cursor","pointer")
-          .keydown( @keyPress.bind(this) )
-
-        @checkbox = $('<input>', {type:"checkbox", 'class':"input value"})
-                   .prependTo(label)
-                   .click( (ev) -> ev.stopPropagation() )
-
-        # clicking on option selects input text or toggles checkbox
-        label.click(
-            () ->
-                if not checkbox.attr('disabled')
-                    checkbox
-                        .attr( "checked", if checkbox.is(':checked') then 0 else 1 )
-        ).appendTo(@e)
+        @checkbox = $('<input>', {type:"checkbox", class:"value"})
+                   .prependTo(@e)
 
         @value(checked)
+    # }}}
+
+    click: (ev) -># {{{
+        return if ev.target.type is "checkbox"
+        @toggle()
+        return false
+    # }}}
+
+    toggle: () -># {{{
+        @value(not @value())
+        return this
     # }}}
 
     value: (val) -># {{{
@@ -530,24 +633,25 @@ class Moka.CheckBox extends Moka.Widget# {{{
             @checkbox.attr("checked", val)
             return this
         else
-            return @checkbox.attr("checked")
+            return @checkbox.is(":checked")
     # }}}
 
-    keyPress: (ev) -># {{{
+    keydown: (ev) -># {{{
         keyname = getKeyName(ev)
         if doKey(keyname, @keys, @default_keys, this)
             return false
     # }}}
 # }}}
 
-class Moka.TextEdit extends Moka.Widget# {{{
-    default_keys: {}# {{{
+class Moka.TextEdit extends Moka.Input# {{{
+    default_keys: # {{{
+        ENTER: ->
     # }}}
 
     constructor: (label_text, text) -># {{{
         super
         @e.addClass("textedit")
-          .keydown( @keyPress.bind(this) )
+        Moka.createLabel(label_text, @e)
         @create = true
     # }}}
 
@@ -555,49 +659,59 @@ class Moka.TextEdit extends Moka.Widget# {{{
         if @create and @e.is(":visible")
             @create = false
 
-            @editor = new CodeMirror(@e[0],
-                height: "dynamic",
-                parserfile: "parsedummy.js",
-                #stylesheet: "deps/codemirror/css/jscolors.css",
+            editor = new CodeMirror( @e[0],
+                height: "dynamic"
+                parserfile: "parsedummy.js"
+                #stylesheet: "deps/codemirror/css/jscolors.css"
                 path: "deps/codemirror/js/"
+                onCursorActivity: () =>
+                    window.clearTimeout(@t_sizeupdate) if @t_sizeupdate
+                    @t_sizeupdate = window.setTimeout( @e.trigger.bind(@e, "mokaSizeChanged"), 300 )
             )
 
-            edit = $(@editor.wrapping)
-            $(@editor.win).focus (ev) ->
-                Moka.gainFocus(ev)
-                edit.trigger("mokaFocused")
+            $(editor.win.document)
+                .keyup( @editorKeyUp.bind(this) )
+                .keydown( () => @oldpos = @editor.cursorPosition() )
+
+            win = $(editor.win)
+            win.focus (ev) => ev.target = editor.wrapping; Moka.gainFocus(ev)
+            win.blur  (ev) => ev.target = editor.wrapping; Moka.lostFocus(ev)
+
+            @e.focus( () => @oldpos = line:null, character:null; editor.win.focus() )
+
+            @editor = editor
+            @oldpos = editor.cursorPosition()
     # }}}
 
-    keyPress: (ev) -># {{{
+    editorKeyUp: (ev) -># {{{
         keyname = getKeyName(ev)
 
         if doKey(keyname, @keys, @default_keys, this)
             return false
 
-        k = keyname.split('-')
-        k = k[k.length-1]
-        # stop propagation only if
-        if k.length is 1 or # a character typed
-           k is "MINUS" or k is "SPACE" or # textedit keys
-           ( @multiline and keyname is "ENTER" ) or # multilineedit keys
-           ( keyname is "C-V" or keyname is "C-C" or keyname is "C-X" or
-             keyname is "S-INSERT" or keyname is "S-DELETE" ) # clipboard access keys
+        pos = @editor.cursorPosition()
+        if @oldpos.line is pos.line and @oldpos.character is pos.character
+            # emulate keydown event
+            ev2 = jQuery.Event("keydown")
+            ev2.which = ev.which
+            @e.trigger(ev2)
+        else
+            @oldpos = pos
             ev.stopPropagation()
     # }}}
 
 # }}}
 
 # TODO: add button icon
-class Moka.Button extends Moka.Widget # {{{
+class Moka.Button extends Moka.Input # {{{
     constructor: (label_text, onclick) -># {{{
         super
-        @e = Moka.createLabel(label_text) # $("<div>")
-             .addClass("widget input button").attr("tabindex", 0)
-             .click(onclick)
-             .keydown( @keyPress.bind(this) )
+        Moka.createLabel(label_text, @e)
+        @e.addClass("button")
+        @click = onclick
     # }}}
 
-    keyPress: (ev) -># {{{
+    keydown: (ev) -># {{{
         keyname = getKeyName(ev)
 
         if keyname is "ENTER" or keyname is "SPACE"
@@ -606,82 +720,15 @@ class Moka.Button extends Moka.Widget # {{{
     # }}}
 # }}}
 
-class Moka.WidgetList extends Moka.Widget # {{{
+class Moka.WidgetList extends Moka.Container # {{{
     constructor: -># {{{
         super
         @e.addClass("widgetlist")
-          .keydown( @keyPress.bind(this) )
-        @widgets = []
-        @items = []
-        @selection = sel = new Moka.Selection(@e)
-        @.current = -1
+
+        @itemClass("widgetlistitem")
     # }}}
 
-    update: -># {{{
-        w = @widgets
-        $.each( w, (i) -> w[i].update?() )
-        @updateSelection()
-        return this
-    # }}}
-
-    next: -># {{{
-        @select(if @current >= 0 and @current < @items.length-1 then @current+1 else 0)
-    # }}}
-
-    prev: -># {{{
-        l = @items.length
-        @select(if @current >= 1 && @current < l then @current-1 else l-1)
-    # }}}
-
-    select: (id, no_focus) -># {{{
-        old_id = @current
-        if old_id != id
-            @current = id
-            item = @items[id]
-            if not no_focus
-                e = item.filter(".input")
-                if not e.length
-                    e = item.find(".input")
-                Moka.focus(e)
-
-            @updateSelection()
-
-            item.trigger("mokaSelected", [id])
-    # }}}
-
-    append: (widget) -># {{{
-        if widget.e?
-            ee = widget.e
-            @widgets.push(widget)
-        else
-            ee = widget
-
-        id = @items.length
-
-        # first & last
-        if id == 0
-            ee.addClass("first")
-        else
-            @items[id-1].removeClass("last")
-        @items.push(ee)
-
-        ee.addClass("widget widgetlistitem last")
-        ee.filter(".input").focus( @select.bind(this, id, false) )
-        ee.find(".input").focus( @select.bind(this, id, false) )
-
-        ee.appendTo(@e)
-          .bind("mokaSizeChanged", @updateSelection.bind(this) )
-          .children().focus( @updateSelection.bind(this) )
-
-        return this
-    # }}}
-
-    updateSelection: -># {{{
-        if @current >= 0
-            @selection.select( @items[@current] )
-    # }}}
-
-    keyPress: (ev) -># {{{
+    keydown: (ev) -># {{{
         keyname = getKeyName(ev)
 
         if @e.hasClass("horizontal")
@@ -711,9 +758,6 @@ class Moka.ButtonBox extends Moka.WidgetList # {{{
           .addClass("buttonbox horizontal")
     # }}}
 
-    updateSelection: -># {{{
-    # }}}
-
     append: (label_text, onclick) -># {{{
         widget = new Moka.Button(label_text, onclick)
         super widget
@@ -723,165 +767,121 @@ class Moka.ButtonBox extends Moka.WidgetList # {{{
     # }}}
 # }}}
 
-class Moka.Tabs extends Moka.Widget # {{{
+class Moka.Tabs extends Moka.Input # {{{
+    default_keys: # {{{
+        ENTER: -> Moka.focus_first(@pages[@current].e)
+        SPACE: -> @pages_e.toggle()
+
+        TAB: -> if (page = @pages[@current]) then Moka.focus_first(page.e)
+        LEFT: ->  if @vertical() then @focusUp() else @prev()
+        RIGHT: -> if @vertical() then @focusDown() else @next()
+        UP: -> if @vertical() then @prev() else @focusUp()
+        DOWN: -> if @vertical() then @next() else @focusDown()
+
+        PAGEUP: -> if @vertical() then @tabs.select(0)
+        PAGEDOWN: -> if @vertical() then @tabs.select(@tabs.length()-1)
+        HOME: -> if not @vertical() then @tabs.select(0)
+        END: -> if not @vertical() then @tabs.select(@tabs.length()-1)
+    # }}}
+
     constructor: -># {{{
         super
         @e.addClass("tabs_widget")
-          .keydown( @keyPress.bind(this) )
 
-        self = this
-        @tabs_e = $("<div>", {class:"tabs input", tabindex:0})
-                 .appendTo(@e)
-        @tabs_e.focus(
-            () ->
-                id = self.current
-                if id >= 0
-                    self.tabs_e.children(".tab")
-                        .eq(id)
-                        .addClass("focused")
-        )
-        @tabs_e.blur(
-            () ->
-                id = self.current
-                if id >= 0
-                    self.tabs_e.children(".tab")
-                        .eq(id)
-                        .removeClass("focused")
-        )
+        @tabs = new Moka.Container()
+               .itemClass("tab")
+        @tabs_e = @tabs.e
+            .addClass("tabs")
+            .appendTo(@e)
+            .bind "mokaSelected", (ev, id) =>
+                @pages[@current].hide() if @current >= 0
+                @current = id
+                @pages[id].show()
+
         @pages_e = $("<div>", class:"pages")
                    .appendTo(@e)
 
         @pages = []
-        @current = -1
-        @selection = new Moka.Selection(@tabs_e)
+        @current = 0
 
-        @setVertical(false)
+        @vertical(false)
     # }}}
 
     update: -># {{{
+        @tabs.update()
         # update active page and tab selection cursor
         if @current >= 0
-            @pages[@current].update?()
-        @updateSelection()
+            @pages[@current].show()
         return this
     # }}}
 
-    next: -># {{{
-        if (@current >= 0 && @current < @pages.length-1)
-            @select(@current+1)
-        else
-            @select(0)
-    # }}}
-
-    prev: -># {{{
-        l = @pages.length
-        if (@current >= 1 && @current < l)
-            @select(@current-1)
-        else
-            @select(l-1)
-    # }}}
-
-    select: (id) -># {{{
-        Moka.focus(@tabs_e)
-        old_id = @current
-
-        if old_id != id
-            if old_id >= 0
-                @pages[old_id].hide()
-                @tabs_e.children(".tab").eq(old_id).removeClass("focused")
-
-            page = @pages[id]
-            page.show()
-
-            tab = @tabs_e.children(".tab").eq(id)
-                 .trigger("mokaSelected", [id])
-            @current = id
-
-        @updateSelection()
-
+    focus: () -># {{{
+        Moka.focus(@tabs.e)
         return this
     # }}}
 
-    updateSelection: -># {{{
-        if not @e.is(":visible")
-            return
+    focusUp: () -># {{{
+        Moka.focus( @e.parents(".input").eq(0) )
+        return this
+    # }}}
 
-        if @current >= 0
-            tab = @tabs_e.children(".tab").eq(@current)
-            @selection.select(tab)
+    focusDown: () -># {{{
+        Moka.focus_first( @pages[@current].e )
+        return this
+    # }}}
+
+    next: () -># {{{
+        @tabs.next()
+        return this
+    # }}}
+
+    prev: () -># {{{
+        @tabs.prev()
+        return this
     # }}}
 
     append: (tabname, widget) -># {{{
         @pages.push(widget)
         page = if widget.e then widget.e else widget
 
-        tab = Moka.createLabel(tabname)
-        tab.addClass("tab")
-        tab.appendTo(@tabs_e)
+        tab = new Moka.Input()
+        Moka.createLabel(tabname, tab.e)
+        @tabs.append(tab)
 
         widget.hide()
         page.addClass("widget page")
         page.appendTo(@pages_e)
 
-        id = @pages.length-1
-        tab.click( @select.bind(this, id) )
-
-        if id is 0
-            @select(0)
+        if @current is @tabs.length()-1
+            @select(@current)
 
         return this
     # }}}
 
-    setVertical: (toggle) -># {{{
-        @tabs_e.addClass( if toggle is false then "horizontal" else "vertical" )
-        @tabs_e.removeClass(if toggle is false then "vertical" else "horizontal")
+    select: (id) -># {{{
+        @tabs.select(id)
         return this
     # }}}
 
-    keyPress: (ev) -># {{{
+    vertical: (toggle) -># {{{
+        if toggle?
+            @tabs_e.addClass( if toggle is false then "horizontal" else "vertical" )
+            @tabs_e.removeClass(if toggle is false then "vertical" else "horizontal")
+            return this
+        else
+            return @tabs_e.hasClass("vertical")
+    # }}}
+
+    keydown: (ev) -># {{{
         keyname = getKeyName(ev)
 
-        # focus next/previous tab
-        go_next = go_prev = go_focus_up = go_focus_down = false
-        if @tabs_e.hasClass("vertical")
-            if keyname is "UP"
-                go_prev = true
-            else if keyname is "DOWN"
-                go_next = true
-            else if keyname is "LEFT"
-                go_focus_up = true
-            else if keyname is "RIGHT"
-                go_focus_down = true
-        else
-            if keyname is "LEFT"
-                go_prev = true
-            else if keyname is "RIGHT"
-                go_next = true
-            else if keyname is "UP"
-                go_focus_up = true
-            else if keyname is "DOWN"
-                go_focus_down = true
-
-        if go_next or go_prev or go_focus_up or go_focus_down
-            Moka.focus(@tabs_e)
-            if go_next
-                @next()
-            else if go_prev
-                @prev()
-            else if go_focus_up
-                Moka.focus( @e.parents().children(".input").eq(-1) )
-            else
-                page = @pages[@current]
-                page = page.e if page.e?
-                Moka.focus( page.find(".input") )
-
+        if doKey(keyname, @keys, @default_keys, this)
             return false
 
         # send key press event to active page
-        if @current >= 0
-            page = @pages[@current]
-            if page.keyPress
-                if page.keyPress(ev) is false
+        if page = @pages[@current]
+            if page.keydown
+                if page.keydown(ev) is false
                     return false
                 else if ev.isPropagationStopped()
                     return
@@ -892,15 +892,15 @@ class Moka.Tabs extends Moka.Widget # {{{
     # }}}
 # }}}
 
-class Moka.ImageView extends Moka.Widget# {{{
-    default_keys = {}# {{{
+class Moka.ImageView extends Moka.Input# {{{
+    default_keys: {}# {{{
     # }}}
 
     constructor: (src) -># {{{
         super
         @e.addClass("imageview")
           .keydown( @keyPress.bind(this) )
-        @view = $("<img>", {class:"input", tabindex:0, src:""})
+        @view = $("<img>", {class:"input", src:""})
                .appendTo(@e)
         @src = src
     # }}}
@@ -994,12 +994,12 @@ class Moka.ImageView extends Moka.Widget# {{{
     # }}}
 # }}}
 
-class Moka.Viewer extends Moka.Widget# {{{
-    default_keys:# {{{
-        RIGHT: -> is_on_screen(focused_widget, "right") and @next()
-        LEFT: -> is_on_screen(focused_widget, "left") and @prev()
-        UP: -> is_on_screen(focused_widget, "top") and @prevRow()
-        DOWN: -> is_on_screen(focused_widget, "bottom") and @nextRow()
+class Moka.Viewer extends Moka.Input # {{{
+    default_keys: # {{{
+        RIGHT: -> is_on_screen(focused_widget, "right") and @focusRight()
+        LEFT: -> is_on_screen(focused_widget, "left") and @focusLeft()
+        UP: -> is_on_screen(focused_widget, "top") and @focusUp()
+        DOWN: -> is_on_screen(focused_widget, "bottom") and @focusDown()
         'KP6': -> @next()
         'KP4': -> @prev()
         'KP2': -> @nextRow()
@@ -1028,13 +1028,13 @@ class Moka.Viewer extends Moka.Widget# {{{
         END: -> @select(@length()-1)
         PAGEUP: ->
             c=@cellCount()
-            if @current%c is 0
+            if @currentcell%c is 0
                 @select(@index-c)
             else
                 @select(@index)
         PAGEDOWN: ->
             c=@cellCount()
-            if (@current+1)%c is 0
+            if (@currentcell+1)%c is 0
                 @select(@index+c)
             else
                 @select(@index+c-1)
@@ -1048,36 +1048,45 @@ class Moka.Viewer extends Moka.Widget# {{{
     constructor: () -># {{{
         super
         @e.addClass("viewer")
-          .keydown( @keyPress.bind(this) )
           .resize( @update.bind(this) )
-          .bind( "scroll.mokaViewerScroll", @onScroll.bind(this) )
-          .mousedown( (ev) -> if ev.button is 0 then dragScroll(ev) )
+          .bind( "scroll.moka", @onScroll.bind(this) )
           .css("cursor", "move")
+        $(window).bind("resize.moka", @update.bind(this) )
 
-        @table = $("<table>", class:"table", cellSpacing:0, cellPadding:0).appendTo(@e)
+        @table = $("<table>", class:"table", border:0, cellSpacing:0, cellPadding:0)
+                .appendTo(@e)
                 .bind("mokaFocused",
                     (ev) =>
-                        e = $(ev.target).parents(".view:last")
-                        return if not e.length
-                        @current = e.data("index")
+                        e = $(ev.target)
+                        return if not e.hasClass("view")
+                        @currentcell = e.data("index")
+                        @current = e.children().eq(0).data("index")
                         e.addClass("current")
+                        e.trigger("mokaSelected", [@current])
                 )
                 .bind("mokaBlurred",
                     (ev) =>
-                        e = $(ev.target).parents(".view:last")
-                        return if @current isnt e.data("index")
-                        @current = -1
+                        e = $(ev.target)
+                        return if not e.hasClass("view")
                         e.removeClass("current")
+                        e.trigger("mokaDeselected", [@current])
                 )
 
-        @updateTimestamp = 0
         @cells = []
         @items = []
+
+        # index of first item on current page
         @index = 0
-        @current = -1
+        # index of selected item on current page
+        @current  = -1
+        # index of selected cell in viewer (from left to right, top to bottom)
+        @currentcell = -1
+
+        # TODO: preload views
         @preload_count = 2
         #@preload_count = 0
 
+        @orientation("lt")
         @layout([1,1])
         @zoom(1)
     # }}}
@@ -1094,6 +1103,12 @@ class Moka.Viewer extends Moka.Widget# {{{
 
         w = @items
         $.each( w, (i) -> if w[i].update then w[i].update?() )
+        return this
+    # }}}
+
+    focus: (ev) -># {{{
+        @currentcell = 0 if @currentcell < 0
+        Moka.focus( @cells[@index + @currentcell] )
         return this
     # }}}
 
@@ -1132,7 +1147,7 @@ class Moka.Viewer extends Moka.Widget# {{{
             #item.hide().e.remove()
 
         i = 0
-        len = @cells.length
+        len = @cellCount()
         @index = Math.floor(id/len)*len
 
         dbg "displaying views",@index+".."+(@index+len-1)
@@ -1146,6 +1161,7 @@ class Moka.Viewer extends Moka.Widget# {{{
                 cell.attr("tabindex", 1)
                     .css(width: @e.width(), height: @e.height())
                 item.e.hide()
+                      .data("index", i)
                       .appendTo(cell)
             else
                 # cell is empty
@@ -1192,8 +1208,9 @@ class Moka.Viewer extends Moka.Widget# {{{
             @view(id)
 
         cell = @cell(id%count)
-        ensure_visible( @at(id).e )
-        Moka.focus(cell)
+        if cell
+            ensure_visible( cell.children() )
+            Moka.focus(cell)
 
         return this
     # }}}
@@ -1218,7 +1235,6 @@ class Moka.Viewer extends Moka.Widget# {{{
 
                 w = (wnd.width()-pos.left)/layout[0]
                 h = (wnd.height()-pos.top)/layout[1]
-                log w,h
 
                 for s in [@table.cellSpacing, @table.cellPadding, @table.border]
                     if s
@@ -1238,7 +1254,6 @@ class Moka.Viewer extends Moka.Widget# {{{
                     @z[1] *= d
                 else
                     @z *= d
-                    log @z,d
             else if not (how instanceof Array)
                 factor = parseFloat(how) or 1
                 @z = factor
@@ -1266,7 +1281,7 @@ class Moka.Viewer extends Moka.Widget# {{{
     # }}}
 
     next: () -># {{{
-        @select(@index+@current+1)
+        @select(@index + @current + 1)
         return this
     # }}}
 
@@ -1295,6 +1310,88 @@ class Moka.Viewer extends Moka.Widget# {{{
         return this
     # }}}
 
+    focusLeft: () -># {{{
+        id = @currentcell - 1
+        h = @layout()[0]
+        if (id+1) % h is 0
+            cell = @cells[id+h]
+            if cell
+                id = cell.children().eq(0).data("index")
+                how = -@cellCount()
+                if "r" in @o
+                    how = -how
+                @select(@index + id + how)
+        else
+            cell = @cells[id]
+            if cell
+                id = cell.children().eq(0).data("index")
+                @select(@index + id)
+        return this
+    # }}}
+
+    focusRight: () -># {{{
+        id = @currentcell + 1
+        h = @layout()[0]
+        if id % h is 0
+            cell = @cells[id-h]
+            if cell
+                id = cell.children().eq(0).data("index")
+                how = @cellCount()
+                if "r" in @o
+                    how = -how
+                @select(@index + id + how)
+        else
+            cell = @cells[id]
+            if cell
+                id = cell.children().eq(0).data("index")
+                @select(@index + id)
+        return this
+    # }}}
+
+    focusUp: () -># {{{
+        id = @currentcell
+        layout = @layout()
+        h = layout[0]
+        id -= h
+        if id < 0
+            len = @cellCount()
+            cell = @cells[id+len]
+            if cell
+                id = cell.children().eq(0).data("index")
+                how = -@cellCount()
+                if "b" in @o
+                    how = -how
+                @select(@index + id + how)
+        else
+            cell = @cells[id]
+            if cell
+                id = cell.children().eq(0).data("index")
+                @select(@index + id)
+        return this
+    # }}}
+
+    focusDown: () -># {{{
+        id = @currentcell
+        layout = @layout()
+        h = layout[0]
+        id += h
+        len = @cellCount()
+        if id >= len
+            cell = @cells[id-len]
+            if cell
+                id = cell.children().eq(0)?.data("index")
+                how = @cellCount()
+                if "b" in @o
+                    how = -how
+                @select(@index + id + how)
+        else
+            cell = @cells[id]
+            if cell
+                id = cell.children().eq(0)?.data("index")
+                @select(@index + id)
+        return this
+    # }}}
+
     appendRow: () -># {{{
         return $("<tr>", class:"row")
               .hide()
@@ -1305,10 +1402,11 @@ class Moka.Viewer extends Moka.Widget# {{{
         td = $("<td>")
             .appendTo(row)
 
-        cell = $("<div>", {class:"widget input view"})
-              .data("index", @cells.length)
-              .focus( () -> focus_first(cell) )
-              .appendTo(td)
+        cell = new Moka.Input().e
+        cell.addClass("view")
+            .data("index", @cellCount())
+            .focus( (ev) => Moka.focus_first(cell.children()) )
+            .appendTo(td)
 
         @cells.push(cell)
 
@@ -1316,7 +1414,7 @@ class Moka.Viewer extends Moka.Widget# {{{
     # }}}
 
     cell: (index) -># {{{
-        return @cells[index]
+        return @cells[ @indexfn(index) ]
     # }}}
 
     updateTable: () -># {{{
@@ -1335,13 +1433,16 @@ class Moka.Viewer extends Moka.Widget# {{{
             @appendCell(row) while ++i <= ilen
             row.show()
             ++j
+
+        # reset orientation
+        @orientation(@o)
     # }}}
 
     layout: (layout) -># {{{
         if layout
             x = Math.max( 0, Number(layout[0]) )
             y = Math.max( 0, Number(layout[1]) )
-            return if @lay and x is @lay[0] and y is @lay[1]
+            return this if @lay and x is @lay[0] and y is @lay[1]
 
             @e.removeClass("layout_"+@lay.join("x")) if @lay
             @lay = [x, y]
@@ -1349,7 +1450,7 @@ class Moka.Viewer extends Moka.Widget# {{{
 
             dbg "setting layout",@lay
 
-            id = @index+@current
+            id = @index+@currentcell
             @updateTable()
             @update()
             @select(id)
@@ -1365,9 +1466,64 @@ class Moka.Viewer extends Moka.Widget# {{{
             return [i, j]
     # }}}
 
+    orientation: (o) -># {{{
+        if o
+            # TODO: correctly parse orientation string
+            # (length is 2 and it contains items: (L or R) and (T or B))
+            @o = ""
+            x = o.toLowerCase().split(" ")
+            if x.length < 2
+                x = o.toLowerCase().split(///%20|-|_///)
+            if x.length < 2
+                a = x[0][0]
+                b = x[0][1]
+            else
+                a = x[0][0]
+                b = x[1][0]
+            log x,a,b
+            if a in "lr"
+                @o += a
+                if b in "tb"
+                    @o += b
+            else if a in "tb"
+                @o += a
+                if b in "lr"
+                    @o += b
+            if @o.length isnt 2
+                dbg "cannot parse orientation ('#{o}'); resetting to 'left top'"
+                @o = "lt"
+            log @o
+
+            len = @cells.length
+            return this if not len
+
+            dbg "setting orientation",o
+
+            x = @lay[0]
+            y = @lay[1]
+
+            fns =
+                lt:(id) -> id
+                rt:(id) -> i=id%x; j=Math.floor(id/x);   x-1 - i + j*x
+                lb:(id) -> i=id%x; j=Math.floor(id/x); len-x + i - j*x
+                rb:(id) -> i=id%x; j=Math.floor(id/x); len-1 - i - j*x
+
+                tl:(id) -> i=id%y; j=Math.floor(id/y);               i*x + j
+                tr:(id) -> i=id%y; j=Math.floor(id/y); len-1 - (y-1-i)*x - j
+                bl:(id) -> i=id%y; j=Math.floor(id/y);         (y-1-i)*x + j
+                br:(id) -> i=id%y; j=Math.floor(id/y); len-1 -       i*x - j
+
+            # index function: view index -> cell index
+            @indexfn = fns[@o]
+
+            return this
+        else
+            return @o
+    # }}}
+
     hideItem: (index) -># {{{
         item = @at(index)
-        cell = @cells[index % @cellCount()]
+        cell = @cell( index % @cellCount() )
         if item.e.is(":visible")
             dbg "hiding item",index
             h = cell.outerHeight()
@@ -1411,7 +1567,7 @@ class Moka.Viewer extends Moka.Widget# {{{
         updateItems = (index, direction) =># {{{
             next = updateItems.bind(this, index+direction, direction)
 
-            cell = @cells[index-@index]
+            cell = @cell(index-@index)
             item = @at(index)
             if not item or not cell
                 # finished
@@ -1444,17 +1600,16 @@ class Moka.Viewer extends Moka.Widget# {{{
 
                     hh = p.height()
                     if current_item
-                        log "XXX"
                         ensure_visible(current_item)
                     else
                         if pos.left < wndleft+@e.width()/2 and ww > w
-                            log "SCROLL", (ww-w)/2
                             @e.scrollLeft( left + (ww-w)/2 )
                         if pos.top < wndtop+@e.height()/2 and hh > h
-                            log "SCROLL", (hh-h)/2
                             @e.scrollTop( top + (hh-h)/2 )
 
-                next()
+                @updateVisible(true)
+                #window.setTimeout(next, 20)
+                #next()
 
             dbg "loading view",index
 
@@ -1478,7 +1633,12 @@ class Moka.Viewer extends Moka.Widget# {{{
         @updateVisible()
     # }}}
 
-    keyPress: (ev) -># {{{
+    mousedown: (ev) -># {{{
+          if ev.button is 0
+              dragScroll(ev)
+    # }}}
+
+    keydown: (ev) -># {{{
         keyname = getKeyName(ev)
 
         # keyhints
@@ -1489,7 +1649,7 @@ class Moka.Viewer extends Moka.Widget# {{{
     # }}}
 # }}}
 
-class Moka.Window extends Moka.Widget# {{{
+class Moka.Window extends Moka.Input# {{{
     default_keys: # {{{
         F4: -> @close()
     # }}}
@@ -1540,36 +1700,35 @@ class Moka.Window extends Moka.Widget# {{{
         self = this
         @e.addClass("window")
           .attr("tabindex", -1)
-          .keydown( @keyPress.bind(this) )
           .hide()
 
         e = @container = $("<div>").css(width:"100%", height:"100%").appendTo(@e)
 
-        $(window).resize( @update.bind(this) )
+        $(window).bind("resize.moka", @update.bind(this) )
 
         # title
-        @title = $("<div>", {class:"input title", html:title, tabindex:0})
-                .css('cursor', "pointer")
-                .keydown( @keyPressTitle.bind(this) )
+        @title = new Moka.Input()
+        @title.keydown = @keyDownTitle.bind(this)
+        @title.e.addClass("title")
+                .html(title)
                 .appendTo(e)
 
         # window title buttons
         $("<div>", {'class':"window_control close"})
             .css('cursor', "pointer")
             .click( @hide.bind(this) )
-            .appendTo(@title)
+            .appendTo(@title.e)
         $("<div>", {'class':"window_control maximize"})
             .css('cursor', "pointer")
             .click( @maximize.bind(this) )
-            .appendTo(@title)
+            .appendTo(@title.e)
 
         # body
         @body = body = $("<div>", {class:"body"})
                       .appendTo(e)
 
-        @title.dblclick( () -> body.toggle(); focus_first(body); return false )
-              .click( () -> this.focus() )
-              .mousedown( (ev) -> ev.preventDefault() ) # prevent selecting text when double-clicking
+        @title.dblclick = () -> body.toggle(); Moka.focus_first(body); return false
+        @title.mousedown = (ev) => @focus(); ev.preventDefault() # prevent selecting text when double-clicking
 
         # window edges
         edges =
@@ -1598,7 +1757,7 @@ class Moka.Window extends Moka.Widget# {{{
                     x = ev.pageX
                     y = ev.pageY
                     $this = $(this)
-                    $(document).bind("mousemove.mokaResize", (ev) ->
+                    $(document).bind("mousemove.moka", (ev) ->
                         dx = ev.pageX-x
                         dy = ev.pageY-y
                         x += dx
@@ -1617,12 +1776,12 @@ class Moka.Window extends Moka.Widget# {{{
                         self.position(pos.left, pos.top)
                         self.update()
                     )
-                    $(document).one("mouseup", () -> $(document).unbind("mousemove.mokaResize"))
+                    $(document).one("mouseup", () -> $(document).unbind("mousemove.moka"))
                     return false
 
         @widgets = []
 
-        initDraggable(@e, @title)
+        initDraggable(@e, @title.e)
         $(window).load( (() -> @update()).bind(this) )
     # }}}
 
@@ -1669,7 +1828,7 @@ class Moka.Window extends Moka.Widget# {{{
     # }}}
 
     focus: () -># {{{
-        Moka.focus(@title)
+        Moka.focus_first(@body)
         return this
     # }}}
 
@@ -1719,7 +1878,7 @@ class Moka.Window extends Moka.Widget# {{{
         @e.remove()
     # }}}
 
-    keyPress: (ev) -># {{{
+    keydown: (ev) -># {{{
         keyname = getKeyName(ev)
 
         # keyhints
@@ -1730,7 +1889,7 @@ class Moka.Window extends Moka.Widget# {{{
             return false
     # }}}
 
-    keyPressTitle: (ev) -># {{{
+    keyDownTitle: (ev) -># {{{
         keyname = getKeyName(ev)
 
         if doKey(keyname, @keys, @default_title_keys, this)

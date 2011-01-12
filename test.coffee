@@ -18,17 +18,17 @@ test = () -># {{{
         .append("Button_4", () -> alert "4 CLICKED")
 
     p3_2_1 = new Moka.Tabs()
-          .setVertical()
+          .vertical(true)
           .append("page _U", $("<div>"))
           .append("page _V", $("<div>"))
           .append("page _W", $("<div>"))
     p3_1 = new Moka.Tabs()
-          .setVertical()
+          .vertical(true)
           .append("page _1", $("<div>"))
           .append("page _2", p3_2_1)
           .append("page _3", $("<div>"))
     p3 = new Moka.Tabs()
-       .setVertical()
+       .vertical(true)
        .append("page _X", p3_1)
        .append("page _Y", $("<div>"))
        .append("page _Z", $("<div>"))
@@ -47,7 +47,7 @@ test = () -># {{{
        .append("page _Z", $("<div>"))
 
     w = new Moka.Tabs()
-       .setVertical()
+       .vertical(true)
        .append("page _A", p1)
        .append("page _B", p2)
        .append("page _C", p3)
@@ -70,8 +70,9 @@ onLoad = () -># {{{
     onLoad = undefined
 
     # vim cmd: .!cd ??? && ls|sed 's_^_        "file://'"$PWD"'/_;s/$/",/g'
-    items = [
+    items = [# {{{
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AlbedoSublimis.jpg",
+        "BAD.png"
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AeternaSaltatus.jpg",
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/amore.jpg",
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Magia of the Heart.jpg",
@@ -89,14 +90,14 @@ onLoad = () -># {{{
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Summoning of the Muse.jpg",
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Visitation.jpg",
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/UnioMystica.jpg",
-        "file:///home/lukas/Pictures/paintings/blackeri/_Color_Me_Blood_Red__by_blackeri.jpg",
-        "file:///home/lukas/Pictures/paintings/blackeri/Eros_Psyche_by_blackeri.jpg",
-        "file:///home/lukas/Pictures/paintings/blackeri/_Kohtalo_.jpg",
-        "file:///home/lukas/Pictures/paintings/blackeri/_MoonGoddess__by_blackeri.jpg",
-        "file:///home/lukas/Pictures/paintings/blackeri/_Seven_Deadly_Sins__ENVY__by_blackeri.jpg",
-        "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__AVARICE_by_blackeri.jpg",
-        "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__LUST_by_blackeri.jpg",
-        "file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__VANITY_by_blackeri.jpg",
+        #"file:///home/lukas/Pictures/paintings/blackeri/_Color_Me_Blood_Red__by_blackeri.jpg",
+        #"file:///home/lukas/Pictures/paintings/blackeri/Eros_Psyche_by_blackeri.jpg",
+        #"file:///home/lukas/Pictures/paintings/blackeri/_Kohtalo_.jpg",
+        #"file:///home/lukas/Pictures/paintings/blackeri/_MoonGoddess__by_blackeri.jpg",
+        #"file:///home/lukas/Pictures/paintings/blackeri/_Seven_Deadly_Sins__ENVY__by_blackeri.jpg",
+        #"file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__AVARICE_by_blackeri.jpg",
+        #"file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__LUST_by_blackeri.jpg",
+        #"file:///home/lukas/Pictures/paintings/blackeri/The_Seven_Deadly_Sins__VANITY_by_blackeri.jpg",
         #"http://th00.deviantart.net/fs71/150/f/2010/291/f/4/emoticon_complete_set_by_deviantwear-d2eyuej.jpg",
         #"BAD.PNG"
         #"http://fc02.deviantart.net/fs70/i/2011/004/2/6/hand_study_by_moni158-d36ghy8.png",
@@ -137,7 +138,12 @@ onLoad = () -># {{{
         #"http://th05.deviantart.net/fs70/150/f/2010/049/8/4/evo_VS_gtr__drift__by_3dmanipulasi.jpg",
         #"http://th06.deviantart.net/fs35/150/i/2008/239/d/5/The_Naked_Truth_by_kjcharmedfreak.jpg",
         #"http://th08.deviantart.net/fs70/150/i/2010/118/d/b/Acrylic_training_3_by_Pendalune.jpg",
-    ]
+    ]# }}}
+
+    #items=[
+        #'http://4.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/0000.jpg','http://6.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/disclaimer.jpg','http://7.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side001.jpg','http://3.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side002.jpg','http://3.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side003.jpg','http://7.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side004.jpg','http://2.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side005.jpg','http://9.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side006.jpg','http://9.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side007.jpg','http://0.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side008.jpg','http://5.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side009.jpg','http://4.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side010.jpg','http://5.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side011.jpg','http://8.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side012.jpg','http://1.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side013.jpg','http://8.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side014.jpg','http://6.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side015.jpg','http://0.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side016.jpg','',
+        #'http://0.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/0000.jpg','http://1.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/disclaimer.jpg','http://9.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side017.jpg','http://4.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side018.jpg','http://3.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side019.jpg','http://7.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side020.jpg','http://6.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side021.jpg','http://8.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side022.jpg','http://2.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side023.jpg','http://5.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side024.jpg','',
+    #]
 
     map = {}
     location.search.replace( /[?&]+([^=&]+)=([^&]*)/gi,
@@ -146,6 +152,7 @@ onLoad = () -># {{{
     # Viewer test {{{
     v = new Moka.Viewer()
        .layout(map.layout.split("x"))
+       .orientation(if map.o then map.o else "lt")
        #.layout([2,1])
        #.layout([0,1])
     #v.append(
@@ -153,6 +160,7 @@ onLoad = () -># {{{
                        #.append("Button _2", () -> alert "click 2!")
     #)
     v.append( new Moka.ImageView(item) ) for item in items
+    #v.append( new Moka.Button(i, ((x) ->-> alert x)(i)) ) for i in [0..36]
 
     # Viwer in document
     v.e.appendTo("body")
