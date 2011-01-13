@@ -57,9 +57,9 @@ test = () -># {{{
     $(".value").css 'font-family': "monospace"
     $(".page").addClass("valign")
 
-    $(".widgetlistitem").bind("mokaSelected", (e, id) -> log "ITEM #{id} SELECTED")
-    $(".buttonbox .button").bind("mokaSelected", (e, id) -> log "BUTTON #{id} SELECTED")
-    $(".tab").bind("mokaSelected", (e, id) -> log "TAB #{id} SELECTED")
+    $(".widgetlistitem").bind("mokaSelected", (e, id) -> console.log "ITEM #{id} SELECTED")
+    $(".buttonbox .button").bind("mokaSelected", (e, id) -> console.log "BUTTON #{id} SELECTED")
+    $(".tab").bind("mokaSelected", (e, id) -> console.log "TAB #{id} SELECTED")
 
     wnd.e.prependTo("body")
     wnd.show()
@@ -72,7 +72,7 @@ onLoad = () -># {{{
     # vim cmd: .!cd ??? && ls|sed 's_^_        "file://'"$PWD"'/_;s/$/",/g'
     items = [# {{{
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AlbedoSublimis.jpg",
-        "BAD.png"
+        #"BAD.png"
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AeternaSaltatus.jpg",
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/amore.jpg",
         "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Magia of the Heart.jpg",
@@ -176,11 +176,18 @@ onLoad = () -># {{{
     # }}}
 
     wnd = new Moka.Window("HELP")
-         .append( Moka.createLabel("Double click on the button to add new window!") )
-         .append( new Moka.Button("Add _New Window", test) )
-         .show()
-    wnd.e.css(right:0, bottom:0).appendTo("body")
-    wnd.focus()
+    wnd.append(
+        new Moka.Container(true).append(
+            new Moka.Container().append(
+                new Moka.Label("Moka is JavaScript GUI framework."),
+                new Moka.ButtonBox().append("Add _New Window", test).append("_Close", () -> wnd.close())
+            ),
+            new Moka.Image("img/moka.png").resize(64).show()
+        )
+    )
+    wnd.do( (e) -> e.prependTo("body") )
+       .show()
+       .focus()
 
     v.zoom(map.zoom)
 # }}}

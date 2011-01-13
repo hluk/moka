@@ -31,7 +31,8 @@ $widget_fg: black;
 $widget_bg: #ccc;
 // selected
 $widget_selected_fg: white;
-$widget_selected_bg: transparentize(#0af, 0.3);
+//$widget_selected_bg: transparentize(#0af, 0.3);
+$widget_selected_bg: transparentize(#fa0, 0.3);
 // current
 //$widget_current_fg: white;
 //$widget_current_bg: transparentize(#6af, 0.3);
@@ -60,10 +61,17 @@ $edit_focused_fg: #555;
 
 $imageview_padding: 4px;
 
+$title_fg: white;
+$title_bg: black;
+$title_selected_fg: black;
+$title_selected_bg: $widget_selected_bg;
+
 $window_layer:3;
 $top_window_layer:9999;
 $window_opacity: 0.5;
 $top_window_opacity: 1;
+
+$selection_transparency: 0.3;
 
 $tab_radius: 2px;
 $item_radius: 3px;
@@ -172,7 +180,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
 .selection {
     /* animate cursor movement */
     @include transitions("opacity .2s ease-in-out, background-color .2s ease-in-out, left .2s ease-in-out, top .2s ease-in-out, width .2s ease-in-out, height .2s ease-in-out");
-    background-color: transparentize($selection_bg * 1.4, 0.5);
+    background-color: transparentize($selection_bg, $selection_transparency);
 }
 .focused .keyhint {
     text-decoration: underline;
@@ -180,7 +188,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
 .label {
     color: transparentize($widget_fg, 0.2);
     font: $font_general;
-    padding: 0 0.5em;
+    padding: 0.5em 0.5em;
     text-shadow: transparentize(white, 0.5) 0 1px 0px;
 }
 .focused.label {
@@ -193,29 +201,29 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
 }
 
 .buttonbox {
-    width: 100%;
+    width: 95%;
     text-align: right;
-}
-.buttonbox .button {
-    &.first {
-        @include rounded(2em, top, left);
-        @include rounded(2em, bottom, left);
+    > .button {
+        &.first {
+            @include rounded(2em, top, left);
+            @include rounded(2em, bottom, left);
+        }
+        &.last {
+            @include rounded(2em, top, right);
+            @include rounded(2em, bottom, right);
+        }
     }
-    &.last {
-        @include rounded(2em, top, right);
-        @include rounded(2em, bottom, right);
-    }
+    .selection {display:none !important}
 }
-.buttonbox .selection {display:none !important}
 .button.label {
-    padding: 0.2em 0.4em;
+    padding: 0.15em 0.4em;
     text-shadow: transparentize(white, 0.5) 0 1px 0px;
 }
 .button {
     cursor: pointer;
     display: inline-block;
     text-align: center;
-    margin: 6px 6px;
+    margin: 6px 2px;
 
     border: 1px transparentize(black, 0.6) solid;
     @include box-shadow(inset 0 0 5px transparentize(white, 0.1));
@@ -252,6 +260,15 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         text-shadow: black 0 0 0;
     }
 }
+.container {
+    margin: 3px;
+    &.vertical{
+        float: left;
+    }
+    &.horizontal > .widget{
+        display: inline;
+    }
+}
 .tabs {
     .tab.current {
         background-color: $widget_current_bg;
@@ -266,7 +283,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         padding:0.5em;
         padding-bottom:0;
 
-        .tab {
+        > .tab {
             display: inline;
 
             /* don't put tab on multiple lines */
@@ -304,7 +321,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     &.vertical {
         float: left;
 
-        .tab {
+        > .tab {
             display: block;
 
             margin: 1.2em 0 1.2em 0.8em;
@@ -315,7 +332,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
             @include rounded($tab_radius, bottom, left);
             @include box-shadow(-2px 0 3px transparentize($widget_bg*0.4, 0.6));
 
-            padding-bottom: 0.4em;
+            padding: 0.3em;
             padding-right: 1em;
             background-image: -webkit-gradient(
                 linear,
@@ -412,8 +429,8 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         font: $font_header;
         padding: 0.1em 0.5em;
 
-        color: transparentize($widget_fg, 0.2);
-        background-color: $widget_bg;
+        color: $title_fg;
+        background-color: $title_bg;
         @include rounded($title_radius);
         @include inset();
     }
@@ -422,13 +439,16 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         z-index: $top_window_layer;
         opacity: $top_window_opacity;
         .title {
-            color: $widget_selected_fg;
-            background-color: $widget_selected_bg;
+            color: $title_selected_fg;
+            background-color: $title_selected_bg;
             &:focus {
                 color: black;
                 background-color: $widget_selected_bg*1.5;
             }
         }
+    }
+    &:hover {
+        opacity: $top_window_opacity;
     }
     // button characters at: http://www.utf8-chartable.de/unicode-utf8-table.pl
     .window_control {

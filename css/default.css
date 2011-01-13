@@ -15,11 +15,11 @@ input, textarea, .tabs, .input, .close, .title {
 
 .window .title.focused, .tab.focused, .widgetlistitem.focused, .button.focused, .imageview.focused {
   color: white;
-  background-color: rgba(0, 170, 255, 0.7); }
+  background-color: rgba(255, 170, 0, 0.7); }
 
 .window .title:hover, .tab:hover, .tabs:hover, .widgetlistitem:hover, .button:hover, .imageviewer:hover {
   color: black;
-  background-color: rgba(0, 170, 255, 0.3); }
+  background-color: rgba(255, 170, 0, 0.3); }
 
 .selection {
   /* animate cursor movement */
@@ -27,7 +27,7 @@ input, textarea, .tabs, .input, .close, .title {
   -moz-transition: opacity .2s ease-in-out, background-color .2s ease-in-out, left .2s ease-in-out, top .2s ease-in-out, width .2s ease-in-out, height .2s ease-in-out;
   -o-transition: opacity .2s ease-in-out, background-color .2s ease-in-out, left .2s ease-in-out, top .2s ease-in-out, width .2s ease-in-out, height .2s ease-in-out;
   transition: opacity .2s ease-in-out, background-color .2s ease-in-out, left .2s ease-in-out, top .2s ease-in-out, width .2s ease-in-out, height .2s ease-in-out;
-  background-color: rgba(0, 237, 255, 0.2); }
+  background-color: rgba(255, 170, 0, 0.4); }
 
 .focused .keyhint {
   text-decoration: underline; }
@@ -35,7 +35,7 @@ input, textarea, .tabs, .input, .close, .title {
 .label {
   color: rgba(0, 0, 0, 0.8);
   font: 11pt "Molengo", sans-serif;
-  padding: 0 0.5em;
+  padding: 0.5em 0.5em;
   text-shadow: rgba(255, 255, 255, 0.5) 0 1px 0px; }
 
 .focused.label {
@@ -47,36 +47,34 @@ input, textarea, .tabs, .input, .close, .title {
   text-shadow: rgba(0, 0, 0, 0.3) 0 -1px 0px; }
 
 .buttonbox {
-  width: 100%;
+  width: 95%;
   text-align: right; }
-
-.buttonbox .button.first {
-  border-top-left-radius: 2em;
-  -moz-border-radius-topleft: 2em;
-  -webkit-border-radius-topleft: 2em;
-  border-bottom-left-radius: 2em;
-  -moz-border-radius-bottomleft: 2em;
-  -webkit-border-radius-bottomleft: 2em; }
-.buttonbox .button.last {
-  border-top-right-radius: 2em;
-  -moz-border-radius-topright: 2em;
-  -webkit-border-radius-topright: 2em;
-  border-bottom-right-radius: 2em;
-  -moz-border-radius-bottomright: 2em;
-  -webkit-border-radius-bottomright: 2em; }
-
-.buttonbox .selection {
-  display: none !important; }
+  .buttonbox > .button.first {
+    border-top-left-radius: 2em;
+    -moz-border-radius-topleft: 2em;
+    -webkit-border-radius-topleft: 2em;
+    border-bottom-left-radius: 2em;
+    -moz-border-radius-bottomleft: 2em;
+    -webkit-border-radius-bottomleft: 2em; }
+  .buttonbox > .button.last {
+    border-top-right-radius: 2em;
+    -moz-border-radius-topright: 2em;
+    -webkit-border-radius-topright: 2em;
+    border-bottom-right-radius: 2em;
+    -moz-border-radius-bottomright: 2em;
+    -webkit-border-radius-bottomright: 2em; }
+  .buttonbox .selection {
+    display: none !important; }
 
 .button.label {
-  padding: 0.2em 0.4em;
+  padding: 0.15em 0.4em;
   text-shadow: rgba(255, 255, 255, 0.5) 0 1px 0px; }
 
 .button {
   cursor: pointer;
   display: inline-block;
   text-align: center;
-  margin: 6px 6px;
+  margin: 6px 2px;
   border: 1px rgba(0, 0, 0, 0.4) solid;
   box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.9);
   -webkit-box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.9);
@@ -86,16 +84,16 @@ input, textarea, .tabs, .input, .close, .title {
   background-image: -moz-linear-gradient(center bottom, #a3a3a3 0%, #cccccc 50%, #e0e0e0 100%); }
   .button:hover {
     color: black;
-    box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.3);
-    -webkit-box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.3);
-    -moz-box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.3);
-    -o-box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.3); }
+    box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.3);
+    -webkit-box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.3);
+    -moz-box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.3);
+    -o-box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.3); }
   .button.focused {
-    background-color: rgba(0, 170, 255, 0.5);
-    box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.4);
-    -webkit-box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.4);
-    -moz-box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.4);
-    -o-box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.4); }
+    background-color: rgba(255, 170, 0, 0.5);
+    box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.4);
+    -webkit-box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.4);
+    -moz-box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.4);
+    -o-box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.4); }
     .button.focused.label {
       color: black;
       text-shadow: rgba(255, 255, 255, 0.5) 0 1px 0px; }
@@ -119,16 +117,23 @@ input, textarea, .tabs, .input, .close, .title {
     background-color: white;
     text-shadow: black 0 0 0; }
 
+.container {
+  margin: 3px; }
+  .container.vertical {
+    float: left; }
+  .container.horizontal > .widget {
+    display: inline; }
+
 .tabs .tab.current {
   background-color: transparent; }
 .tabs.focused .tab.current {
   color: white; }
 .tabs.focused .selection {
-  background-color: rgba(0, 170, 255, 0.7); }
+  background-color: rgba(255, 170, 0, 0.7); }
 .tabs.horizontal {
   padding: 0.5em;
   padding-bottom: 0; }
-  .tabs.horizontal .tab {
+  .tabs.horizontal > .tab {
     display: inline;
     /* don't put tab on multiple lines */
     display: inline-block;
@@ -157,7 +162,7 @@ input, textarea, .tabs, .input, .close, .title {
     -webkit-border-radius-topright: 2px; }
 .tabs.vertical {
   float: left; }
-  .tabs.vertical .tab {
+  .tabs.vertical > .tab {
     display: block;
     margin: 1.2em 0 1.2em 0.8em;
     border-top-left-radius: 0;
@@ -176,7 +181,7 @@ input, textarea, .tabs, .input, .close, .title {
     -webkit-box-shadow: -2px 0 3px rgba(81, 81, 81, 0.4);
     -moz-box-shadow: -2px 0 3px rgba(81, 81, 81, 0.4);
     -o-box-shadow: -2px 0 3px rgba(81, 81, 81, 0.4);
-    padding-bottom: 0.4em;
+    padding: 0.3em;
     padding-right: 1em;
     background-image: -webkit-gradient(linear, left top, right top, color-stop(0, rgba(255, 255, 255, 0.5)), color-stop(0.6, rgba(204, 204, 204, 0)), color-stop(1, #cccccc));
     background-image: -moz-linear-gradient(left center, rgba(255, 255, 255, 0.5) 0%, rgba(204, 204, 204, 0) 60%, #cccccc 100%); }
@@ -207,7 +212,7 @@ input, textarea, .tabs, .input, .close, .title {
     -moz-border-radius: 3px;
     -webkit-border-radius: 3px; }
   .widgetlist.focused .selection {
-    background-color: rgba(0, 170, 255, 0.7); }
+    background-color: rgba(255, 170, 0, 0.7); }
 
 .widgetlistitem:nth-child(even) {
   background-color: rgba(255, 255, 255, 0.2); }
@@ -221,7 +226,7 @@ input, textarea, .tabs, .input, .close, .title {
   .widgetlistitem.focused, .widgetlistitem:nth-child(even).focused {
     background-color: transparent; }
   .widgetlistitem:hover, .widgetlistitem:nth-child(even):hover {
-    background-color: rgba(0, 170, 255, 0.3); }
+    background-color: rgba(255, 170, 0, 0.3); }
 
 .viewer, .viewer table {
   width: 100%;
@@ -269,8 +274,8 @@ input, textarea, .tabs, .input, .close, .title {
   .window .title {
     font: 11pt "Molengo", sans-serif;
     padding: 0.1em 0.5em;
-    color: rgba(0, 0, 0, 0.8);
-    background-color: #cccccc;
+    color: white;
+    background-color: black;
     border-radius: 0px;
     -moz-border-radius: 0px;
     -webkit-border-radius: 0px;
@@ -285,11 +290,13 @@ input, textarea, .tabs, .input, .close, .title {
     z-index: 9999;
     opacity: 1; }
     .window.focused .title {
-      color: white;
-      background-color: rgba(0, 170, 255, 0.7); }
+      color: black;
+      background-color: rgba(255, 170, 0, 0.7); }
       .window.focused .title:focus {
         color: black;
-        background-color: rgba(0, 255, 255, 0.7); }
+        background-color: rgba(255, 255, 0, 0.7); }
+  .window:hover {
+    opacity: 1; }
   .window .window_control {
     opacity: 0.5;
     float: left; }
