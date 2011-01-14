@@ -1,6 +1,8 @@
 # requirements: sass, coffee-script, inotify-tools
 NAME = test
-CSS = default
+CSS_CONFIG = css/dark.scss
+CSS_CORE = css/core.scss
+CSS_LIBS = css/utils.scss
 DEST = $(PWD)
 SRC = src
 LIB = moka
@@ -15,7 +17,7 @@ all: js css
 
 js: $(DEST)/$(NAME).js $(SRC)/$(LIB).js
 
-css: css/$(CSS).css
+css: $(CSS_CONFIG).css
 
 # TODO: fetch dependencies (git or download and unpack)
 deps:
@@ -25,21 +27,22 @@ deps:
 	coffee -c -o $(DEST) $^
 	@echo $(DIV)
 
-%.css: %.scss
+$(DEST)/$(NAME).css: $(CSS_CONFIG) $(CSS_CORE) $(CSS_LIBS)
 	@echo $(DIV)
-	sass $^:$@
+	ln -sf $< config.scss
+	sass $(CSS_CORE):$(DEST)/$(NAME).css
 	@echo $(DIV)
 
 
 .PHONY:watch watch.%.scss watch.%.coffee
 
 watch:
-	$(MAKE) -j3 $(SRC)/$(LIB).coffee.watch $(NAME).coffee.watch css/$(CSS).scss.watch
+	$(MAKE) -j3 $(SRC)/$(LIB).coffee.watch $(NAME).coffee.watch $(CSS_CONFIG).watch
 
-%.scss.watch: %.scss
+%.scss.watch: %.scss $(CSS_CORE) $(CSS_LIBS)
 	while true; do \
-		while [ ! -f $^ ]; do sleep 0.1; done && \
-		$(MAKE) $(^:.scss=.css); \
+		while ! ls $^ 2>/dev/null ; do sleep 0.1; done && \
+		$(MAKE) $(DEST)/$(NAME).css; \
 		$(INOTIFY) $^; done
 
 %.coffee.watch: %.coffee

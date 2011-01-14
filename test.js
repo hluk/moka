@@ -2,7 +2,7 @@
   var onLoad, test, wnd_count;
   wnd_count = 0;
   test = function() {
-    var p0, p1, p2, p3, p3_1, p3_2_1, p4, p4_1, p4_2_1, w, wnd;
+    var e, p0, p1, p2, p3, p3_1, p3_2_1, p4, p4_1, p4_2_1, w, wnd;
     wnd = new Moka.Window("Widget Test - Window " + (++wnd_count));
     p0 = new Moka.WidgetList();
     p1 = new Moka.WidgetList().append(new Moka.TextEdit("text _edit widget:", "type some text\nhere", true)).append(new Moka.TextEdit("text _edit widget:", "type some text here")).append(new Moka.Button("_Button", function() {
@@ -17,12 +17,13 @@
     }).append("Button_4", function() {
       return alert("4 CLICKED");
     });
-    p3_2_1 = new Moka.Tabs().vertical(true).append("page _U", $("<div>")).append("page _V", $("<div>")).append("page _W", $("<div>"));
-    p3_1 = new Moka.Tabs().vertical(true).append("page _1", $("<div>")).append("page _2", p3_2_1).append("page _3", $("<div>"));
-    p3 = new Moka.Tabs().vertical(true).append("page _X", p3_1).append("page _Y", $("<div>")).append("page _Z", $("<div>"));
-    p4_2_1 = new Moka.Tabs().append("page _U", $("<div>")).append("page _V", $("<div>")).append("page _W", $("<div>"));
-    p4_1 = new Moka.Tabs().append("page _1", $("<div>")).append("page _2", p4_2_1).append("page _3", $("<div>"));
-    p4 = new Moka.Tabs().append("page _X", p4_1).append("page _Y", $("<div>")).append("page _Z", $("<div>"));
+    e = new Moka.Input($("<input>"));
+    p3_2_1 = new Moka.Tabs().vertical(true).append("page _U", e).append("page _V", e).append("page _W", e);
+    p3_1 = new Moka.Tabs().vertical(true).append("page _1", e).append("page _2", p3_2_1).append("page _3", e);
+    p3 = new Moka.Tabs().vertical(true).append("page _X", p3_1).append("page _Y", e).append("page _Z", e);
+    p4_2_1 = new Moka.Tabs().append("page _U", e).append("page _V", e).append("page _W", e);
+    p4_1 = new Moka.Tabs().append("page _1", e).append("page _2", p4_2_1).append("page _3", e);
+    p4 = new Moka.Tabs().append("page _X", p4_1).append("page _Y", e).append("page _Z", e);
     w = new Moka.Tabs().vertical(true).append("page _A", p1).append("page _B", p2).append("page _C", p3).append("page _D", p4);
     wnd.append(w);
     $(".value").css({
@@ -60,7 +61,7 @@
     wnd = new Moka.Window("HELP");
     wnd.append(new Moka.Container(true).append(new Moka.Container().append(new Moka.Label("Moka is JavaScript GUI framework."), new Moka.ButtonBox().append("Add _New Window", test).append("_Close", function() {
       return wnd.close();
-    })), new Moka.Image("img/moka.png").resize(64).show()));
+    })), new Moka.Image("img/moka.png", 96, 96).show()));
     wnd["do"](function(e) {
       return e.prependTo("body");
     }).show().focus();

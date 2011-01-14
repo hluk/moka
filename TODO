@@ -1,12 +1,6 @@
-Viewer
-======
-- continuous view: show all cells of table (viewer) with some initial size and don't show content yet
-    * continuous horizontal layout is [0, 1]
-    * continuous vertical layout is [1, 0]
-
 TextEdit
 ========
-- use CodeMirror for TextEdit: http://marijnhaverbeke.nl/git/codemirror
+- if no action taken -> allow user to specify own (i.e. dokey)
 
 LineEdit
 ========
