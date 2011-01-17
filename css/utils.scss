@@ -50,32 +50,17 @@
 }
 
 @mixin inset-text($fg:$widget_fg) {
-    @if $fg - #800 == black {
-        text-shadow: transparentize(white - $fg, 0.2), 0 1px 0px;
+    @if opacify($fg, 1) - #800 == black {
+        text-shadow: transparentize(white - opacity($fg), 0.2), 0 1px 0px;
     } @else {
         text-shadow: transparentize(white - $fg, 0.2) 0 -1px 0px;
     }
 }
 
-@mixin gradient($color1, $color2:0, $color3:0) {
-    @if $color2 == 0 {
-        $color2: $color1;
-        $color1: $color2*1.1;
-        $color3: $color2*0.8;
-    }
-    background-image: -webkit-gradient(
-        linear,
-        left bottom,
-        left top,
-        color-stop(0,  $color3),
-        color-stop(.5, $color2),
-        color-stop(1,  $color1)
-    );
-    background-image: -moz-linear-gradient(
-        center bottom,
-        $color3 0%,
-        $color2 50%,
-        $color1 100%
-    );
+@mixin linear-gradient($angle, $colors) {
+    background-image: -webkit-linear-gradient(#{$angle}deg, unquote($colors));
+    background-image: -moz-linear-gradient(#{$angle}deg, unquote($colors));
+    background-image: linear-gradient(#{$angle}deg, unquote($colors));
+
 }
 

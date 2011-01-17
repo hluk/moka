@@ -1,6 +1,6 @@
 # requirements: sass, coffee-script, inotify-tools
 NAME = test
-CSS_CONFIG = css/dark.scss
+CSS_CONFIG = css/default.sass
 CSS_CORE = css/core.scss
 CSS_LIBS = css/utils.scss
 DEST = $(PWD)
@@ -29,17 +29,17 @@ deps:
 
 $(DEST)/$(NAME).css: $(CSS_CONFIG) $(CSS_CORE) $(CSS_LIBS)
 	@echo $(DIV)
-	ln -sf $< config.scss
+	ln -sf $< config.sass
 	sass $(CSS_CORE):$(DEST)/$(NAME).css
 	@echo $(DIV)
 
 
-.PHONY:watch watch.%.scss watch.%.coffee
+.PHONY:watch watch.%.sass watch.%.coffee
 
 watch:
 	$(MAKE) -j3 $(SRC)/$(LIB).coffee.watch $(NAME).coffee.watch $(CSS_CONFIG).watch
 
-%.scss.watch: %.scss $(CSS_CORE) $(CSS_LIBS)
+%.sass.watch: %.sass $(CSS_CORE) $(CSS_LIBS)
 	while true; do \
 		while ! ls $^ 2>/dev/null ; do sleep 0.1; done && \
 		$(MAKE) $(DEST)/$(NAME).css; \

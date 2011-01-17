@@ -8,6 +8,16 @@ body {
     padding: 0;
 }
 
+.widget {
+    @include transitions("opacity .2s ease-in-out, background-color .2s ease-in-out, color .2s ease-in-out");
+    z-index: inherit;
+}
+
+.widgetlistitem.current, .tab.current, .view.current .cell {
+    color: $widget_current_fg;
+    background-color: $widget_current_bg;
+}
+
 input, textarea, .tabs, .input, .close, .title {outline: 0}
 
 .window .title, .tab, .widgetlistitem, .button, .imageview {
@@ -37,13 +47,13 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     padding: 0.5em 0.5em;
     @include inset-text();
 }
+.current.label {
+    color: $widget_current_fg;
+    @include inset-text($widget_current_fg);
+}
 .focused.label {
     color: $widget_selected_fg;
     @include inset-text($widget_selected_fg);
-}
-.focused.current.label {
-    color: $widget_current_fg;
-    @include inset-text($widget_current_fg);
 }
 
 .buttonbox {
@@ -71,14 +81,19 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     text-align: center;
     margin: 6px 2px;
 
-    border: 1px solid transparentize(black, 0.5);
+    border: 1px solid $widget_bg*0.6;
+
     @include box-shadow(inset 0 0 5px transparentize($widget_bg*1.5, 0.3));
 
-    @include gradient($widget_bg);
+    @include linear-gradient(-90,
+        ($widget_bg*1.1) +","+
+        ($widget_bg) +","+
+        ($widget_bg*0.8)
+    );
 
     &:hover {
         color: $button_hover_fg;
-        @include box-shadow(inset 0 0 10px transparentize($button_hover_bg, 0));
+        @include box-shadow(inset 0 0 10px $button_hover_bg);
     }
     &.focused {
         &.label {
@@ -117,13 +132,11 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
 }
 .tabs {
     .tab {
-        border: 1px solid transparentize(black, 0.5);
-        &.current {
-            background-color: $widget_current_bg;
+        border: 1px solid $widget_bg*0.6;
+        .focused {
+            color: $widget_selected_fg;
+            background-color: $widget_selected_bg;
         }
-    }
-    &.focused .tab.current {
-        color: $widget_selected_fg;
     }
     &.focused .selection {
         background-color: $selection_bg;
@@ -148,22 +161,10 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
             @include box-shadow(0 -2px 3px transparentize($widget_bg*0.4, 0.6));
 
             padding-bottom: 1em;
-            background-image: -webkit-gradient(
-                linear,
-                left top,
-                left bottom,
-                color-stop(.0,  transparentize($widget_bg*1.5, 0.5)),
-                color-stop(.4,  transparentize($widget_bg, 1)),
-                color-stop(.7,  transparentize($widget_bg*0.6, 0.8)),
-                color-stop(1, $widget_bg)
-            );
-            background-image: -moz-linear-gradient(
-                center top,
-                transparentize($widget_bg*1.5, 0.5) 0%,
-                transparentize($widget_bg, 1)       40%,
-                transparentize($widget_bg*0.6, 0.8) 70%,
-                $widget_bg 100%
-            );
+            @include linear-gradient(-90,
+                transparentize(white,1) +" 65%,"+
+                $widget_bg
+            )
         }
         .selection {
             @include rounded($tab_radius, top, left);
@@ -187,22 +188,10 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
 
             padding: 0.3em;
             padding-right: 1em;
-            background-image: -webkit-gradient(
-                linear,
-                left top,
-                right top,
-                color-stop(.0,  transparentize($widget_bg*1.5, 0.5)),
-                color-stop(.4,  transparentize($widget_bg, 1)),
-                color-stop(.7,  transparentize($widget_bg*0.6, 0.8)),
-                color-stop(1, $widget_bg)
-            );
-            background-image: -moz-linear-gradient(
-                left center,
-                transparentize($widget_bg*1.5, 0.5) 0%,
-                transparentize($widget_bg, 1)       40%,
-                transparentize($widget_bg*0.6, 0.8) 70%,
-                $widget_bg 100%
-            );
+            @include linear-gradient(0,
+                transparentize(white,1) +" 75%,"+
+                $widget_bg
+            )
         }
         .selection {
             @include rounded(0, top, left);
@@ -226,10 +215,14 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     &.focused .selection {
         background-color: $selection_bg;
     }
+    &.focused .widgetlistitem.current {
+        color: $widget_selected_fg;
+        background-color: $widget_selected_bg;
+    }
 }
 .widgetlistitem {
     &:nth-child(even) {
-        background-color: transparentize(white, 0.9);
+        background-color: $widget_bg*1.05;
     }
     &, &:nth-child(even) {
         padding-top: 0.2em;
@@ -238,6 +231,9 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         @include rounded($item_radius);
 
         &.focused {
+            background-color: $widget_selected_bg;
+        }
+        &.current {
             background-color: $widget_current_bg;
         }
         &:hover {
@@ -267,13 +263,11 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
 
     position: absolute;
 
-    background: $widget_bg;
+    background-color: $widget_bg;
     @include rounded(5px);
     @include outset();
     @include rounded($window_radius);
     .body {
-        max-width: 100%;
-        max-height: 100%;
         overflow: auto;
     }
     .title, .body {
@@ -287,6 +281,11 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         background-color: $title_bg;
         @include rounded($title_radius);
         @include inset();
+
+        .label {
+            display:inline;
+            text-shadow:transparent 0 0 0;
+        }
     }
     // focused window on top
     &.top_window {opacity: $top_window_opacity;}
@@ -307,8 +306,8 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     }
     // button characters at: http://www.utf8-chartable.de/unicode-utf8-table.pl
     .window_control {
-        opacity: 0.5;
-        float: left;
+        opacity: 0.6;
+        display:inline;
         &:hover, &:focus {
             opacity: 1;
             color: white;
@@ -321,7 +320,6 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         }
     }
     .maximize {
-        padding-right: 0.5em;
         &:before {
           content: '\2299';
         }

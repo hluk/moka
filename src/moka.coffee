@@ -142,8 +142,7 @@ keyHintFocus = (keyname, root) -># {{{
 # }}}
 
 Moka.createLabel = (text, e) -># {{{
-    if not e
-        e = $("<div>")
+    e = $("<div>") if not e
     e.addClass("label")
 
     # replace _x with underlined character and assign x key
@@ -321,19 +320,6 @@ Moka.focus_first = (e) -># {{{
         return false
 # }}}
 
-ensure_position = (ee, e, size) -># {{{
-    ee.show()
-
-    pos = e.offset()
-    pos = left:Math.ceil(pos.left)+1, top:Math.ceil(pos.top)+1
-    ee.offset(pos)
-    if size
-        w = e.outerWidth()-2
-        h = e.outerHeight()-2
-        ee.width(w).height(h)
-    newpos = ee.offset()
-# }}}
-
 is_on_screen = (w, how) -># {{{
     return false if not w
     e = if w.e then w.e else w
@@ -418,20 +404,6 @@ Moka.gainFocus = (ev) ->
     #dbg "focused element",focused_widget
 # }}}
 
-Moka.init = () -># {{{
-    # wait before document loaded
-    ensure_fns = []
-
-    ensure_position_tmp = ensure_position
-    ensure_position = (ee, e, size) ->
-        ee.hide()
-        ensure_fns.push ensure_position_tmp.bind(this, ee, e, size)
-
-    $(window).load () ->
-        ensure_position = ensure_position_tmp
-        fn() for fn in ensure_fns
-# }}}
-
 class Moka.Widget# {{{
     constructor: (from_element) -># {{{
         @e = if from_element and from_element.hasClass then from_element else $("<div>")
@@ -501,35 +473,6 @@ class Moka.Input extends Moka.Widget # {{{
     # }}}
 # }}}
 
-class Moka.Selection extends Moka.Widget # {{{
-    constructor: () -># {{{
-        super
-        @e.css({position:"absolute", 'z-index':-2})
-          .addClass("selection")
-        @current = null
-    # }}}
-
-    update: -># {{{
-        @current ? @select(@current)
-        return this
-    # }}}
-
-    select: (e) -># {{{
-        @current.removeClass("current") if @current
-
-        if e?
-            pos = e.offset()
-            @e.show()
-              .width( e.outerWidth() )
-              .height( e.outerHeight() )
-              .offset({top:pos.top, left:pos.left})
-            @current = e.addClass("current")
-            ensure_position(this.e, e, true)
-        else
-            @e.hide()
-    # }}}
-# }}}
-
 class Moka.Container extends Moka.Widget# {{{
     constructor: (horizontal) -># {{{
         super
@@ -593,15 +536,23 @@ class Moka.Container extends Moka.Widget# {{{
     # }}}
 # }}}
 
-# container with selection cursor and interaction
 class Moka.WidgetList extends Moka.Container # {{{
     default_keys: # {{{
         LEFT:  -> if @e.hasClass("horizontal") then @prev() else false
         RIGHT: -> if @e.hasClass("horizontal") then @next() else false
         UP:    -> if not @e.hasClass("horizontal") then @prev() else false
         DOWN:  -> if not @e.hasClass("horizontal") then @next() else false
-        TAB:   -> if @current+1 < @length() then @next() else false
-        'S-TAB': -> if @current > 0 then @prev() else false
+        TAB:   ->
+            if @current+1 < @length()
+                @next()
+            else
+                @select(0)
+                @e.parent().trigger("mokaFocusUpRequest.moka")
+        'S-TAB': ->
+            if @current > 0
+                @prev()
+            else
+                @e.parent().trigger("mokaFocusUpRequest.moka")
     # }}}
 
     constructor: (cls, itemcls) -># {{{
@@ -613,28 +564,17 @@ class Moka.WidgetList extends Moka.Container # {{{
           .bind( "mokaFocusPrevRequest.moka", () => @prev(); return false )
 
         @itemcls = if itemcls? then itemcls else "widgetlistitem"
-        @selection = new Moka.Selection()
-        @selection.appendTo(@e)
-    # }}}
-
-    update: () -># {{{
-        super
-        @updateSelection()
-    # }}}
-
-    updateSelection: -># {{{
-        @selection.select( if @current >= 0 then @widgets[@current].e else null )
     # }}}
 
     select: (id) -># {{{
+        @widgets[@current]?.e.removeClass("current")
         if id >= 0
             @current = id
             w = @widgets[id]
+            w.e.addClass("current")
             Moka.focus_first(w.e)
         else
             @current = -1
-
-        @updateSelection()
     # }}}
 
     next: -># {{{
@@ -719,27 +659,27 @@ class Moka.TextEdit extends Moka.Input# {{{
 
             editor = new CodeMirror( @e[0],
                 height: "dynamic"
+                minHeight: 24
                 tabmode: "default"
-                parserfile: ["tokenizejavascript.js", "parsejavascript.js"],
+                parserfile: ["tokenizejavascript.js", "parsejavascript.js"]
                 stylesheet: "deps/codemirror/css/jscolors.css"
                 path: "deps/codemirror/js/"
             )
 
             # FIXME: grab key events only if no action taken in editor
             Moka.editor = editor
-            $(editor.win.document)
-                .keydown( (ev) => @oldpos = @editor.cursorPosition() )
-                .keyup (ev) => @editorKeyUp(ev)
 
             # Chromium: hidden iframe gets focus
             $(editor.frame).attr("tabindex", -1)
+
+            $(editor.win.document).bind "keydown.moka", @editorKeyDown.bind(this)
 
             win = $(editor.win)
             win.resize () =>
                 window.clearTimeout(@t_sizeupdate) if @t_sizeupdate
                 @t_sizeupdate = window.setTimeout( (() => @e.trigger("mokaSizeChanged")), 100 )
             win.focus (ev) =>
-                @oldpos = line:null, character:null
+                @oldpos = @editor.cursorPosition()
                 ev.target = editor.wrapping
                 Moka.gainFocus(ev)
             win.blur  (ev) =>
@@ -751,22 +691,19 @@ class Moka.TextEdit extends Moka.Input# {{{
             @editor = editor
     # }}}
 
-    editorKeyUp: (ev) -># {{{
+    editorKeyDown: (ev) -># {{{
         keyname = getKeyName(ev)
 
         if doKey(keyname, @keys, @default_keys, this)
             return false
 
-        pos = @editor.cursorPosition()
-        log @oldpos, pos, @editor.getCode()
-        if @oldpos.line is pos.line and @oldpos.character is pos.character
+        k = keyname.replace(/^S-/,"").replace(/^KP/,"")
+        log k
+        if k is "TAB" or k.search(/^F[0-9]/) >= 0
             # emulate keydown event
-            ev2 = jQuery.Event("keydown")
-            ev2.which = ev.which
-            @e.trigger(ev2)
-        else
-            @oldpos = pos
-            ev.stopPropagation()
+            #ev2 = jQuery.Event("keydown")
+            #ev2.which = ev.which
+            @e.trigger(ev)
     # }}}
 # }}}
 
@@ -852,14 +789,14 @@ class Moka.Tabs extends Moka.Widget # {{{
                    .appendTo(@e)
 
         @pages = []
-        @current = -1
+        @current = 0
 
         @vertical(false)
     # }}}
 
     update: -># {{{
         @tabs.update()
-        # update active page and tab selection cursor
+        # update active page
         if @current >= 0
             @pages[@current].show()
         return this
@@ -1163,7 +1100,8 @@ class Moka.Viewer extends Moka.Input # {{{
     update: -># {{{
         return if not @e.is(":visible")
 
-        @view(@index)
+        @orientation(@o)
+        #@view(@index)
 
         w = @items
         $.each( w, (i) -> if w[i].update then w[i].update?() )
@@ -1221,11 +1159,11 @@ class Moka.Viewer extends Moka.Input # {{{
             item = @at(@index+i)
 
             cell.children().detach()
+            cell.data("itemindex", i)
             if item
                 cell.attr("tabindex", 1)
                     .css(width: @e.width(), height: @e.height())
                 item.e.hide()
-                      .data("index", i)
                       .appendTo(cell)
             else
                 # cell is empty
@@ -1380,7 +1318,7 @@ class Moka.Viewer extends Moka.Input # {{{
         if (id+1) % h is 0
             cell = @cells[id+h]
             if cell
-                id = cell.children().eq(0).data("index")
+                id = cell.data("itemindex")
                 how = -@cellCount()
                 if "r" in @o
                     how = -how
@@ -1388,7 +1326,7 @@ class Moka.Viewer extends Moka.Input # {{{
         else
             cell = @cells[id]
             if cell
-                id = cell.children().eq(0).data("index")
+                id = cell.data("itemindex")
                 @select(@index + id)
         return this
     # }}}
@@ -1399,7 +1337,7 @@ class Moka.Viewer extends Moka.Input # {{{
         if id % h is 0
             cell = @cells[id-h]
             if cell
-                id = cell.children().eq(0).data("index")
+                id = cell.data("itemindex")
                 how = @cellCount()
                 if "r" in @o
                     how = -how
@@ -1407,7 +1345,7 @@ class Moka.Viewer extends Moka.Input # {{{
         else
             cell = @cells[id]
             if cell
-                id = cell.children().eq(0).data("index")
+                id = cell.data("itemindex")
                 @select(@index + id)
         return this
     # }}}
@@ -1421,7 +1359,7 @@ class Moka.Viewer extends Moka.Input # {{{
             len = @cellCount()
             cell = @cells[id+len]
             if cell
-                id = cell.children().eq(0).data("index")
+                id = cell.data("itemindex")
                 how = -@cellCount()
                 if "b" in @o
                     how = -how
@@ -1429,7 +1367,8 @@ class Moka.Viewer extends Moka.Input # {{{
         else
             cell = @cells[id]
             if cell
-                id = cell.children().eq(0).data("index")
+                id = cell.data("itemindex")
+                log id
                 @select(@index + id)
         return this
     # }}}
@@ -1443,7 +1382,7 @@ class Moka.Viewer extends Moka.Input # {{{
         if id >= len
             cell = @cells[id-len]
             if cell
-                id = cell.children().eq(0)?.data("index")
+                id = cell.data("itemindex")
                 how = @cellCount()
                 if "b" in @o
                     how = -how
@@ -1451,7 +1390,7 @@ class Moka.Viewer extends Moka.Input # {{{
         else
             cell = @cells[id]
             if cell
-                id = cell.children().eq(0)?.data("index")
+                id = cell.data("itemindex")
                 @select(@index + id)
         return this
     # }}}
@@ -1472,16 +1411,19 @@ class Moka.Viewer extends Moka.Input # {{{
             .focus( (ev) => Moka.focus_first(cell.children()) )
             .bind("mokaFocused",
                 (ev) =>
+                    if @current >= 0
+                        @cell(@currentcell).removeClass("current")
                     @currentcell = cell.data("index")
-                    @current = cell.children().eq(0).data("index")
-                    cell.trigger("mokaSelected", [@current])
+                    @current = cell.data("itemindex")
+                    cell.addClass("current")
+                        .trigger("mokaSelected", [@current])
             )
             .bind("mokaBlurred",
                 (ev) =>
-                    id = @current
-                    @current = -1
-                    cell.removeClass("current")
-                    cell.trigger("mokaDeselected", [id])
+                    #id = @current
+                    #@current = -1
+                    #cell.removeClass("current")
+                    #cell.trigger("mokaDeselected", [id])
             )
             .appendTo(td)
 
@@ -1510,9 +1452,6 @@ class Moka.Viewer extends Moka.Input # {{{
             @appendCell(row) while ++i <= ilen
             row.show()
             ++j
-
-        # reset orientation
-        @orientation(@o)
     # }}}
 
     layout: (layout) -># {{{
@@ -1590,6 +1529,7 @@ class Moka.Viewer extends Moka.Input # {{{
 
             # index function: view index -> cell index
             @indexfn = fns[@o]
+            @view(@index)
 
             return this
         else
@@ -1726,6 +1666,12 @@ class Moka.Viewer extends Moka.Input # {{{
     # }}}
 # }}}
 
+class Moka.Notfication extends Moka.Widget# {{{
+    constructor: () -># {{{
+        super
+    # }}}
+# }}}
+
 class Moka.Window extends Moka.Input# {{{
     default_keys: # {{{
         F4: -> @close()
@@ -1793,7 +1739,6 @@ class Moka.Window extends Moka.Input# {{{
         @title = new Moka.Input()
         @title.keydown = @keyDownTitle.bind(this)
         @title.e.addClass("title")
-                .html(title)
                 .appendTo(e)
 
         # window title buttons
@@ -1806,8 +1751,12 @@ class Moka.Window extends Moka.Input# {{{
             .click( @maximize.bind(this) )
             .appendTo(@title.e)
 
+        # title name
+        Moka.createLabel(title).appendTo(@title.e)
+
         # body
         @body = body = $("<div>", {class:"body"})
+                      .bind( "scroll.moka", @update.bind(this) )
                       .appendTo(e)
 
         @title.dblclick = () -> body.toggle(); Moka.focus_first(body); return false
@@ -1983,6 +1932,4 @@ class Moka.Window extends Moka.Input# {{{
     # }}}
 # }}}
 # }}}
-
-$(document).ready(Moka.init)
 
