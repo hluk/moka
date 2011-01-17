@@ -207,7 +207,6 @@ dragScroll = (ev) ->
     # do not prevent focus
     Moka.focus( $(ev.target).parents(".input:first") )
 
-
     wnd = ev.currentTarget
     w = $(wnd)
 
@@ -286,8 +285,6 @@ dragScroll = (ev) ->
     ev.preventDefault()
 # }}}
 
-# GUI classes# {{{
-# only one widget can can be focused at a time
 focused_widget = $()
 focus_timestamp = 0
 
@@ -404,6 +401,9 @@ Moka.gainFocus = (ev) ->
     #dbg "focused element",focused_widget
 # }}}
 
+
+# GUI classes# {{{
+# only one widget can can be focused at a time
 class Moka.Widget# {{{
     constructor: (from_element) -># {{{
         @e = if from_element and from_element.hasClass then from_element else $("<div>")
@@ -547,21 +547,21 @@ class Moka.WidgetList extends Moka.Container # {{{
                 @next()
             else
                 @select(0)
-                @e.parent().trigger("mokaFocusUpRequest.moka")
+                @e.parent().trigger("mokaFocusUpRequest")
         'S-TAB': ->
             if @current > 0
                 @prev()
             else
-                @e.parent().trigger("mokaFocusUpRequest.moka")
+                @e.parent().trigger("mokaFocusUpRequest")
     # }}}
 
     constructor: (cls, itemcls) -># {{{
         super
         @e.addClass(if cls? then cls else "widgetlist")
           .bind( "keydown.moka", (ev) => @keydown(ev) )
-          .bind( "mokaFocusUpRequest.moka", () => @select(Math.max(0, @current)); return false )
-          .bind( "mokaFocusNextRequest.moka", () => @next(); return false )
-          .bind( "mokaFocusPrevRequest.moka", () => @prev(); return false )
+          .bind( "mokaFocusUpRequest", () => @select(Math.max(0, @current)); return false )
+          .bind( "mokaFocusNextRequest", () => @next(); return false )
+          .bind( "mokaFocusPrevRequest", () => @prev(); return false )
 
         @itemcls = if itemcls? then itemcls else "widgetlistitem"
     # }}}
@@ -698,7 +698,6 @@ class Moka.TextEdit extends Moka.Input# {{{
             return false
 
         k = keyname.replace(/^S-/,"").replace(/^KP/,"")
-        log k
         if k is "TAB" or k.search(/^F[0-9]/) >= 0
             # emulate keydown event
             #ev2 = jQuery.Event("keydown")
@@ -767,7 +766,7 @@ class Moka.Tabs extends Moka.Widget # {{{
         super
         @e.addClass("tabs_widget")
           .bind( "keydown.moka", (ev) => @keydown(ev) )
-          .bind( "mokaFocusUpRequest.moka", () => @select(Math.max(0, @current)); return false )
+          .bind( "mokaFocusUpRequest", () => @select(Math.max(0, @current)); return false )
 
         @tabs = new Moka.WidgetList("tabs", "tab")
         @tabs_e = @tabs.e
@@ -806,7 +805,7 @@ class Moka.Tabs extends Moka.Widget # {{{
         if not @tabs_e.hasClass("focused")
             @select(Math.max(0, @current))
         else
-            @e.parent().trigger("mokaFocusUpRequest.moka")
+            @e.parent().trigger("mokaFocusUpRequest")
         return this
     # }}}
 
@@ -1067,7 +1066,7 @@ class Moka.Viewer extends Moka.Input # {{{
           .bind( "scroll.moka", @onScroll.bind(this) )
           .css("cursor", "move")
           .attr("tabindex", 1)
-          .bind( "mokaFocusUpRequest.moka", () => @select(@index + @current); return false )
+          .bind( "mokaFocusUpRequest", () => @select(@index + @current); return false )
         $(window).bind("resize.moka", @update.bind(this) )
 
         @table = $("<table>", class:"table", border:0, cellSpacing:0, cellPadding:0)
@@ -1101,7 +1100,6 @@ class Moka.Viewer extends Moka.Input # {{{
         return if not @e.is(":visible")
 
         @orientation(@o)
-        #@view(@index)
 
         w = @items
         $.each( w, (i) -> if w[i].update then w[i].update?() )
@@ -1109,8 +1107,8 @@ class Moka.Viewer extends Moka.Input # {{{
     # }}}
 
     focus: (ev) -># {{{
-        @currentcell = 0 if @currentcell < 0
-        Moka.focus( @cells[@index + @currentcell] )
+        cell = @cells[if @currentcell > 0 then @currentcell else 0]
+        Moka.focus_first( cell.children() ) or Moka.focus(cell)
         return this
     # }}}
 
@@ -1161,7 +1159,7 @@ class Moka.Viewer extends Moka.Input # {{{
             cell.children().detach()
             cell.data("itemindex", i)
             if item
-                cell.attr("tabindex", 1)
+                cell.attr("tabindex", -1)
                     .css(width: @e.width(), height: @e.height())
                 item.e.hide()
                       .appendTo(cell)
@@ -1209,10 +1207,8 @@ class Moka.Viewer extends Moka.Input # {{{
         if id < @index or id >= @index+count
             @view(id)
 
-        cell = @cell(id%count)
-        if cell
-            ensure_visible( cell.children() )
-            Moka.focus(cell)
+        cell = @cells[id%count]
+        Moka.focus_first( cell.children() ) or Moka.focus(cell)
 
         return this
     # }}}
@@ -1273,6 +1269,7 @@ class Moka.Viewer extends Moka.Input # {{{
 
             @updateVisible()
 
+            @e.trigger("mokaZoomChanged")
             return this
         else
             return @z
@@ -1313,8 +1310,8 @@ class Moka.Viewer extends Moka.Input # {{{
     # }}}
 
     focusLeft: () -># {{{
-        id = @currentcell - 1
         h = @layout()[0]
+        id = @currentcell - 1
         if (id+1) % h is 0
             cell = @cells[id+h]
             if cell
@@ -1332,12 +1329,13 @@ class Moka.Viewer extends Moka.Input # {{{
     # }}}
 
     focusRight: () -># {{{
-        id = @currentcell + 1
         h = @layout()[0]
+        id = @currentcell + 1
         if id % h is 0
             cell = @cells[id-h]
             if cell
                 id = cell.data("itemindex")
+                log cell, id
                 how = @cellCount()
                 if "r" in @o
                     how = -how
@@ -1351,10 +1349,8 @@ class Moka.Viewer extends Moka.Input # {{{
     # }}}
 
     focusUp: () -># {{{
-        id = @currentcell
-        layout = @layout()
-        h = layout[0]
-        id -= h
+        h = @layout()[0]
+        id = @currentcell - h
         if id < 0
             len = @cellCount()
             cell = @cells[id+len]
@@ -1368,17 +1364,14 @@ class Moka.Viewer extends Moka.Input # {{{
             cell = @cells[id]
             if cell
                 id = cell.data("itemindex")
-                log id
                 @select(@index + id)
         return this
     # }}}
 
     focusDown: () -># {{{
-        id = @currentcell
-        layout = @layout()
-        h = layout[0]
-        id += h
+        h = @layout()[0]
         len = @cellCount()
+        id = @currentcell + h
         if id >= len
             cell = @cells[id-len]
             if cell
@@ -1397,7 +1390,6 @@ class Moka.Viewer extends Moka.Input # {{{
 
     appendRow: () -># {{{
         return $("<tr>", class:"row")
-              .hide()
               .appendTo(@table)
     # }}}
 
@@ -1406,24 +1398,22 @@ class Moka.Viewer extends Moka.Input # {{{
             .appendTo(row)
 
         cell = new Moka.Input().e
+        id = @cellCount()
         cell.addClass("view")
-            .data("index", @cellCount())
-            .focus( (ev) => Moka.focus_first(cell.children()) )
             .bind("mokaFocused",
                 (ev) =>
-                    if @current >= 0
-                        @cell(@currentcell).removeClass("current")
-                    @currentcell = cell.data("index")
+                    return if @currentcell is id and @currentindex is @index+id
+                    if ev.target is cell[0] and Moka.focus_first(cell.children())
+                        return
+
+                    @cells[@currentcell]?.removeClass("current")
+                                         .trigger("mokaDeselected", [@index + @current])
+                    @currentindex = @index+id
+                    @currentcell = id
                     @current = cell.data("itemindex")
+
                     cell.addClass("current")
-                        .trigger("mokaSelected", [@current])
-            )
-            .bind("mokaBlurred",
-                (ev) =>
-                    #id = @current
-                    #@current = -1
-                    #cell.removeClass("current")
-                    #cell.trigger("mokaDeselected", [id])
+                    @e.trigger("mokaSelected", [@index + @current])
             )
             .appendTo(td)
 
@@ -1438,7 +1428,7 @@ class Moka.Viewer extends Moka.Input # {{{
 
     updateTable: () -># {{{
         cell.children().detach() for cell in @cells
-        @table.empty()
+        @table.empty().hide()
         @cells = []
 
         layout = @layout()
@@ -1450,8 +1440,9 @@ class Moka.Viewer extends Moka.Input # {{{
             row = @appendRow()
             i = 0
             @appendCell(row) while ++i <= ilen
-            row.show()
             ++j
+
+        @table.show()
     # }}}
 
     layout: (layout) -># {{{
@@ -1666,9 +1657,53 @@ class Moka.Viewer extends Moka.Input # {{{
     # }}}
 # }}}
 
-class Moka.Notfication extends Moka.Widget# {{{
-    constructor: () -># {{{
+class Moka.Notification extends Moka.Widget# {{{
+    constructor: (html, notification_class, delay, @animation_speed) -># {{{
         super
+        if not Moka.notificationLayer?
+            Moka.notificationLayer =
+                $("<div>", id:"notification-layer")
+                    .appendTo("body")
+        delay = 8000 if not delay?
+        @animation_speed = 1000 if not @animation_speed?
+
+        @e.addClass("notification "+notification_class)
+          .html(html)
+          .bind( "mouseeter.moka", () => window.clearTimeout(@t_notify) )
+          .bind( "mouseleave.moka", () => @t_notify = window.setTimeout(@remove.bind(this), delay) )
+          .hide()
+          .appendTo(Moka.notificationLayer)
+          .show(@animation_speed)
+
+        @t_notify = window.setTimeout( @remove.bind(this), delay )
+    # }}}
+
+    remove: () -># {{{
+        window.clearTimeout(@t_notify)
+        @e.hide( @animation_speed, (() => @e.remove()) )
+    # }}}
+# }}}
+
+class Moka.NotificationX extends Moka.Widget# {{{
+    constructor: (html, delay) -># {{{
+        super
+        delay = 8000 if not delay?
+
+        @e.addClass("notification")
+          .css(top:Moka.notifyTop)
+          .html(html)
+          .bind( "mouseeter.moka", () => window.clearTimeout(@t_notify) )
+          .bind( "mouseleave.moka", () => @t_notify = window.setTimeout((() => @e.remove()), delay) )
+          .appendTo("body")
+        @height = @e.outerHeight(true)
+        Moka.notifyTop += @height
+
+        @t_notify = window.setTimeout( (() => @e.remove()), delay )
+    # }}}
+
+    remove: () -># {{{
+        @e.remove()
+        Moka.notifyTop -= @e.outerHeight(true)
     # }}}
 # }}}
 
@@ -1725,7 +1760,7 @@ class Moka.Window extends Moka.Input# {{{
         @e.addClass("window")
           .attr("tabindex", 1)
           .hide()
-          .bind( "mokaFocusUpRequest.moka", () => @title.do(Moka.focus); return false )
+          .bind( "mokaFocusUpRequest", () => @title.do(Moka.focus); return false )
           .bind "mokaFocused", () =>
               cls="top_window"
               @e.parent().children("."+cls).removeClass(cls)

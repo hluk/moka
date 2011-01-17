@@ -157,15 +157,34 @@ onLoad = () -># {{{
        #.layout([2,1])
        #.layout([0,1])
     #v.append(
-        #new ButtonBox().append("Button _1", () -> alert "click 1!")
+        #new Moka.ButtonBox().append("Button _1", () -> alert "click 1!")
                        #.append("Button _2", () -> alert "click 2!")
     #)
     v.append( new Moka.ImageView(item) ) for item in items
+    #v.append( new Moka.Image(item) ) for item in items
     #v.append( new Moka.Button(i, ((x) ->-> alert x)(i)) ) for i in [0..36]
 
     # Viwer in document
     v.e.appendTo("body")
     v.show()
+
+    # notifications
+    oldid = undefined
+    notify = (id) ->
+        if id?
+            oldid = id
+        else
+            id = oldid
+        Moka.notificationLayer?.empty()
+        new Moka.Notification(
+            "<b>#{id+1}/#{items.length}</b><br/>"+
+            "URL: <i>#{items[id]}</i><br/>"+
+            "zoom: <i>#{v.at(id).zhow}</i>", "", 4000, 300
+        )
+
+    v.e.bind "mokaSelected mokaZoomChanged", (ev, id) ->
+        return if ev.target isnt this or not (id? or oldid?)
+        notify(id)
 
     # Viewer in window
     #wnd = new Window("Viewer")

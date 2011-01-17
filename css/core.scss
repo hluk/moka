@@ -13,7 +13,7 @@ body {
     z-index: inherit;
 }
 
-.widgetlistitem.current, .tab.current, .view.current .cell {
+.widgetlistitem.current, .tab.current, .view.current > .widget {
     color: $widget_current_fg;
     background-color: $widget_current_bg;
 }
@@ -101,7 +101,12 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
             @include inset-text($button_selected_fg);
         }
         background-color: $button_selected_bg;
-        @include box-shadow(inset 0 0 10px $button_selected_bg);
+        //@include box-shadow(inset 0 0 10px $button_selected_bg);
+        @include linear-gradient(-90,
+            ($button_selected_bg*1.1) +","+
+            ($button_selected_bg) +","+
+            ($button_selected_bg*0.8)
+        );
     }
 }
 .textedit .CodeMirror-wrapping {
@@ -241,22 +246,25 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         }
     }
 }
-.viewer, .viewer table {
+.viewer, .viewer .table {
     width: 100%;
     height: 100%;
     overflow: auto;
 }
-.viewer .view {
+.view.focused > .widget {
+    color: $title_selected_fg;
+    background-color: $title_selected_bg;
+}
+.viewer td {
     text-align: center;
 }
-.viewer .imageview {
+.viewer .view {
     display:inline-block;
 }
 .imageview img {padding:$imageview_padding}
 .viewer .table {margin:auto}
 .window {
     border: 1px solid black;
-	color: transparentize(white, 0.6);
     opacity: $window_opacity;
 
 	z-index: $window_layer; /* on top */
@@ -283,6 +291,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         @include inset();
 
         .label {
+            color: $title_fg;
             display:inline;
             text-shadow:transparent 0 0 0;
         }
@@ -294,9 +303,15 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         z-index: $top_window_layer;
         .title {
             color: $title_selected_fg;
+            .label {
+                color: $title_selected_fg;
+            }
             background-color: $title_selected_bg;
             &:focus {
                 color: $title_focused_fg;
+                .label {
+                    color: $title_focused_fg;
+                }
                 background-color: $title_focused_bg;
             }
         }
@@ -324,5 +339,27 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
           content: '\2299';
         }
     }
+}
+
+#notification-layer {
+    position: fixed;
+    z-index: $notification_layer;
+    top:0; left:0;
+}
+
+.notification {
+    float:left;
+    margin: 1em;
+    white-space: nowrap;
+
+    text-shadow: $notification_bg*0.7 1px 1px 1px;
+
+    color: $notification_fg;
+    background-color: $notification_bg;
+    padding: 0.5em 1.5em;
+
+    @include box-shadow(0 0 20px rgba(0,0,0,0.5));
+    @include rounded(5px);
+    @include transitionsx("opacity 0.5s ease-in-out, background-color 1.5s ease-in-out");
 }
 

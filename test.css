@@ -16,7 +16,7 @@ body {
   transition: opacity .2s ease-in-out, background-color .2s ease-in-out, color .2s ease-in-out;
   z-index: inherit; }
 
-.widgetlistitem.current, .tab.current, .view.current .cell {
+.widgetlistitem.current, .tab.current, .view.current > .widget {
   color: rgba(0, 0, 0, 0.8);
   background-color: rgba(221, 170, 68, 0.4); }
 
@@ -101,10 +101,9 @@ input, textarea, .tabs, .input, .close, .title {
     -o-box-shadow: inset 0 0 10px rgba(221, 170, 68, 0.3); }
   .button.focused {
     background-color: rgba(221, 170, 68, 0.5);
-    box-shadow: inset 0 0 10px rgba(221, 170, 68, 0.5);
-    -webkit-box-shadow: inset 0 0 10px rgba(221, 170, 68, 0.5);
-    -moz-box-shadow: inset 0 0 10px rgba(221, 170, 68, 0.5);
-    -o-box-shadow: inset 0 0 10px rgba(221, 170, 68, 0.5); }
+    background-image: -webkit-linear-gradient(-90deg, rgba(243, 187, 74, 0.5),rgba(221, 170, 68, 0.5),rgba(176, 136, 54, 0.5));
+    background-image: -moz-linear-gradient(-90deg, rgba(243, 187, 74, 0.5),rgba(221, 170, 68, 0.5),rgba(176, 136, 54, 0.5));
+    background-image: linear-gradient(-90deg, rgba(243, 187, 74, 0.5),rgba(221, 170, 68, 0.5),rgba(176, 136, 54, 0.5)); }
     .button.focused.label {
       color: black;
       text-shadow: rgba(254, 254, 254, 0.8), 0 1px 0px; }
@@ -248,15 +247,19 @@ input, textarea, .tabs, .input, .close, .title {
   .widgetlistitem:hover, .widgetlistitem:nth-child(even):hover {
     background-color: rgba(221, 170, 68, 0.3); }
 
-.viewer, .viewer table {
+.viewer, .viewer .table {
   width: 100%;
   height: 100%;
   overflow: auto; }
 
-.viewer .view {
+.view.focused > .widget {
+  color: black;
+  background-color: rgba(221, 170, 68, 0.7); }
+
+.viewer td {
   text-align: center; }
 
-.viewer .imageview {
+.viewer .view {
   display: inline-block; }
 
 .imageview img {
@@ -267,7 +270,6 @@ input, textarea, .tabs, .input, .close, .title {
 
 .window {
   border: 1px solid black;
-  color: rgba(255, 255, 255, 0.4);
   opacity: 0.4;
   z-index: 3;
   /* on top */
@@ -306,6 +308,7 @@ input, textarea, .tabs, .input, .close, .title {
     -moz-box-shadow: inset 0 0 4px rgba(112, 107, 88, 0.4);
     -o-box-shadow: inset 0 0 4px rgba(112, 107, 88, 0.4); }
     .window .title .label {
+      color: white;
       display: inline;
       text-shadow: transparent 0 0 0; }
   .window.top_window {
@@ -313,13 +316,17 @@ input, textarea, .tabs, .input, .close, .title {
   .window.focused {
     opacity: 1; }
   .window.focused {
-    z-index: 9999; }
+    z-index: 999; }
     .window.focused .title {
       color: black;
       background-color: rgba(221, 170, 68, 0.7); }
+      .window.focused .title .label {
+        color: black; }
       .window.focused .title:focus {
         color: black;
         background-color: #ffee88; }
+        .window.focused .title:focus .label {
+          color: black; }
   .window:hover {
     opacity: 1; }
   .window .window_control {
@@ -333,3 +340,29 @@ input, textarea, .tabs, .input, .close, .title {
     content: '\2297'; }
   .window .maximize:before {
     content: '\2299'; }
+
+#notification-layer {
+  position: fixed;
+  z-index: 9999;
+  top: 0;
+  left: 0; }
+
+.notification {
+  float: left;
+  margin: 1em;
+  white-space: nowrap;
+  text-shadow: rgba(156, 149, 123, 0.7) 1px 1px 1px;
+  color: black;
+  background-color: rgba(224, 214, 176, 0.7);
+  padding: 0.5em 1.5em;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  -webkit-box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  -moz-box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  -o-box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  border-radius: 5px;
+  -moz-border-radius: 5px;
+  -webkit-border-radius: 5px;
+  -webkit-transition: -webkit-opacity 0.5s ease-in-out, background-color 1.5s ease-in-out;
+  -moz-transition: -moz-opacity 0.5s ease-in-out, background-color 1.5s ease-in-out;
+  -o-transition: -o-opacity 0.5s ease-in-out, background-color 1.5s ease-in-out;
+  transition: opacity 0.5s ease-in-out, background-color 1.5s ease-in-out; }
