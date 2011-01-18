@@ -47,12 +47,13 @@ test = () -># {{{
        .append("page _Y", e)
        .append("page _Z", e)
 
-    w = new Moka.Tabs()
+    t = new Moka.Tabs()
        .vertical(true)
        .append("page _A", p1)
        .append("page _B", p2)
        .append("page _C", p3)
        .append("page _D", p4)
+    w = new Moka.Container().append(t, new Moka.ButtonBox().append("_Close", () -> wnd.close()) )
     wnd.append(w)
 
     $(".value").css 'font-family': "monospace"
@@ -176,10 +177,13 @@ onLoad = () -># {{{
         else
             id = oldid
         Moka.notificationLayer?.empty()
+        img = v.at(id)
         new Moka.Notification(
             "<b>#{id+1}/#{items.length}</b><br/>"+
             "URL: <i>#{items[id]}</i><br/>"+
-            "zoom: <i>#{v.at(id).zhow}</i>", "", 4000, 300
+            (if img.width then "size: <i>#{img.width}x#{img.height}</i></br>" else "") +
+            "zoom: <i>#{if img.width then Math.floor(100*img.image.e.width()/img.width)+"%" else img.zhow}</i>",
+            "", 4000, 300
         )
 
     v.e.bind "mokaSelected mokaZoomChanged", (ev, id) ->

@@ -2,7 +2,7 @@
   var onLoad, test, wnd_count;
   wnd_count = 0;
   test = function() {
-    var e, p0, p1, p2, p3, p3_1, p3_2_1, p4, p4_1, p4_2_1, w, wnd;
+    var e, p0, p1, p2, p3, p3_1, p3_2_1, p4, p4_1, p4_2_1, t, w, wnd;
     wnd = new Moka.Window("Widget Test - Window " + (++wnd_count));
     p0 = new Moka.WidgetList();
     p1 = new Moka.WidgetList().append(new Moka.TextEdit("text _edit widget:", "type some text\nhere", true)).append(new Moka.TextEdit("text _edit widget:", "type some text here")).append(new Moka.Button("_Button", function() {
@@ -24,7 +24,10 @@
     p4_2_1 = new Moka.Tabs().append("page _U", e).append("page _V", e).append("page _W", e);
     p4_1 = new Moka.Tabs().append("page _1", e).append("page _2", p4_2_1).append("page _3", e);
     p4 = new Moka.Tabs().append("page _X", p4_1).append("page _Y", e).append("page _Z", e);
-    w = new Moka.Tabs().vertical(true).append("page _A", p1).append("page _B", p2).append("page _C", p3).append("page _D", p4);
+    t = new Moka.Tabs().vertical(true).append("page _A", p1).append("page _B", p2).append("page _C", p3).append("page _D", p4);
+    w = new Moka.Container().append(t, new Moka.ButtonBox().append("_Close", function() {
+      return wnd.close();
+    }));
     wnd.append(w);
     $(".value").css({
       'font-family': "monospace"
@@ -60,7 +63,7 @@
     v.show();
     oldid = void 0;
     notify = function(id) {
-      var _ref;
+      var img, _ref;
       if (id != null) {
         oldid = id;
       } else {
@@ -69,10 +72,10 @@
       if ((_ref = Moka.notificationLayer) != null) {
         _ref.empty();
       }
-      return new Moka.Notification(("<b>" + (id + 1) + "/" + items.length + "</b><br/>") + ("URL: <i>" + items[id] + "</i><br/>") + ("zoom: <i>" + (v.at(id).zhow) + "</i>"), "", 4000, 300);
+      img = v.at(id);
+      return new Moka.Notification(("<b>" + (id + 1) + "/" + items.length + "</b><br/>") + ("URL: <i>" + items[id] + "</i><br/>") + (img.width ? "size: <i>" + img.width + "x" + img.height + "</i></br>" : "") + ("zoom: <i>" + (img.width ? Math.floor(100 * img.image.e.width() / img.width) + "%" : img.zhow) + "</i>"), "", 4000, 300);
     };
     v.e.bind("mokaSelected mokaZoomChanged", function(ev, id) {
-      console.log(oldid, id);
       if (ev.target !== this || !((id != null) || (oldid != null))) {
         return;
       }

@@ -126,12 +126,10 @@ keyHintFocus = (keyname, root) -># {{{
                 if $this.is(":visible") and keyhint is $this.text().toUpperCase()
                     parent = $this.parent()
                     if not parent.hasClass("focused")
-                        if parent.hasClass("tab")
-                            e = parent
-                        else if parent.hasClass("input")
+                        if parent.hasClass("tab") or parent.hasClass("input")
                             e = parent
                         else
-                            e = parent.find(".input").eq(0)
+                            e = parent.find(".input:first")
 
                         if e.length
                             Moka.focus(e)
@@ -305,12 +303,14 @@ Moka.focus_first = (e) -># {{{
     if e.hasClass("input")
         ee = e
     else
-        ee = e.find(".input:first")
+        ee = e.find(".input:visible:first")
+        log ee
         # elements with "current" class first
         eee = ee.siblings(".current")
         if eee.length
             ee = eee
     if ee.length
+        log ee
         Moka.focus(ee)
         return true
     else
@@ -401,7 +401,6 @@ Moka.gainFocus = (ev) ->
     #dbg "focused element",focused_widget
 # }}}
 
-
 # GUI classes# {{{
 # only one widget can can be focused at a time
 class Moka.Widget# {{{
@@ -479,7 +478,6 @@ class Moka.Container extends Moka.Widget# {{{
         @e.addClass("container")
 
         @widgets = []
-        @current = -1
 
         @vertical(if horizontal then false else true)
     # }}}
@@ -520,14 +518,6 @@ class Moka.Container extends Moka.Widget# {{{
                 @widgets[id-1].e.removeClass("last")
 
             e.addClass(@itemcls+" last")
-            e.bind( "mokaFocused", () =>
-                if @current >= 0
-                    e.trigger("mokaDeselected", [@current])
-                @current = id
-                e.trigger("mokaSelected", [id])
-                @update()
-            )
-
             e.appendTo(@e)
               .bind("mokaSizeChanged", @update.bind(this) )
               #.children().focus( @update.bind(this) )
@@ -546,13 +536,13 @@ class Moka.WidgetList extends Moka.Container # {{{
             if @current+1 < @length()
                 @next()
             else
-                @select(0)
-                @e.parent().trigger("mokaFocusUpRequest")
+                false
         'S-TAB': ->
             if @current > 0
                 @prev()
             else
-                @e.parent().trigger("mokaFocusUpRequest")
+                false
+                #@e.parent().trigger("mokaFocusUpRequest")
     # }}}
 
     constructor: (cls, itemcls) -># {{{
@@ -564,17 +554,33 @@ class Moka.WidgetList extends Moka.Container # {{{
           .bind( "mokaFocusPrevRequest", () => @prev(); return false )
 
         @itemcls = if itemcls? then itemcls else "widgetlistitem"
+        @current = 0
+    # }}}
+
+    append: (widgets) -># {{{
+        super
+        for widget in arguments
+            id = @length()-1
+            e = widget.e
+
+            e.bind( "mokaFocused", () =>
+                if @current >= 0
+                    @widgets[@current]?.e.removeClass("current")
+                    e.trigger("mokaDeselected", [@current])
+                @current = id
+                e.addClass("current")
+                 .trigger("mokaSelected", [id])
+                @update()
+            )
+
+            e.addClass("current") if id is @current
+        return this
     # }}}
 
     select: (id) -># {{{
-        @widgets[@current]?.e.removeClass("current")
         if id >= 0
-            @current = id
             w = @widgets[id]
-            w.e.addClass("current")
-            Moka.focus_first(w.e)
-        else
-            @current = -1
+            Moka.focus_first(w.e) if w
     # }}}
 
     next: -># {{{
@@ -759,7 +765,7 @@ class Moka.Tabs extends Moka.Widget # {{{
     # }}}
 
     default_tab_keys: # {{{
-        TAB: -> if (page = @pages[@current]) then Moka.focus_first(page.e) else false
+        TAB: -> if (page = @pages[@current]) then Moka.focus_first(page.e.children()) else false
     # }}}
 
     constructor: -># {{{
@@ -865,6 +871,7 @@ class Moka.Tabs extends Moka.Widget # {{{
             return false
 
         # keyhints
+        page = @pages[@current]
         if (page? and keyHintFocus(keyname, page.e)) or keyHintFocus(keyname, @tabs_e)
             return false
     # }}}

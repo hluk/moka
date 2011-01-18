@@ -130,12 +130,10 @@
         if ($this.is(":visible") && keyhint === $this.text().toUpperCase()) {
           parent = $this.parent();
           if (!parent.hasClass("focused")) {
-            if (parent.hasClass("tab")) {
-              e = parent;
-            } else if (parent.hasClass("input")) {
+            if (parent.hasClass("tab") || parent.hasClass("input")) {
               e = parent;
             } else {
-              e = parent.find(".input").eq(0);
+              e = parent.find(".input:first");
             }
             if (e.length) {
               Moka.focus(e);
@@ -298,13 +296,15 @@
     if (e.hasClass("input")) {
       ee = e;
     } else {
-      ee = e.find(".input:first");
+      ee = e.find(".input:visible:first");
+      log(ee);
       eee = ee.siblings(".current");
       if (eee.length) {
         ee = eee;
       }
     }
     if (ee.length) {
+      log(ee);
       Moka.focus(ee);
       return true;
     } else {
@@ -469,7 +469,6 @@
       Container.__super__.constructor.apply(this, arguments);
       this.e.addClass("container");
       this.widgets = [];
-      this.current = -1;
       this.vertical(horizontal ? false : true);
     }
     Container.prototype.update = function() {
@@ -508,14 +507,6 @@
           this.widgets[id - 1].e.removeClass("last");
         }
         e.addClass(this.itemcls + " last");
-        e.bind("mokaFocused", __bind(function() {
-          if (this.current >= 0) {
-            e.trigger("mokaDeselected", [this.current]);
-          }
-          this.current = id;
-          e.trigger("mokaSelected", [id]);
-          return this.update();
-        }, this));
         e.appendTo(this.e).bind("mokaSizeChanged", this.update.bind(this));
       }
       return this;
@@ -557,15 +548,14 @@
         if (this.current + 1 < this.length()) {
           return this.next();
         } else {
-          this.select(0);
-          return this.e.parent().trigger("mokaFocusUpRequest");
+          return false;
         }
       },
       'S-TAB': function() {
         if (this.current > 0) {
           return this.prev();
         } else {
-          return this.e.parent().trigger("mokaFocusUpRequest");
+          return false;
         }
       }
     };
@@ -584,19 +574,40 @@
         return false;
       }, this));
       this.itemcls = itemcls != null ? itemcls : "widgetlistitem";
+      this.current = 0;
     }
-    WidgetList.prototype.select = function(id) {
-      var w, _ref;
-      if ((_ref = this.widgets[this.current]) != null) {
-        _ref.e.removeClass("current");
+    WidgetList.prototype.append = function(widgets) {
+      var e, id, widget, _i, _len;
+      WidgetList.__super__.append.apply(this, arguments);
+      for (_i = 0, _len = arguments.length; _i < _len; _i++) {
+        widget = arguments[_i];
+        id = this.length() - 1;
+        e = widget.e;
+        e.bind("mokaFocused", __bind(function() {
+          var _ref;
+          if (this.current >= 0) {
+            if ((_ref = this.widgets[this.current]) != null) {
+              _ref.e.removeClass("current");
+            }
+            e.trigger("mokaDeselected", [this.current]);
+          }
+          this.current = id;
+          e.addClass("current").trigger("mokaSelected", [id]);
+          return this.update();
+        }, this));
+        if (id === this.current) {
+          e.addClass("current");
+        }
       }
+      return this;
+    };
+    WidgetList.prototype.select = function(id) {
+      var w;
       if (id >= 0) {
-        this.current = id;
         w = this.widgets[id];
-        w.e.addClass("current");
-        return Moka.focus_first(w.e);
-      } else {
-        return this.current = -1;
+        if (w) {
+          return Moka.focus_first(w.e);
+        }
       }
     };
     WidgetList.prototype.next = function() {
@@ -831,7 +842,7 @@
       TAB: function() {
         var page;
         if ((page = this.pages[this.current])) {
-          return Moka.focus_first(page.e);
+          return Moka.focus_first(page.e.children());
         } else {
           return false;
         }
@@ -926,7 +937,7 @@
       }
     };
     Tabs.prototype.tabsKeyDown = function(ev) {
-      var keyname;
+      var keyname, page;
       if (ev.isPropagationStopped()) {
         return;
       }
@@ -934,7 +945,8 @@
       if (doKey(keyname, this.tab_keys, this.default_tab_keys, this)) {
         return false;
       }
-      if (((typeof page != "undefined" && page !== null) && keyHintFocus(keyname, page.e)) || keyHintFocus(keyname, this.tabs_e)) {
+      page = this.pages[this.current];
+      if (((page != null) && keyHintFocus(keyname, page.e)) || keyHintFocus(keyname, this.tabs_e)) {
         return false;
       }
     };
