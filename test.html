@@ -10,5 +10,48 @@
     <title>Moka test</title>
 </head>
 <body>
+    <div class="moka-window">
+        <div class="moka-title">
+            Window 1
+        </div>
+        <div class="moka-tabwidget">
+            <div class="moka-tab">tab _A</div>
+            <div class="moka-tab">tab _B</div>
+            <div class="moka-tab">tab _C</div>
+            <div class="moka-tab">tab _D</div>
+            <div class="moka-page"></div>
+        </div>
+        <div class="moka-buttonbox">
+            <div onclick="this.parent().remove()">_Cancel</div>
+            <div onclick="this.parent().remove()">_Ok</div>
+        </div>
+    </div>
+
+    <div class="moka-window" id="help-window">
+        <div class="moka-title">
+            HELP - <i>HTML generated window</i>
+        </div>
+        <div class="moka-keys">
+            <div onclick="test()">shift-t</div>
+        </div>
+        <div class="moka-container moka-horizontal">
+            <div class="moka-container moka-vertical">
+                <div class="moka-label">
+                    Moka is JavaScript GUI framework.
+                </div>
+                <div class="moka-buttonbox">
+                    <div onclick="test()">
+                        Add _New Window
+                    </div>
+                    <div onclick="$('#help-window').remove()">
+                        _Close
+                    </div>
+                </div>
+            </div>
+            <div class="moka-image moka-size-96x96">
+                img/moka.png
+            </div>
+        </div>
+    </div>
 </body>
 </html>

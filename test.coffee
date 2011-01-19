@@ -1,5 +1,5 @@
 wnd_count = 0
-test = () -># {{{
+window.test = () -># {{{
     wnd = new Moka.Window("Widget Test - Window #{++wnd_count}")
 
     p0 = new Moka.WidgetList()
@@ -199,7 +199,7 @@ onLoad = () -># {{{
     #wnd.focus()
     # }}}
 
-    wnd = new Moka.Window("HELP")
+    wnd = new Moka.Window("HELP - <i>JavaScript generated window</i>")
     wnd.append(
         new Moka.Container(true).append(
             new Moka.Container().append(
@@ -209,7 +209,9 @@ onLoad = () -># {{{
             new Moka.Image("img/moka.png", 96, 96).show()
         )
     )
+    wnd.addKey("shift-t", test)
     wnd.do( (e) -> e.prependTo("body") )
+       .position(0, 150)
        .show()
        .focus()
 

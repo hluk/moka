@@ -8,74 +8,68 @@ body {
     padding: 0;
 }
 
-.widget {
+.moka-widget {
     @include transitions("opacity .2s ease-in-out, background-color .2s ease-in-out, color .2s ease-in-out");
     z-index: inherit;
 }
 
-.widgetlistitem.current, .tab.current, .view.current > .widget {
+.moka-widgetlistitem.moka-current, .moka-tab.moka-current, .moka-view.moka-current > .moka-widget {
     color: $widget_current_fg;
     background-color: $widget_current_bg;
 }
 
-input, textarea, .tabs, .input, .close, .title {outline: 0}
+input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 
-.window .title, .tab, .widgetlistitem, .button, .imageview {
-    &.focused {
+.moka-window .moka-title, .moka-tab, .moka-widgetlistitem, .moka-button, .moka-imageview {
+    &.moka-focus {
         color: $widget_selected_fg;
         background-color: $widget_selected_bg;
     }
 }
 // hover
-.window .title, .tab, .tabs, .widgetlistitem, .button, .imageviewer {
+.moka-window .moka-title, .moka-tab, .moka-tabs, .moka-widgetlistitem, .moka-button, .moka-imageviewer {
     &:hover {
         color: $widget_hover_fg;
         background-color: $widget_hover_bg;
     }
 }
-.selection {
-    /* animate cursor movement */
-    @include transitions("opacity .2s ease-in-out, background-color .2s ease-in-out, left .2s ease-in-out, top .2s ease-in-out, width .2s ease-in-out, height .2s ease-in-out");
-    background-color: transparentize($selection_bg, $selection_transparency);
-}
-.focused .keyhint {
+.moka-focus .moka-keyhint {
     text-decoration: underline;
 }
-.label {
+.moka-label {
     color: transparentize($widget_fg, 0.2);
     font: $font_general;
     padding: 0.5em 0.5em;
     @include inset-text();
 }
-.current.label {
+.moka-current.moka-label {
     color: $widget_current_fg;
     @include inset-text($widget_current_fg);
 }
-.focused.label {
+.moka-focus.moka-label {
     color: $widget_selected_fg;
     @include inset-text($widget_selected_fg);
 }
 
-.buttonbox {
+.moka-buttonbox {
     width: 95%;
     text-align: right;
-    > .button {
-        &.first {
+    > .moka-button {
+        &.moka-first {
             @include rounded(2em, top, left);
             @include rounded(2em, bottom, left);
         }
-        &.last {
+        &.moka-last {
             @include rounded(2em, top, right);
             @include rounded(2em, bottom, right);
         }
     }
-    .selection {display:none !important}
 }
-.button.label {
+.moka-button.moka-label {
     padding: 0.15em 0.4em;
     @include inset-text()
 }
-.button {
+.moka-button {
     cursor: pointer;
     display: inline-block;
     text-align: center;
@@ -95,8 +89,8 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         color: $button_hover_fg;
         @include box-shadow(inset 0 0 10px $button_hover_bg);
     }
-    &.focused {
-        &.label {
+    &.moka-focus {
+        &.moka-label {
             color: $button_selected_fg;
             @include inset-text($button_selected_fg);
         }
@@ -109,7 +103,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         );
     }
 }
-.textedit .CodeMirror-wrapping {
+.moka-textedit .CodeMirror-wrapping {
     color: $edit_fg;
     background-color: $edit_bg;
     border-color: $widget_bg * 1.6;
@@ -120,37 +114,34 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
 
     @include inset();
 
-    &.focused {
+    &.moka-focus {
         color: $edit_focused_fg;
         background-color: $edit_focused_bg;
         text-shadow: black 0 0 0;
     }
 }
-.container {
+.moka-container {
     margin: 3px;
-    &.vertical{
+    &.moka-vertical{
         float: left;
     }
-    &.horizontal > .widget{
+    &.moka-horizontal > .moka-widget{
         display: inline;
     }
 }
-.tabs {
-    .tab {
+.moka-tabs {
+    .moka-tab {
         border: 1px solid $widget_bg*0.6;
-        .focused {
+        .moka-focus {
             color: $widget_selected_fg;
             background-color: $widget_selected_bg;
         }
     }
-    &.focused .selection {
-        background-color: $selection_bg;
-    }
-    &.horizontal {
+    &.moka-horizontal {
         padding:0.5em;
         padding-bottom:0;
 
-        > .tab {
+        > .moka-tab {
             border-bottom:0;
             display: inline;
 
@@ -171,15 +162,11 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
                 $widget_bg
             )
         }
-        .selection {
-            @include rounded($tab_radius, top, left);
-            @include rounded($tab_radius, top, right);
-        }
     }
-    &.vertical {
+    &.moka-vertical {
         float: left;
 
-        > .tab {
+        > .moka-tab {
             border-right:0;
             display: block;
 
@@ -198,34 +185,22 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
                 $widget_bg
             )
         }
-        .selection {
-            @include rounded(0, top, left);
-            @include rounded(0, top, right);
-            @include rounded($tab_radius, top, left);
-            @include rounded($tab_radius, bottom, left);
-        }
     }
 }
-.pages {
+.moka-pages {
     float: left;
 }
-.widgetlist {
+.moka-widgetlist {
     margin:auto;
     padding: 1em;
     text-align: left;
 
-    .selection {
-        @include rounded($item_radius);
-    }
-    &.focused .selection {
-        background-color: $selection_bg;
-    }
-    &.focused .widgetlistitem.current {
+    &.moka-focus .moka-widgetlistitem.moka-current {
         color: $widget_selected_fg;
         background-color: $widget_selected_bg;
     }
 }
-.widgetlistitem {
+.moka-widgetlistitem {
     &:nth-child(even) {
         background-color: $widget_bg*1.05;
     }
@@ -235,10 +210,10 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         margin: 0.3em;
         @include rounded($item_radius);
 
-        &.focused {
+        &.moka-focus {
             background-color: $widget_selected_bg;
         }
-        &.current {
+        &.moka-current {
             background-color: $widget_current_bg;
         }
         &:hover {
@@ -246,24 +221,24 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         }
     }
 }
-.viewer, .viewer .table {
+.moka-viewer, .moka-viewer .moka-table {
     width: 100%;
     height: 100%;
     overflow: auto;
 }
-.view.focused > .widget {
+.moka-view.moka-focus > .moka-widget {
     color: $title_selected_fg;
     background-color: $title_selected_bg;
 }
-.viewer td {
+.moka-viewer td {
     text-align: center;
 }
-.viewer .view {
+.moka-viewer .moka-view {
     display:inline-block;
 }
-.imageview img {padding:$imageview_padding}
-.viewer .table {margin:auto}
-.window {
+.moka-imageview img {padding:$imageview_padding}
+.moka-viewer .moka-table {margin:auto}
+.moka-window {
     border: 1px solid black;
     opacity: $window_opacity;
 
@@ -275,13 +250,13 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     @include rounded(5px);
     @include outset();
     @include rounded($window_radius);
-    .body {
+    .moka-body {
         overflow: auto;
     }
-    .title, .body {
+    .moka-title, .moka-body {
         margin: 3px 3px;
     }
-    .title {
+    .moka-title {
         font: $font_header;
         padding: 0.1em 0.5em;
 
@@ -290,7 +265,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         @include rounded($title_radius);
         @include inset();
 
-        .label {
+        .moka-label {
             color: $title_fg;
             display:inline;
             text-shadow:transparent 0 0 0;
@@ -298,18 +273,18 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
     }
     // focused window on top
     &.top_window {opacity: $top_window_opacity;}
-    &.focused {opacity: $focused_window_opacity;}
-    &.focused {
+    &.moka-focus {opacity: $focused_window_opacity;}
+    &.moka-focus {
         z-index: $top_window_layer;
-        .title {
+        .moka-title {
             color: $title_selected_fg;
-            .label {
+            .moka-label {
                 color: $title_selected_fg;
             }
             background-color: $title_selected_bg;
             &:focus {
                 color: $title_focused_fg;
-                .label {
+                .moka-label {
                     color: $title_focused_fg;
                 }
                 background-color: $title_focused_bg;
@@ -320,7 +295,7 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
         opacity: $focused_window_opacity;
     }
     // button characters at: http://www.utf8-chartable.de/unicode-utf8-table.pl
-    .window_control {
+    .moka-window-button {
         opacity: 0.6;
         display:inline;
         &:hover, &:focus {
@@ -329,37 +304,42 @@ input, textarea, .tabs, .input, .close, .title {outline: 0}
             text-shadow: #ddd 0 0 7px;
         }
     }
-    .close {
+    .moka-close {
         &:before {
           content: '\2297';
         }
     }
-    .maximize {
+    .moka-maximize {
         &:before {
           content: '\2299';
         }
     }
 }
 
-#notification-layer {
+#moka-notification-layer {
     position: fixed;
     z-index: $notification_layer;
     top:0; left:0;
 }
 
-.notification {
+.moka-notification {
     float:left;
-    margin: 1em;
+    margin: 0.5em;
     white-space: nowrap;
 
-    text-shadow: $notification_bg*0.7 1px 1px 1px;
+    //text-shadow: $notification_bg*0.8 1px 1px 1px;
 
     color: $notification_fg;
     background-color: $notification_bg;
     padding: 0.5em 1.5em;
 
-    @include box-shadow(0 0 20px rgba(0,0,0,0.5));
+    border: 2px solid $widget_bg*0.5;
+
+    @include box-shadow(2px 2px 5px rgba(0,0,0,0.3));
     @include rounded(5px);
     @include transitionsx("opacity 0.5s ease-in-out, background-color 1.5s ease-in-out");
+
+    opacity: $notification_opacity;
+    &:hover {opacity:1}
 }
 

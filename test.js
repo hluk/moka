@@ -1,7 +1,7 @@
 (function() {
-  var onLoad, test, wnd_count;
+  var onLoad, wnd_count;
   wnd_count = 0;
-  test = function() {
+  window.test = function() {
     var e, p0, p1, p2, p3, p3_1, p3_2_1, p4, p4_1, p4_2_1, t, w, wnd;
     wnd = new Moka.Window("Widget Test - Window " + (++wnd_count));
     p0 = new Moka.WidgetList();
@@ -81,13 +81,14 @@
       }
       return notify(id);
     });
-    wnd = new Moka.Window("HELP");
+    wnd = new Moka.Window("HELP - <i>JavaScript generated window</i>");
     wnd.append(new Moka.Container(true).append(new Moka.Container().append(new Moka.Label("Moka is JavaScript GUI framework."), new Moka.ButtonBox().append("Add _New Window", test).append("_Close", function() {
       return wnd.close();
     })), new Moka.Image("img/moka.png", 96, 96).show()));
+    wnd.addKey("shift-t", test);
     wnd["do"](function(e) {
       return e.prependTo("body");
-    }).show().focus();
+    }).position(0, 150).show().focus();
     return v.zoom(map.zoom);
   };
   $(document).ready(onLoad);

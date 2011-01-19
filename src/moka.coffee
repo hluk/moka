@@ -90,6 +90,19 @@ if userAgent() is userAgents.webkit
 # }}}
 
 last_keyname = last_keyname_timestamp = null
+
+# keyboard combination name is normalized
+# format is "A-C-S-KEY" where A, C, S are optional modifiers (alt, control, shift)
+normalizeKeyName = (keyname) -># {{{
+    modifiers = keyname.toUpperCase().split("-")
+    key = modifiers.pop()
+
+    modifiers = modifiers.map((x) -> x[0]).sort()
+    k = if modifiers.length then modifiers.join("-")+"-"+key else key
+
+    return k
+# }}}
+
 getKeyName = (ev) -># {{{
     if ev.timeStamp is last_keyname_timestamp
         return last_keyname
@@ -121,15 +134,15 @@ keyHintFocus = (keyname, root) -># {{{
 
     e = null
     if keyhint?
-        root.find(".keyhint").each () ->
+        root.find(".moka-keyhint").each () ->
                 $this = $(this)
                 if $this.is(":visible") and keyhint is $this.text().toUpperCase()
                     parent = $this.parent()
-                    if not parent.hasClass("focused")
-                        if parent.hasClass("tab") or parent.hasClass("input")
+                    if not parent.hasClass("moka-focus")
+                        if parent.hasClass("moka-tab") or parent.hasClass("moka-input")
                             e = parent
                         else
-                            e = parent.find(".input:first")
+                            e = parent.find(".moka-input:first")
 
                         if e.length
                             Moka.focus(e)
@@ -141,7 +154,7 @@ keyHintFocus = (keyname, root) -># {{{
 
 Moka.createLabel = (text, e) -># {{{
     e = $("<div>") if not e
-    e.addClass("label")
+    e.addClass("moka-label")
 
     # replace _x with underlined character and assign x key
     i=0
@@ -157,7 +170,7 @@ Moka.createLabel = (text, e) -># {{{
     if i+1 < text.length
         key = text[i+1]
         text = text.substr(0, i) +
-            '<span class="keyhint">'+key+'</span>' +
+            '<span class="moka-keyhint">'+key+'</span>' +
             text.substr(i+2)
 
     e.html(text)
@@ -203,7 +216,7 @@ jQuery.extend( jQuery.easing,
 
 dragScroll = (ev) ->
     # do not prevent focus
-    Moka.focus( $(ev.target).parents(".input:first") )
+    Moka.focus( $(ev.target).parents(".moka-input:first") )
 
     wnd = ev.currentTarget
     w = $(wnd)
@@ -300,17 +313,15 @@ Moka.blur = (e) -># {{{
 # }}}
 
 Moka.focus_first = (e) -># {{{
-    if e.hasClass("input")
+    if e.hasClass("moka-input")
         ee = e
     else
-        ee = e.find(".input:visible:first")
-        log ee
+        ee = e.find(".moka-input:visible:first")
         # elements with "current" class first
-        eee = ee.siblings(".current")
+        eee = ee.siblings(".moka-current")
         if eee.length
             ee = eee
     if ee.length
-        log ee
         Moka.focus(ee)
         return true
     else
@@ -386,7 +397,7 @@ doKey = (keyname, keys, default_keys, object) -># {{{
 
 # widget focusing # {{{
 Moka.lostFocus = (ev) ->
-    focused_widget.removeClass("focused")
+    focused_widget.removeClass("moka-focus")
                   .trigger("mokaBlurred")
     focused_widget = $()
     #dbg "blurred element",focused_widget
@@ -395,7 +406,7 @@ Moka.gainFocus = (ev) ->
     return if focus_timestamp is ev.timeStamp
     focus_timestamp = ev.timeStamp
     focused_widget = $(ev.target)
-    focused_widget.addClass("focused")
+    focused_widget.addClass("moka-focus")
                   .trigger("mokaFocused")
     ensure_visible(focused_widget)
     #dbg "focused element",focused_widget
@@ -407,9 +418,9 @@ class Moka.Widget# {{{
     constructor: (from_element) -># {{{
         @e = if from_element and from_element.hasClass then from_element else $("<div>")
 
-        @e.addClass("widget")
-          .bind( "mokaFocused",  () -> $(this).addClass("focused") )
-          .bind( "mokaBlurred",  () -> $(this).removeClass("focused") )
+        @e.addClass("moka-widget")
+          .bind( "mokaFocused",  () -> $(this).addClass("moka-focus") )
+          .bind( "mokaBlurred",  () -> $(this).removeClass("moka-focus") )
     # }}}
 
     show: -># {{{
@@ -433,10 +444,21 @@ class Moka.Widget# {{{
 
     appendTo: (e) -># {{{
         @e.appendTo(e)
+        return this
     # }}}
 
     remove: () -># {{{
-        e.remove()
+        @e.remove()
+    # }}}
+
+    parent: () -># {{{
+        return @parentWidget
+    # }}}
+
+    addKey: (keyname, fn) -># {{{
+        @keys = {} if not @keys
+        @keys[ normalizeKeyName(keyname) ] = fn
+        return this
     # }}}
 
     do: (fn) -># {{{
@@ -454,7 +476,7 @@ class Moka.Label extends Moka.Widget # {{{
 class Moka.Input extends Moka.Widget # {{{
     constructor: () -># {{{
         super
-        @e.addClass("input")
+        @e.addClass("moka-input")
           .attr("tabindex", 0)
           .css("cursor","pointer")
 
@@ -475,7 +497,7 @@ class Moka.Input extends Moka.Widget # {{{
 class Moka.Container extends Moka.Widget# {{{
     constructor: (horizontal) -># {{{
         super
-        @e.addClass("container")
+        @e.addClass("moka-container")
 
         @widgets = []
 
@@ -498,26 +520,27 @@ class Moka.Container extends Moka.Widget# {{{
 
     vertical: (toggle) -># {{{
         if toggle?
-            @e.addClass( if toggle is false then "horizontal" else "vertical" )
-            @e.removeClass(if toggle is false then "vertical" else "horizontal")
+            @e.addClass( if toggle is false then "moka-horizontal" else "moka-vertical" )
+            @e.removeClass(if toggle is false then "moka-vertical" else "moka-horizontal")
             return this
         else
-            return @e.hasClass("vertical")
+            return @e.hasClass("moka-vertical")
     # }}}
 
     append: (widgets) -># {{{
         for widget in arguments
             id = @length()
+            widget.parentWidget = this
             @widgets.push(widget)
             e = widget.e
 
             # first & last
             if id is 0
-                e.addClass("first")
+                e.addClass("moka-first")
             else
-                @widgets[id-1].e.removeClass("last")
+                @widgets[id-1].e.removeClass("moka-last")
 
-            e.addClass(@itemcls+" last")
+            e.addClass(@itemcls+" moka-last")
             e.appendTo(@e)
               .bind("mokaSizeChanged", @update.bind(this) )
               #.children().focus( @update.bind(this) )
@@ -528,10 +551,10 @@ class Moka.Container extends Moka.Widget# {{{
 
 class Moka.WidgetList extends Moka.Container # {{{
     default_keys: # {{{
-        LEFT:  -> if @e.hasClass("horizontal") then @prev() else false
-        RIGHT: -> if @e.hasClass("horizontal") then @next() else false
-        UP:    -> if not @e.hasClass("horizontal") then @prev() else false
-        DOWN:  -> if not @e.hasClass("horizontal") then @next() else false
+        LEFT:  -> if @e.hasClass("moka-horizontal") then @prev() else false
+        RIGHT: -> if @e.hasClass("moka-horizontal") then @next() else false
+        UP:    -> if not @e.hasClass("moka-horizontal") then @prev() else false
+        DOWN:  -> if not @e.hasClass("moka-horizontal") then @next() else false
         TAB:   ->
             if @current+1 < @length()
                 @next()
@@ -547,7 +570,7 @@ class Moka.WidgetList extends Moka.Container # {{{
 
     constructor: (cls, itemcls) -># {{{
         super
-        @e.addClass(if cls? then cls else "widgetlist")
+        @e.addClass(if cls? then cls else "moka-widgetlist")
           .bind( "keydown.moka", (ev) => @keydown(ev) )
           .bind( "mokaFocusUpRequest", () => @select(Math.max(0, @current)); return false )
           .bind( "mokaFocusNextRequest", () => @next(); return false )
@@ -562,18 +585,19 @@ class Moka.WidgetList extends Moka.Container # {{{
         for widget in arguments
             id = @length()-1
             e = widget.e
+            widget.parentWidget = this
 
             e.bind( "mokaFocused", () =>
                 if @current >= 0
-                    @widgets[@current]?.e.removeClass("current")
+                    @widgets[@current]?.e.removeClass("moka-current")
                     e.trigger("mokaDeselected", [@current])
                 @current = id
-                e.addClass("current")
+                e.addClass("moka-current")
                  .trigger("mokaSelected", [id])
                 @update()
             )
 
-            e.addClass("current") if id is @current
+            e.addClass("moka-current") if id is @current
         return this
     # }}}
 
@@ -612,9 +636,9 @@ class Moka.CheckBox extends Moka.Input # {{{
     # }}}
 
     constructor: (text, checked) -># {{{
-        super Moka.createLabel(text).addClass("checkbox")
+        super Moka.createLabel(text).addClass("moka-checkbox")
 
-        @checkbox = $('<input>', {tabindex:1, type:"checkbox", class:"value"})
+        @checkbox = $('<input>', {tabindex:1, type:"checkbox", class:"moka-value"})
                    .prependTo(@e)
 
         @value(checked)
@@ -653,7 +677,7 @@ class Moka.TextEdit extends Moka.Input# {{{
 
     constructor: (label_text, text) -># {{{
         super
-        @e.addClass("textedit")
+        @e.addClass("moka-textedit")
           .attr("tabindex", 1)
         Moka.createLabel(label_text, @e)
         @create = true
@@ -717,7 +741,7 @@ class Moka.Button extends Moka.Input # {{{
     constructor: (label_text, onclick) -># {{{
         super
         Moka.createLabel(label_text, @e)
-        @e.addClass("button")
+        @e.addClass("moka-button")
         @click = onclick
     # }}}
 
@@ -735,14 +759,14 @@ class Moka.ButtonBox extends Moka.WidgetList # {{{
     constructor: -># {{{
         super
         @e
-          .removeClass("widgetlist")
-          .addClass("buttonbox horizontal")
+          .removeClass("moka-widgetlist")
+          .addClass("moka-buttonbox moka-horizontal")
     # }}}
 
     append: (label_text, onclick) -># {{{
         widget = new Moka.Button(label_text, onclick)
         super widget
-        widget.e.removeClass("widgetlistitem")
+        widget.e.removeClass("moka-widgetlistitem")
 
         return this
     # }}}
@@ -770,13 +794,12 @@ class Moka.Tabs extends Moka.Widget # {{{
 
     constructor: -># {{{
         super
-        @e.addClass("tabs_widget")
+        @e.addClass("moka-tabwidget")
           .bind( "keydown.moka", (ev) => @keydown(ev) )
           .bind( "mokaFocusUpRequest", () => @select(Math.max(0, @current)); return false )
 
-        @tabs = new Moka.WidgetList("tabs", "tab")
+        @tabs = new Moka.WidgetList("moka-tabs", "moka-tab")
         @tabs_e = @tabs.e
-            .addClass("tabs")
             .appendTo(@e)
             .bind "mokaSelected", (ev, id) =>
                 return if @current is id
@@ -790,7 +813,7 @@ class Moka.Tabs extends Moka.Widget # {{{
         @tabs.keydown = @tabsKeyDown.bind(this)
         @tabs.keys = @tab_keys = {}
 
-        @pages_e = $("<div>", class:"pages")
+        @pages_e = $("<div>", class:"moka-pages")
                    .appendTo(@e)
 
         @pages = []
@@ -808,7 +831,7 @@ class Moka.Tabs extends Moka.Widget # {{{
     # }}}
 
     focusUp: () -># {{{
-        if not @tabs_e.hasClass("focused")
+        if not @tabs_e.hasClass("moka-focus")
             @select(Math.max(0, @current))
         else
             @e.parent().trigger("mokaFocusUpRequest")
@@ -834,12 +857,15 @@ class Moka.Tabs extends Moka.Widget # {{{
         @pages.push(widget)
 
         tab = new Moka.Input().do( (e) -> e.attr("tabindex", -1) )
+        tab.parentWidget = this
         Moka.createLabel(tabname, tab.e)
         @tabs.append(tab)
 
-        widget.hide()
-        page = widget.e.addClass("page")
         # FIXME: handle showing/hidding elements already in DOM
+        widget.hide()
+        widget.parentWidget = this
+        page = widget.e.addClass("moka-page")
+        page.parentWidget = this
         if page.parent().length is 0
             page.appendTo(@pages_e)
         page.keydown(@keydown.bind(this))
@@ -891,7 +917,7 @@ class Moka.Tabs extends Moka.Widget # {{{
 
 class Moka.Image extends Moka.Widget# {{{
     constructor: (@src, w, h, onload, onerror) -># {{{
-        super $("<img>", class:"widget image", width:w, height:h)
+        super $("<img>", class:"moka-widget moka-image", width:w, height:h)
         @e.one( "load",
             () =>
                 @ok = true
@@ -927,7 +953,7 @@ class Moka.ImageView extends Moka.Input# {{{
 
     constructor: (src) -># {{{
         super
-        @e.addClass("imageview")
+        @e.addClass("moka-imageview")
         @src = src
     # }}}
 
@@ -1068,7 +1094,7 @@ class Moka.Viewer extends Moka.Input # {{{
 
     constructor: () -># {{{
         super
-        @e.addClass("viewer")
+        @e.addClass("moka-viewer")
           .resize( @update.bind(this) )
           .bind( "scroll.moka", @onScroll.bind(this) )
           .css("cursor", "move")
@@ -1076,7 +1102,7 @@ class Moka.Viewer extends Moka.Input # {{{
           .bind( "mokaFocusUpRequest", () => @select(@index + @current); return false )
         $(window).bind("resize.moka", @update.bind(this) )
 
-        @table = $("<table>", class:"table", border:0, cellSpacing:0, cellPadding:0)
+        @table = $("<table>", class:"moka-table", border:0, cellSpacing:0, cellPadding:0)
                 .appendTo(@e)
 
         @cells = []
@@ -1121,6 +1147,7 @@ class Moka.Viewer extends Moka.Input # {{{
 
     append: (widget) -># {{{
         id = @items.length
+        widget.parentWidget = this
         @items.push(widget)
         if @lay[0] <= 0 or @lay[1] <= 0
             @updateTable()
@@ -1342,7 +1369,6 @@ class Moka.Viewer extends Moka.Input # {{{
             cell = @cells[id-h]
             if cell
                 id = cell.data("itemindex")
-                log cell, id
                 how = @cellCount()
                 if "r" in @o
                     how = -how
@@ -1396,7 +1422,7 @@ class Moka.Viewer extends Moka.Input # {{{
     # }}}
 
     appendRow: () -># {{{
-        return $("<tr>", class:"row")
+        return $("<tr>", class:"moka-row")
               .appendTo(@table)
     # }}}
 
@@ -1406,20 +1432,20 @@ class Moka.Viewer extends Moka.Input # {{{
 
         cell = new Moka.Input().e
         id = @cellCount()
-        cell.addClass("view")
+        cell.addClass("moka-view")
             .bind("mokaFocused",
                 (ev) =>
                     return if @currentcell is id and @currentindex is @index+id
                     if ev.target is cell[0] and Moka.focus_first(cell.children())
                         return
 
-                    @cells[@currentcell]?.removeClass("current")
+                    @cells[@currentcell]?.removeClass("moka-current")
                                          .trigger("mokaDeselected", [@index + @current])
                     @currentindex = @index+id
                     @currentcell = id
                     @current = cell.data("itemindex")
 
-                    cell.addClass("current")
+                    cell.addClass("moka-current")
                     @e.trigger("mokaSelected", [@index + @current])
             )
             .appendTo(td)
@@ -1458,9 +1484,9 @@ class Moka.Viewer extends Moka.Input # {{{
             y = Math.max( 0, Number(layout[1]) )
             return this if @lay and x is @lay[0] and y is @lay[1]
 
-            @e.removeClass("layout_"+@lay.join("x")) if @lay
+            @e.removeClass("moka-layout-"+@lay.join("x")) if @lay
             @lay = [x, y]
-            @e.addClass("layout_"+@lay.join("x"))
+            @e.addClass("moka-layout-"+@lay.join("x"))
 
             dbg "setting layout",@lay
 
@@ -1669,15 +1695,15 @@ class Moka.Notification extends Moka.Widget# {{{
         super
         if not Moka.notificationLayer?
             Moka.notificationLayer =
-                $("<div>", id:"notification-layer")
+                $("<div>", id:"moka-notification-layer")
                     .appendTo("body")
         delay = 8000 if not delay?
         @animation_speed = 1000 if not @animation_speed?
 
-        @e.addClass("notification "+notification_class)
+        @e.addClass("moka-notification "+notification_class)
           .html(html)
-          .bind( "mouseeter.moka", () => window.clearTimeout(@t_notify) )
-          .bind( "mouseleave.moka", () => @t_notify = window.setTimeout(@remove.bind(this), delay) )
+          .bind( "mouseenter.moka", () => window.clearTimeout(@t_notify) )
+          .bind( "mouseleave.moka", () => @t_notify = window.setTimeout(@remove.bind(this), delay/2) )
           .hide()
           .appendTo(Moka.notificationLayer)
           .show(@animation_speed)
@@ -1696,7 +1722,7 @@ class Moka.NotificationX extends Moka.Widget# {{{
         super
         delay = 8000 if not delay?
 
-        @e.addClass("notification")
+        @e.addClass("moka-notification")
           .css(top:Moka.notifyTop)
           .html(html)
           .bind( "mouseeter.moka", () => window.clearTimeout(@t_notify) )
@@ -1764,14 +1790,14 @@ class Moka.Window extends Moka.Input# {{{
     constructor: (title) -># {{{
         super
         self = this
-        @e.addClass("window")
+        @e.addClass("moka-window")
           .attr("tabindex", 1)
           .hide()
           .bind( "mokaFocusUpRequest", () => @title.do(Moka.focus); return false )
           .bind "mokaFocused", () =>
-              cls="top_window"
+              cls="moka-top_window"
               @e.parent().children("."+cls).removeClass(cls)
-              @e.addClass("top_window")
+              @e.addClass("moka-top_window")
 
         e = @container = $("<div>").css(width:"100%", height:"100%").appendTo(@e)
 
@@ -1780,15 +1806,15 @@ class Moka.Window extends Moka.Input# {{{
         # title
         @title = new Moka.Input()
         @title.keydown = @keyDownTitle.bind(this)
-        @title.e.addClass("title")
+        @title.e.addClass("moka-title")
                 .appendTo(e)
 
         # window title buttons
-        $("<div>", {'class':"window_control close"})
+        $("<div>", {'class':"moka-window-button moka-close"})
             .css('cursor', "pointer")
             .click( @hide.bind(this) )
             .appendTo(@title.e)
-        $("<div>", {'class':"window_control maximize"})
+        $("<div>", {'class':"moka-window-button moka-maximize"})
             .css('cursor', "pointer")
             .click( @maximize.bind(this) )
             .appendTo(@title.e)
@@ -1797,7 +1823,7 @@ class Moka.Window extends Moka.Input# {{{
         Moka.createLabel(title).appendTo(@title.e)
 
         # body
-        @body = body = $("<div>", {class:"body"})
+        @body = body = $("<div>", {class:"moka-body"})
                       .bind( "scroll.moka", @update.bind(this) )
                       .appendTo(e)
 
@@ -1806,16 +1832,16 @@ class Moka.Window extends Moka.Input# {{{
 
         # window edges
         edges =
-            n:  [1, 1, 0, 1, 0, 1, "n"]
-            e:  [1, 1, 1, 0, 1, 0, "e"]
-            s:  [0, 1, 1, 1, 0, 1, "s"]
-            w:  [1, 0, 1, 1, 1, 0, "w"]
-            ne: [1, 1, 0, 0, 1, 1, "ne"]
-            se: [0, 1, 1, 0, 1, 1, "se"]
-            sw: [0, 0, 1, 1, 1, 1, "sw"]
-            nw: [1, 0, 0, 1, 1, 1, "nw"]
+            'moka-n':        [1, 1, 0, 1, 0, 1, "n"]
+            'moka-e':        [1, 1, 1, 0, 1, 0, "e"]
+            'moka-s':        [0, 1, 1, 1, 0, 1, "s"]
+            'moka-w':        [1, 0, 1, 1, 1, 0, "w"]
+            'moka-n moka-e': [1, 1, 0, 0, 1, 1, "ne"]
+            'moka-s moka-e': [0, 1, 1, 0, 1, 1, "se"]
+            'moka-s moka-w': [0, 0, 1, 1, 1, 1, "sw"]
+            'moka-n moka-w': [1, 0, 0, 1, 1, 1, "nw"]
         for edge, s of edges
-            $("<div>", {class:"edge " + edge.split("").join(" ")})
+            $("<div>", {class:"moka-edge " + edge})
                 .css(
                     position:"absolute"
                     top: s[0] and "-2px" or ""
@@ -1837,14 +1863,14 @@ class Moka.Window extends Moka.Input# {{{
                         x += dx
                         y += dy
                         pos = self.position()
-                        if $this.hasClass("n")
+                        if $this.hasClass("moka-n")
                             body.height( body.height()-dy )
                             pos.top += dy
-                        if $this.hasClass("e")
+                        if $this.hasClass("moka-e")
                             body.width( body.width()+dx )
-                        if $this.hasClass("s")
+                        if $this.hasClass("moka-s")
                             body.height( body.height()+dy )
-                        if $this.hasClass("w")
+                        if $this.hasClass("moka-w")
                             body.width( body.width()-dx )
                             pos.left += dx
                         self.position(pos.left, pos.top)
@@ -1875,7 +1901,7 @@ class Moka.Window extends Moka.Input# {{{
         $.each( w, (i) -> w[i].update?() )
 
         # vertical align
-        #$(".widget.valign").each(
+        #$(".moka-widget.valign").each(
             #() ->
                 #$this = $(this)
                 #ah = $this.height()
@@ -1893,11 +1919,9 @@ class Moka.Window extends Moka.Input# {{{
 
     append: (widgets) -># {{{
         for widget in arguments
-            if widget.e and widget.e.hasClass("widget")
-                @widgets.push(widget)
-                widget.e.appendTo(@body)
-            else
-                widget.appendTo(@body)
+            widget.parentWidget = this
+            @widgets.push(widget)
+            widget.e.appendTo(@body)
 
         return this
     # }}}
@@ -1936,7 +1960,7 @@ class Moka.Window extends Moka.Input# {{{
     # }}}
 
     nextWindow: (left_or_top, direction) -># {{{
-        wnds = @e.siblings(".window")
+        wnds = @e.siblings(".moka-window")
         x = @e.offset()[left_or_top]
         d = -1
         e = @e
@@ -1946,7 +1970,7 @@ class Moka.Window extends Moka.Input# {{{
             if (d < 0 and dd >= 0) or (dd > 0 and dd < d)
                 e = $this
                 d = dd
-        Moka.focus( e.find(".title:first") )
+        Moka.focus( e.find(".moka-title:first") )
     # }}}
 
     close: () -># {{{
@@ -1974,4 +1998,73 @@ class Moka.Window extends Moka.Input# {{{
     # }}}
 # }}}
 # }}}
+
+elementToWidget = (e) -># {{{
+    w = null
+    if e.hasClass("moka-window")
+        title = e.children(".moka-title").html() or "untitled"
+        w = new Moka.Window(title)
+        e.children().each () ->
+            ww = elementToWidget( $(this) )
+            w.append(ww) if ww
+    else if e.hasClass("moka-button")
+        onclick = e[0].onclick
+        label = e.html() or ""
+        w = new Moka.Button(label, onclick)
+    else if e.hasClass("moka-label")
+        label = e.html() or ""
+        w = new Moka.Label(label)
+    else if e.hasClass("moka-image")
+        src = e.text().trim() or ""
+        m = e.attr("class").match(/\bmoka-size-([0-9]*)x([0-9]*)\b/)
+        w = if m then m[1] else ""
+        h = if m then m[2] else ""
+        w = new Moka.Image(src, w, h)
+    else if e.hasClass("moka-container")
+        w = new Moka.Container().vertical( e.hasClass("moka-vertical") )
+        e.children().each () ->
+            ww = elementToWidget( $(this) )
+            w.append(ww) if ww
+    else if e.hasClass("moka-widgetlist")
+        w = new Moka.WidgetList().vertical( e.hasClass("moka-vertical") )
+        e.children().each () ->
+            ww = elementToWidget( $(this) )
+            w.append(ww) if ww
+    else if e.hasClass("moka-buttonbox")
+        w = new Moka.ButtonBox().vertical( e.hasClass("moka-vertical") )
+        e.children().each () ->
+            onclick = this.onclick
+            label = $(this).html() or ""
+            w.append(label, onclick)
+    #else if e.hasClass("moka-tabwidget")
+
+    if w?
+        # copy element attributes
+        w.do (we) ->
+            we.addClass(e.attr("class"))
+            attr = e.attr("id")
+            we.attr("id", attr) if attr
+            attr = e.attr("style")
+            we.attr("style", attr) if attr
+
+        # parse moka-keys
+        e.children(".moka-keys").each () ->
+            $(this).children().each () ->
+                key = $(this).text()
+                fn = this.onclick
+                w.addKey(key, fn)
+
+    return w
+# }}}
+
+mokaInit = () -># {{{
+    $("body").find(".moka-window").each () ->
+        $this = $(this)
+        w = elementToWidget( $(this) )
+        if w
+            w.appendTo($this.parent()).show()
+            $this.remove()
+# }}}
+
+$(document).ready(mokaInit)
 
