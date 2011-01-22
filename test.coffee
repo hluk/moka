@@ -153,7 +153,7 @@ onLoad = () -># {{{
 
     # Viewer test {{{
     v = new Moka.Viewer()
-       .layout(map.layout.split("x"))
+        .layout(if map.layout? then map.layout.split("x") else [1,1])
        .orientation(if map.o then map.o else "lt")
        #.layout([2,1])
        #.layout([0,1])

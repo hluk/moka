@@ -1119,8 +1119,8 @@ class Moka.Viewer extends Moka.Input # {{{
         @preload_count = 2
         #@preload_count = 0
 
-        @orientation("lt")
         @layout([1,1])
+        @orientation("lt")
         @zoom(1)
     # }}}
 
@@ -1132,7 +1132,7 @@ class Moka.Viewer extends Moka.Input # {{{
     update: -># {{{
         return if not @e.is(":visible")
 
-        @orientation(@o)
+        @view(@index)
 
         w = @items
         $.each( w, (i) -> if w[i].update then w[i].update?() )
@@ -1482,7 +1482,7 @@ class Moka.Viewer extends Moka.Input # {{{
         if layout
             x = Math.max( 0, Number(layout[0]) )
             y = Math.max( 0, Number(layout[1]) )
-            return this if @lay and x is @lay[0] and y is @lay[1]
+            return this if not (x? and y?) or (@lay and x is @lay[0] and y is @lay[1])
 
             @e.removeClass("moka-layout-"+@lay.join("x")) if @lay
             @lay = [x, y]
@@ -1532,27 +1532,25 @@ class Moka.Viewer extends Moka.Input # {{{
                 dbg "cannot parse orientation ('#{o}'); resetting to 'left top'"
                 @o = "lt"
 
-            len = @cells.length
-            return this if not len
-
             dbg "setting orientation",o
 
-            x = @lay[0]
-            y = @lay[1]
-
             fns =
-                lt:(id) -> id
-                rt:(id) -> i=id%x; j=Math.floor(id/x);   x-1 - i + j*x
-                lb:(id) -> i=id%x; j=Math.floor(id/x); len-x + i - j*x
-                rb:(id) -> i=id%x; j=Math.floor(id/x); len-1 - i - j*x
+                lt:(id,x,y) -> id
+                rt:(id,x,y) -> i=id%x; j=Math.floor(id/x);   x-1 - i + j*x
+                lb:(id,x,y) -> i=id%x; j=Math.floor(id/x); x*y-x + i - j*x
+                rb:(id,x,y) -> i=id%x; j=Math.floor(id/x); x*y-1 - i - j*x
 
-                tl:(id) -> i=id%y; j=Math.floor(id/y);               i*x + j
-                tr:(id) -> i=id%y; j=Math.floor(id/y); len-1 - (y-1-i)*x - j
-                bl:(id) -> i=id%y; j=Math.floor(id/y);         (y-1-i)*x + j
-                br:(id) -> i=id%y; j=Math.floor(id/y); len-1 -       i*x - j
+                tl:(id,x,y) -> i=id%y; j=Math.floor(id/y);               i*x + j
+                tr:(id,x,y) -> i=id%y; j=Math.floor(id/y); x*y-1 - (y-1-i)*x - j
+                bl:(id,x,y) -> i=id%y; j=Math.floor(id/y);         (y-1-i)*x + j
+                br:(id,x,y) -> i=id%y; j=Math.floor(id/y); x*y-1 -       i*x - j
 
             # index function: view index -> cell index
-            @indexfn = fns[@o]
+            @indexfn = (id) =>
+                x = @lay[0]
+                y = @lay[1]
+                fns[@o].apply(this, [id,x,y])
+
             @view(@index)
 
             return this

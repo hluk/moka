@@ -54,7 +54,7 @@
     location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m, key, value) {
       return map[key] = value;
     });
-    v = new Moka.Viewer().layout(map.layout.split("x")).orientation(map.o ? map.o : "lt");
+    v = new Moka.Viewer().layout(map.layout != null ? map.layout.split("x") : [1, 1]).orientation(map.o ? map.o : "lt");
     for (_i = 0, _len = items.length; _i < _len; _i++) {
       item = items[_i];
       v.append(new Moka.ImageView(item));

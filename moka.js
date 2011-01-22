@@ -1246,8 +1246,8 @@
       this.current = -1;
       this.currentcell = -1;
       this.preload_count = 2;
-      this.orientation("lt");
       this.layout([1, 1]);
+      this.orientation("lt");
       this.zoom(1);
     }
     Viewer.prototype.show = function() {
@@ -1259,7 +1259,7 @@
       if (!this.e.is(":visible")) {
         return;
       }
-      this.orientation(this.o);
+      this.view(this.index);
       w = this.items;
       $.each(w, function(i) {
         var _base;
@@ -1622,7 +1622,7 @@
       if (layout) {
         x = Math.max(0, Number(layout[0]));
         y = Math.max(0, Number(layout[1]));
-        if (this.lay && x === this.lay[0] && y === this.lay[1]) {
+        if (!((x != null) && (y != null)) || (this.lay && x === this.lay[0] && y === this.lay[1])) {
           return this;
         }
         if (this.lay) {
@@ -1648,7 +1648,7 @@
       }
     };
     Viewer.prototype.orientation = function(o) {
-      var a, b, fns, len, x, y;
+      var a, b, fns, x;
       if (o) {
         this.o = "";
         x = o.toLowerCase().split(" ");
@@ -1677,61 +1677,60 @@
           dbg("cannot parse orientation ('" + o + "'); resetting to 'left top'");
           this.o = "lt";
         }
-        len = this.cells.length;
-        if (!len) {
-          return this;
-        }
         dbg("setting orientation", o);
-        x = this.lay[0];
-        y = this.lay[1];
         fns = {
-          lt: function(id) {
+          lt: function(id, x, y) {
             return id;
           },
-          rt: function(id) {
+          rt: function(id, x, y) {
             var i, j;
             i = id % x;
             j = Math.floor(id / x);
             return x - 1 - i + j * x;
           },
-          lb: function(id) {
+          lb: function(id, x, y) {
             var i, j;
             i = id % x;
             j = Math.floor(id / x);
-            return len - x + i - j * x;
+            return x * y - x + i - j * x;
           },
-          rb: function(id) {
+          rb: function(id, x, y) {
             var i, j;
             i = id % x;
             j = Math.floor(id / x);
-            return len - 1 - i - j * x;
+            return x * y - 1 - i - j * x;
           },
-          tl: function(id) {
+          tl: function(id, x, y) {
             var i, j;
             i = id % y;
             j = Math.floor(id / y);
             return i * x + j;
           },
-          tr: function(id) {
+          tr: function(id, x, y) {
             var i, j;
             i = id % y;
             j = Math.floor(id / y);
-            return len - 1 - (y - 1 - i) * x - j;
+            return x * y - 1 - (y - 1 - i) * x - j;
           },
-          bl: function(id) {
+          bl: function(id, x, y) {
             var i, j;
             i = id % y;
             j = Math.floor(id / y);
             return (y - 1 - i) * x + j;
           },
-          br: function(id) {
+          br: function(id, x, y) {
             var i, j;
             i = id % y;
             j = Math.floor(id / y);
-            return len - 1 - i * x - j;
+            return x * y - 1 - i * x - j;
           }
         };
-        this.indexfn = fns[this.o];
+        this.indexfn = __bind(function(id) {
+          var y;
+          x = this.lay[0];
+          y = this.lay[1];
+          return fns[this.o].apply(this, [id, x, y]);
+        }, this);
         this.view(this.index);
         return this;
       } else {
