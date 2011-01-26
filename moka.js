@@ -1,5 +1,5 @@
 (function() {
-  var dbg, doKey, dragScroll, elementToWidget, ensure_visible, focus_timestamp, focused_widget, getKeyName, initDraggable, isOnScreen, keyHintFocus, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, mokaInit, normalizeKeyName, tt, userAgent, userAgents;
+  var dbg, doKey, dragScroll, elementToWidget, ensureVisible, focus_timestamp, focused_widget, getKeyName, initDraggable, isOnScreen, keyHintFocus, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, mokaInit, normalizeKeyName, tt, userAgent, userAgents;
   var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -161,22 +161,24 @@
       e = $("<div>");
     }
     e.addClass("moka-label");
-    i = 0;
-    while (i < text.length) {
-      c = text[i];
-      if (c === '_') {
-        break;
-      } else if (c === '\\') {
-        text = text.slice(0, i) + text.slice(i + 1);
+    if (text) {
+      i = 0;
+      while (i < text.length) {
+        c = text[i];
+        if (c === '_') {
+          break;
+        } else if (c === '\\') {
+          text = text.slice(0, i) + text.slice(i + 1);
+          ++i;
+        }
         ++i;
       }
-      ++i;
+      if (i + 1 < text.length) {
+        key = text[i + 1];
+        text = text.substr(0, i) + '<span class="moka-keyhint">' + key + '</span>' + text.substr(i + 2);
+      }
+      e.html(text);
     }
-    if (i + 1 < text.length) {
-      key = text[i + 1];
-      text = text.substr(0, i) + '<span class="moka-keyhint">' + key + '</span>' + text.substr(i + 2);
-    }
-    e.html(text);
     e.css("cursor", "pointer");
     return e;
   };
@@ -360,8 +362,9 @@
     x = pos[how];
     return x >= min && x <= max;
   };
-  ensure_visible = function(w, wnd) {
+  ensureVisible = function(w, wnd) {
     var bottom, cbottom, cleft, cpos, cright, ctop, e, left, pos, right, top;
+    return;
     e = w.e ? w.e : w;
     if (!wnd) {
       wnd = w.parent();
@@ -395,7 +398,7 @@
         wnd.scrollTop(e.height() >= (w = wnd.height()) ? cbottom - w : ctop);
       }
     }
-    return ensure_visible(w, wnd.parent());
+    return ensureVisible(w, wnd.parent());
   };
   doKey = function(keyname, keys, default_keys, object) {
     var fn;
@@ -423,7 +426,7 @@
     focus_timestamp = ev.timeStamp;
     focused_widget = $(ev.target);
     focused_widget.addClass("moka-focus").trigger("mokaFocused");
-    return ensure_visible(focused_widget);
+    return ensureVisible(focused_widget);
   };
   Moka.Widget = (function() {
     function Widget(from_element) {
@@ -437,6 +440,7 @@
     Widget.prototype.show = function() {
       this.e.show();
       this.update();
+      this.e.trigger("mokaDone", [false]);
       return this;
     };
     Widget.prototype.hide = function() {
@@ -450,7 +454,11 @@
       return true;
     };
     Widget.prototype.appendTo = function(e) {
-      this.e.appendTo(e);
+      if (e.e && e.append) {
+        e.append(this);
+      } else {
+        this.e.appendTo(e);
+      }
       return this;
     };
     Widget.prototype.remove = function() {
@@ -551,6 +559,7 @@
         e.addClass(this.itemcls + " moka-last");
         e.appendTo(this.e).bind("mokaSizeChanged", this.update.bind(this));
       }
+      this.update();
       return this;
     };
     return Container;
@@ -620,10 +629,9 @@
     }
     WidgetList.prototype.append = function(widgets) {
       var e, id, widget, _i, _len;
-      WidgetList.__super__.append.apply(this, arguments);
       for (_i = 0, _len = arguments.length; _i < _len; _i++) {
         widget = arguments[_i];
-        id = this.length() - 1;
+        id = this.length();
         e = widget.e;
         widget.parentWidget = this;
         e.bind("mokaFocused", __bind(function() {
@@ -642,6 +650,7 @@
           e.addClass("moka-current");
         }
       }
+      WidgetList.__super__.append.apply(this, arguments);
       return this;
     };
     WidgetList.prototype.select = function(id) {
@@ -777,25 +786,29 @@
   })();
   Moka.TextEdit = (function() {
     __extends(TextEdit, Moka.Input);
-    TextEdit.prototype.default_keys = {};
+    TextEdit.prototype.default_keys = {
+      ENTER: function() {
+        return Moka.focus(this.editor.win);
+      }
+    };
     function TextEdit(label_text, text) {
       TextEdit.__super__.constructor.apply(this, arguments);
       this.e.addClass("moka-textedit").attr("tabindex", 1);
       Moka.createLabel(label_text, this.e);
-      this.create = true;
-      this.text = text;
+      this.editor = null;
+      this.text = text || "";
     }
     TextEdit.prototype.update = function() {
       var editor, win;
-      if (this.create && this.e.is(":visible")) {
-        this.create = false;
+      if (!this.editor && this.e.is(":visible")) {
         editor = new CodeMirror(this.e[0], {
           height: "dynamic",
           minHeight: 24,
-          tabmode: "default",
-          parserfile: ["tokenizejavascript.js", "parsejavascript.js"],
-          stylesheet: "deps/codemirror/css/jscolors.css",
-          path: "deps/codemirror/js/"
+          parserfile: "parsedummy.js",
+          path: "deps/codemirror/js/",
+          onChange: __bind(function() {
+            return this.text = this.editor.getCode();
+          }, this)
         });
         $(editor.frame).attr("tabindex", -1);
         $(editor.win.document).bind("keydown.moka", this.editorKeyDown.bind(this));
@@ -817,18 +830,35 @@
           ev.target = editor.wrapping;
           return Moka.lostFocus(ev);
         }, this));
-        this.e.focus(__bind(function() {
-          return Moka.focus(editor.win);
-        }, this));
         this.editor = editor;
-        if (this.text) {
-          editor.setCode(this.text);
-          return this.text = null;
+        this.value(this.text);
+      }
+      return this;
+    };
+    TextEdit.prototype.hide = function() {
+      this.e.hide();
+      if (this.editor) {
+        $(this.editor.wrapping).remove();
+        this.editor = null;
+      }
+      return this;
+    };
+    TextEdit.prototype.value = function(text) {
+      if (text != null) {
+        if (this.editor) {
+          this.editor.setCode(text);
         }
+        this.text = text;
+        return this;
+      } else {
+        return this.text;
       }
     };
     TextEdit.prototype.editorKeyDown = function(ev) {
       var k, keyname;
+      if (ev.isPropagationStopped()) {
+        return;
+      }
       keyname = getKeyName(ev);
       if (doKey(keyname, this.keys, this.default_keys, this)) {
         return false;
@@ -836,6 +866,19 @@
       k = keyname.replace(/^S-/, "").replace(/^KP/, "");
       if (k === "TAB" || k.search(/^F[0-9]/) >= 0) {
         return this.e.trigger(ev);
+      } else if (k === "ESCAPE") {
+        this.hide();
+        return this.show();
+      }
+    };
+    TextEdit.prototype.keydown = function(ev) {
+      var keyname;
+      if (ev.isPropagationStopped()) {
+        return;
+      }
+      keyname = getKeyName(ev);
+      if (doKey(keyname, this.keys, this.default_keys, this)) {
+        return false;
       }
     };
     return TextEdit;
@@ -875,6 +918,7 @@
       widget = new Moka.Button(label_text, onclick, tooltip);
       ButtonBox.__super__.append.call(this, widget);
       widget.e.removeClass("moka-widgetlistitem");
+      this.update();
       return this;
     };
     return ButtonBox;
@@ -1024,6 +1068,7 @@
       if (this.current < 0 || this.current === this.tabs.length() - 1) {
         this.select(Math.max(0, this.current));
       }
+      this.update();
       return this;
     };
     Tabs.prototype.select = function(id) {
@@ -1136,7 +1181,7 @@
           return this.e.trigger("mokaDone", [true]);
         }, this);
         this.image = new Moka.Image(this.src, "", "", onload, onerror);
-        this.image.e.appendTo(this.e);
+        this.image.appendTo(this.e);
         this.e.show();
       }
       return this;
@@ -1144,8 +1189,10 @@
     ImageView.prototype.hide = function() {
       this.e.hide();
       this.ok = null;
-      this.image["delete"]();
-      this.image = null;
+      if (this.image != null) {
+        this.image.remove();
+        this.image = null;
+      }
       return this;
     };
     ImageView.prototype.isLoaded = function() {
@@ -1218,6 +1265,20 @@
       },
       DOWN: function() {
         return isOnScreen(focused_widget, "bottom") && this.focusDown();
+      },
+      TAB: function() {
+        if (this.index + this.current + 1 < this.length() && this.currentcell < this.cellCount()) {
+          return this.next();
+        } else {
+          return false;
+        }
+      },
+      'S-TAB': function() {
+        if (this.currentcell > 0) {
+          return this.prev();
+        } else {
+          return false;
+        }
       },
       'KP6': function() {
         return this.next();
@@ -1399,7 +1460,7 @@
             width: this.e.width(),
             height: this.e.height()
           });
-          item.e.hide().appendTo(cell);
+          item.hide().appendTo(cell);
         } else {
           cell.attr("tabindex", "");
         }
@@ -1509,7 +1570,7 @@
           ++i;
         }
         if (this.current >= 0) {
-          ensure_visible(this.at(this.index + this.current).e);
+          ensureVisible(this.at(this.index + this.current).e);
         }
         this.updateVisible();
         this.e.trigger("mokaZoomChanged");
@@ -1580,7 +1641,7 @@
           if (__indexOf.call(this.o, "r") >= 0) {
             how = -how;
           }
-          this.select(this.index + id + how);
+          this.select(Math.min(this.index + id + how, this.length() - 1));
         }
       } else {
         cell = this.cells[id];
@@ -1628,7 +1689,7 @@
           if (__indexOf.call(this.o, "b") >= 0) {
             how = -how;
           }
-          this.select(this.index + id + how);
+          this.select(Math.min(this.index + id + how, this.length() - 1));
         }
       } else {
         cell = this.cells[id];
@@ -1901,7 +1962,7 @@
             ww = p.width();
             hh = p.height();
             if (current_item) {
-              ensure_visible(current_item);
+              ensureVisible(current_item);
             } else {
               if (pos.left < wndleft + this.e.width() / 2 && ww > w) {
                 this.e.scrollLeft(left + (ww - w) / 2);
@@ -2022,6 +2083,13 @@
   Moka.Window = (function() {
     __extends(Window, Moka.Input);
     Window.prototype.default_keys = {
+      'S-TAB': function() {
+        if (focused_widget[0] !== this.title.e[0]) {
+          return Moka.focus(this.title.e);
+        } else {
+          return false;
+        }
+      },
       F4: function() {
         return this.close();
       },
@@ -2118,6 +2186,9 @@
       },
       ESCAPE: function() {
         return this.close();
+      },
+      TAB: function() {
+        return this.focus();
       }
     };
     function Window(title) {
@@ -2258,6 +2329,7 @@
         this.widgets.push(widget);
         widget.e.appendTo(this.body);
       }
+      this.update();
       return this;
     };
     Window.prototype.focus = function() {
@@ -2268,10 +2340,12 @@
       var pos;
       if (x != null) {
         pos = this.e.parent().offset();
-        this.e.offset({
-          left: pos.left + x,
-          top: pos.top + y
-        });
+        if (pos) {
+          this.e.offset({
+            left: pos.left + x,
+            top: pos.top + y
+          });
+        }
         return this;
       } else {
         return this.e.offset();
