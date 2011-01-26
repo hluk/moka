@@ -180,6 +180,24 @@
     e.css("cursor", "pointer");
     return e;
   };
+  Moka.findInput = function(e, str) {
+    var find, query, res;
+    if (!str) {
+      return null;
+    }
+    query = str.toUpperCase();
+    res = null;
+    find = function() {
+      var $this;
+      $this = $(this);
+      if ($this.text().toUpperCase().search(query) >= 0) {
+        res = $this.closest(".moka-input");
+        return false;
+      }
+    };
+    e.find(".moka-input.moka-label:visible, .moka-input > .moka-label:visible").each(find);
+    return res;
+  };
   initDraggable = function(e, handle_e) {
     if (!handle_e) {
       handle_e = e;
@@ -391,8 +409,13 @@
     return false;
   };
   Moka.lostFocus = function(ev) {
-    focused_widget.removeClass("moka-focus").trigger("mokaBlurred");
-    return focused_widget = $();
+    var e;
+    e = $(ev.target);
+    log(e[0], focused_widget[0]);
+    e.removeClass("moka-focus").trigger("mokaBlurred");
+    if (e[0] === focused_widget[0]) {
+      return focused_widget = $();
+    }
   };
   Moka.gainFocus = function(ev) {
     if (focus_timestamp === ev.timeStamp) {
@@ -593,7 +616,7 @@
         this.prev();
         return false;
       }, this));
-      this.itemcls = itemcls != null ? itemcls : "widgetlistitem";
+      this.itemcls = itemcls != null ? itemcls : "moka-widgetlistitem";
       this.current = 0;
     }
     WidgetList.prototype.append = function(widgets) {
@@ -704,6 +727,55 @@
     };
     return CheckBox;
   })();
+  Moka.LineEdit = (function() {
+    __extends(LineEdit, Moka.Input);
+    LineEdit.prototype.default_keys = {};
+    function LineEdit(label_text, text) {
+      LineEdit.__super__.constructor.apply(this, arguments);
+      this.e.addClass("moka-lineedit");
+      if (label_text) {
+        Moka.createLabel(label_text, this.e);
+      }
+      this.edit = $("<input>").appendTo(this.e).keyup(this.update.bind(this)).focus(__bind(function(ev) {
+        ev.target = this.edit[0];
+        return Moka.gainFocus(ev);
+      }, this)).blur(__bind(function(ev) {
+        ev.target = this.edit[0];
+        return Moka.lostFocus(ev);
+      }, this));
+      if (text) {
+        this.value(text);
+      }
+    }
+    LineEdit.prototype.focus = function() {
+      Moka.focus(this.edit);
+      return this;
+    };
+    LineEdit.prototype.update = function() {
+      return this.edit.attr("size", this.value().length + 2);
+    };
+    LineEdit.prototype.value = function(text) {
+      if (text != null) {
+        this.edit.attr("value", text);
+        return this;
+      } else {
+        return this.edit.attr("value");
+      }
+    };
+    LineEdit.prototype.keydown = function(ev) {
+      var k, keyname;
+      keyname = getKeyName(ev);
+      if (doKey(keyname, this.keys, this.default_keys, this)) {
+        return false;
+      }
+      k = keyname.split('-');
+      k = k[k.length - 1];
+      if (k.length === 1 || ["LEFT", "RIGHT", "BACKSPACE", "DELETE", "MINUS", "SPACE"].indexOf(k) >= 0) {
+        return ev.stopPropagation();
+      }
+    };
+    return LineEdit;
+  })();
   Moka.TextEdit = (function() {
     __extends(TextEdit, Moka.Input);
     TextEdit.prototype.default_keys = {};
@@ -712,6 +784,7 @@
       this.e.addClass("moka-textedit").attr("tabindex", 1);
       Moka.createLabel(label_text, this.e);
       this.create = true;
+      this.text = text;
     }
     TextEdit.prototype.update = function() {
       var editor, win;
@@ -749,7 +822,11 @@
         this.e.focus(__bind(function() {
           return Moka.focus(editor.win);
         }, this));
-        return this.editor = editor;
+        this.editor = editor;
+        if (this.text) {
+          editor.setCode(this.text);
+          return this.text = null;
+        }
       }
     };
     TextEdit.prototype.editorKeyDown = function(ev) {
@@ -767,11 +844,14 @@
   })();
   Moka.Button = (function() {
     __extends(Button, Moka.Input);
-    function Button(label_text, onclick) {
+    function Button(label_text, onclick, tooltip) {
       Button.__super__.constructor.apply(this, arguments);
       Moka.createLabel(label_text, this.e);
       this.e.addClass("moka-button");
       this.click = onclick;
+      if (tooltip) {
+        this.e.attr("title", tooltip);
+      }
     }
     Button.prototype.keydown = function(ev) {
       var keyname;
@@ -792,9 +872,9 @@
       ButtonBox.__super__.constructor.apply(this, arguments);
       this.e.removeClass("moka-widgetlist").addClass("moka-buttonbox moka-horizontal");
     }
-    ButtonBox.prototype.append = function(label_text, onclick) {
+    ButtonBox.prototype.append = function(label_text, onclick, tooltip) {
       var widget;
-      widget = new Moka.Button(label_text, onclick);
+      widget = new Moka.Button(label_text, onclick, tooltip);
       ButtonBox.__super__.append.call(this, widget);
       widget.e.removeClass("moka-widgetlistitem");
       return this;
@@ -1949,6 +2029,29 @@
       },
       F2: function() {
         return this.title["do"](Moka.focus);
+      },
+      F3: function() {
+        var e, edit, last_focused, pos, w, wnd;
+        last_focused = focused_widget;
+        wnd = new Moka.Window("Search");
+        w = new Moka.LineEdit("Find string:");
+        e = w.e;
+        edit = w.edit;
+        edit.blur(function() {
+          return wnd.close();
+        });
+        wnd.addKey("ESCAPE", function() {
+          Moka.focus(last_focused);
+          return wnd.close();
+        });
+        wnd.addKey("ENTER", __bind(function() {
+          var tofocus;
+          tofocus = Moka.findInput(this.e, edit.attr("value"));
+          Moka.focus(tofocus ? tofocus : last_focused);
+          return wnd.close();
+        }, this));
+        pos = this.position();
+        return wnd.append(w).appendTo(this.e.parent()).position(pos.left, pos.top).show().focus();
       }
     };
     Window.prototype.default_title_keys = {
@@ -2238,7 +2341,7 @@
     return Window;
   })();
   elementToWidget = function(e) {
-    var h, label, m, onclick, src, title, w;
+    var h, label, m, onclick, src, title, tooltip, w;
     w = null;
     if (e.hasClass("moka-window")) {
       title = e.children(".moka-title").html() || "untitled";
@@ -2252,8 +2355,9 @@
       });
     } else if (e.hasClass("moka-button")) {
       onclick = e[0].onclick;
+      tooltip = e.attr("title");
       label = e.html() || "";
-      w = new Moka.Button(label, onclick);
+      w = new Moka.Button(label, onclick, tooltip);
     } else if (e.hasClass("moka-label")) {
       label = e.html() || "";
       w = new Moka.Label(label);
@@ -2285,8 +2389,9 @@
       w = new Moka.ButtonBox().vertical(e.hasClass("moka-vertical"));
       e.children().each(function() {
         onclick = this.onclick;
+        tooltip = this.title;
         label = $(this).html() || "";
-        return w.append(label, onclick);
+        return w.append(label, onclick, tooltip);
       });
     }
     if (w != null) {

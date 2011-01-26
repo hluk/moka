@@ -179,6 +179,25 @@ Moka.createLabel = (text, e) -># {{{
     return e
 # }}}
 
+Moka.findInput = (e, str) -># {{{
+    return null if not str
+
+    # case-insensitive search
+    query = str.toUpperCase()
+
+    res = null
+    find = () ->
+        $this = $(this)
+        if $this.text().toUpperCase().search(query) >= 0
+            res = $this.closest(".moka-input")
+            return false
+
+    # search in labels inside each moka-input element
+    e.find(".moka-input.moka-label:visible, .moka-input > .moka-label:visible").each(find)
+
+    return res
+# }}}
+
 initDraggable = (e, handle_e) -># {{{
     if not handle_e
         handle_e = e
@@ -397,10 +416,12 @@ doKey = (keyname, keys, default_keys, object) -># {{{
 
 # widget focusing # {{{
 Moka.lostFocus = (ev) ->
-    focused_widget.removeClass("moka-focus")
-                  .trigger("mokaBlurred")
-    focused_widget = $()
-    #dbg "blurred element",focused_widget
+    e = $(ev.target)
+    log e[0], focused_widget[0]
+    e.removeClass("moka-focus")
+     .trigger("mokaBlurred")
+    focused_widget = $() if e[0] is focused_widget[0]
+    #dbg "blurred element",e
 
 Moka.gainFocus = (ev) ->
     return if focus_timestamp is ev.timeStamp
@@ -576,7 +597,7 @@ class Moka.WidgetList extends Moka.Container # {{{
           .bind( "mokaFocusNextRequest", () => @next(); return false )
           .bind( "mokaFocusPrevRequest", () => @prev(); return false )
 
-        @itemcls = if itemcls? then itemcls else "widgetlistitem"
+        @itemcls = if itemcls? then itemcls else "moka-widgetlistitem"
         @current = 0
     # }}}
 
@@ -671,6 +692,56 @@ class Moka.CheckBox extends Moka.Input # {{{
     # }}}
 # }}}
 
+class Moka.LineEdit extends Moka.Input# {{{
+    default_keys: {}# {{{
+    # }}}
+
+    constructor: (label_text, text) -># {{{
+        super
+        @e.addClass("moka-lineedit")
+        Moka.createLabel(label_text, @e) if label_text
+        @edit = $("<input>")
+               .appendTo(@e)
+               .keyup( this.update.bind(this) )
+               .focus (ev) =>
+                    ev.target = @edit[0]
+                    Moka.gainFocus(ev)
+               .blur  (ev) =>
+                    ev.target = @edit[0]
+                    Moka.lostFocus(ev)
+        @value(text) if text
+    # }}}
+
+    focus: () -># {{{
+        Moka.focus(@edit)
+        return this
+    # }}}
+
+    update: () -># {{{
+        @edit.attr( "size", @value().length+2 )
+    # }}}
+
+    value: (text) -># {{{
+        if text?
+            @edit.attr("value", text)
+            return this
+        else
+            return @edit.attr("value")
+    # }}}
+
+    keydown: (ev) -># {{{
+        keyname = getKeyName(ev)
+
+        if doKey(keyname, @keys, @default_keys, this)
+            return false
+
+        k = keyname.split('-')
+        k = k[k.length-1]
+        if k.length is 1 or ["LEFT", "RIGHT", "BACKSPACE", "DELETE", "MINUS", "SPACE"].indexOf(k) >= 0
+            ev.stopPropagation()
+    # }}}
+# }}}
+
 class Moka.TextEdit extends Moka.Input# {{{
     default_keys: {}# {{{
     # }}}
@@ -681,6 +752,7 @@ class Moka.TextEdit extends Moka.Input# {{{
           .attr("tabindex", 1)
         Moka.createLabel(label_text, @e)
         @create = true
+        @text = text
     # }}}
 
     update: () -># {{{
@@ -719,6 +791,10 @@ class Moka.TextEdit extends Moka.Input# {{{
             @e.focus( () => Moka.focus(editor.win) )
 
             @editor = editor
+
+            if @text
+                editor.setCode(@text)
+                @text = null
     # }}}
 
     editorKeyDown: (ev) -># {{{
@@ -738,11 +814,13 @@ class Moka.TextEdit extends Moka.Input# {{{
 
 # TODO: add button icon
 class Moka.Button extends Moka.Input # {{{
-    constructor: (label_text, onclick) -># {{{
+    constructor: (label_text, onclick, tooltip) -># {{{
         super
         Moka.createLabel(label_text, @e)
         @e.addClass("moka-button")
         @click = onclick
+
+        @e.attr("title", tooltip) if tooltip
     # }}}
 
     keydown: (ev) -># {{{
@@ -763,8 +841,8 @@ class Moka.ButtonBox extends Moka.WidgetList # {{{
           .addClass("moka-buttonbox moka-horizontal")
     # }}}
 
-    append: (label_text, onclick) -># {{{
-        widget = new Moka.Button(label_text, onclick)
+    append: (label_text, onclick, tooltip) -># {{{
+        widget = new Moka.Button(label_text, onclick, tooltip)
         super widget
         widget.e.removeClass("moka-widgetlistitem")
 
@@ -1741,7 +1819,30 @@ class Moka.NotificationX extends Moka.Widget# {{{
 class Moka.Window extends Moka.Input# {{{
     default_keys: # {{{
         F4: -> @close()
-        F2:  -> @title.do(Moka.focus)
+        F2: -> @title.do(Moka.focus)
+        F3: ->
+            last_focused = focused_widget
+
+            wnd = new Moka.Window("Search")
+            w = new Moka.LineEdit("Find string:")
+            e = w.e
+            edit = w.edit
+
+            edit.blur   () -> wnd.close()
+            wnd.addKey "ESCAPE", () ->
+                Moka.focus(last_focused)
+                wnd.close()
+            wnd.addKey "ENTER", () =>
+                tofocus = Moka.findInput( @e, edit.attr("value") )
+                Moka.focus(if tofocus then tofocus else last_focused)
+                wnd.close()
+
+            pos = @position()
+            wnd.append(w)
+               .appendTo( @e.parent() )
+               .position(pos.left, pos.top)
+               .show()
+               .focus()
     # }}}
 
     default_title_keys: # {{{
@@ -2007,8 +2108,9 @@ elementToWidget = (e) -># {{{
             w.append(ww) if ww
     else if e.hasClass("moka-button")
         onclick = e[0].onclick
+        tooltip = e.attr("title")
         label = e.html() or ""
-        w = new Moka.Button(label, onclick)
+        w = new Moka.Button(label, onclick, tooltip)
     else if e.hasClass("moka-label")
         label = e.html() or ""
         w = new Moka.Label(label)
@@ -2032,8 +2134,9 @@ elementToWidget = (e) -># {{{
         w = new Moka.ButtonBox().vertical( e.hasClass("moka-vertical") )
         e.children().each () ->
             onclick = this.onclick
+            tooltip = this.title
             label = $(this).html() or ""
-            w.append(label, onclick)
+            w.append(label, onclick, tooltip)
     #else if e.hasClass("moka-tabwidget")
 
     if w?

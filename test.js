@@ -5,7 +5,7 @@
     var e, p0, p1, p2, p3, p3_1, p3_2_1, p4, p4_1, p4_2_1, t, w, wnd;
     wnd = new Moka.Window("Widget Test - Window " + (++wnd_count));
     p0 = new Moka.WidgetList();
-    p1 = new Moka.WidgetList().append(new Moka.TextEdit("text _edit widget:", "type some text\nhere", true)).append(new Moka.TextEdit("text _edit widget:", "type some text here")).append(new Moka.Button("_Button", function() {
+    p1 = new Moka.WidgetList().append(new Moka.TextEdit("text _edit widget:", "type some text\nhere", true)).append(new Moka.LineEdit("_line edit widget:", "type some text here")).append(new Moka.Button("_Button", function() {
       return alert("CLICKED");
     })).append(new Moka.CheckBox("_Checkbox")).append(new Moka.CheckBox("C_heckbox", true));
     p2 = new Moka.ButtonBox().append("Button_1", function() {
@@ -82,13 +82,11 @@
       return notify(id);
     });
     wnd = new Moka.Window("HELP - <i>JavaScript generated window</i>");
-    wnd.append(new Moka.Container(true).append(new Moka.Container().append(new Moka.Label("Moka is JavaScript GUI framework."), new Moka.ButtonBox().append("Add _New Window", test).append("_Close", function() {
+    wnd.append(new Moka.Container(true).append(new Moka.Container().append(new Moka.Label("Moka is JavaScript GUI framework."), new Moka.ButtonBox().append("Add _New Window", test, "Create new window").append("_Close", (function() {
       return wnd.close();
-    })), new Moka.Image("img/moka.png", 96, 96).show()));
+    }), "Close this window")), new Moka.Image("img/moka.png", 96, 96).show()));
     wnd.addKey("shift-t", test);
-    wnd["do"](function(e) {
-      return e.prependTo("body");
-    }).position(0, 150).show().focus();
+    wnd.appendTo("body").position(0, 150).show().focus();
     return v.zoom(map.zoom);
   };
   $(document).ready(onLoad);

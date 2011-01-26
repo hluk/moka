@@ -103,7 +103,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         );
     }
 }
-.moka-textedit .CodeMirror-wrapping {
+.moka-lineedit input, .moka-textedit .CodeMirror-wrapping {
     color: $edit_fg;
     background-color: $edit_bg;
     border-color: $widget_bg * 1.6;

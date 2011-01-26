@@ -6,7 +6,7 @@ window.test = () -># {{{
 
     p1 = new Moka.WidgetList()
         .append( new Moka.TextEdit("text _edit widget:", "type some text\nhere", true) )
-        .append( new Moka.TextEdit("text _edit widget:", "type some text here") )
+        .append( new Moka.LineEdit("_line edit widget:", "type some text here") )
         .append( new Moka.Button("_Button", () -> alert "CLICKED") )
         .append( new Moka.CheckBox("_Checkbox") )
         .append( new Moka.CheckBox("C_heckbox", true) )
@@ -204,13 +204,15 @@ onLoad = () -># {{{
         new Moka.Container(true).append(
             new Moka.Container().append(
                 new Moka.Label("Moka is JavaScript GUI framework."),
-                new Moka.ButtonBox().append("Add _New Window", test).append("_Close", () -> wnd.close())
+                new Moka.ButtonBox()
+                    .append("Add _New Window", test, "Create new window")
+                    .append("_Close", (() -> wnd.close()), "Close this window")
             ),
             new Moka.Image("img/moka.png", 96, 96).show()
         )
     )
     wnd.addKey("shift-t", test)
-    wnd.do( (e) -> e.prependTo("body") )
+    wnd.appendTo("body")
        .position(0, 150)
        .show()
        .focus()
