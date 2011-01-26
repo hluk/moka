@@ -307,11 +307,13 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     .moka-close {
         &:before {
           content: '\2297';
+          //content: '\22A0';
         }
     }
     .moka-maximize {
         &:before {
           content: '\2299';
+          //content: '\22A1';
         }
     }
 }

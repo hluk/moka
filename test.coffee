@@ -142,16 +142,12 @@ onLoad = () -># {{{
         #"http://th08.deviantart.net/fs70/150/i/2010/118/d/b/Acrylic_training_3_by_Pendalune.jpg",
     ]# }}}
 
-    #items=[
-        #'http://4.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/0000.jpg','http://6.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/disclaimer.jpg','http://7.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side001.jpg','http://3.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side002.jpg','http://3.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side003.jpg','http://7.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side004.jpg','http://2.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side005.jpg','http://9.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side006.jpg','http://9.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side007.jpg','http://0.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side008.jpg','http://5.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side009.jpg','http://4.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side010.jpg','http://5.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side011.jpg','http://8.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side012.jpg','http://1.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side013.jpg','http://8.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side014.jpg','http://6.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side015.jpg','http://0.p.s.mfcdn.net/store/manga/150/00-001.0/compressed/side016.jpg','',
-        #'http://0.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/0000.jpg','http://1.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/disclaimer.jpg','http://9.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side017.jpg','http://4.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side018.jpg','http://3.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side019.jpg','http://7.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side020.jpg','http://6.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side021.jpg','http://8.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side022.jpg','http://2.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side023.jpg','http://5.p.s.mfcdn.net/store/manga/150/00-002.0/compressed/side024.jpg','',
-    #]
-
+    # variables from URL
     map = {}
     location.search.replace( /[?&]+([^=&]+)=([^&]*)/gi,
         (m,key,value) -> map[key] = value )
 
-    # Viewer test {{{
+    # Moka.Viewer {{{
     v = new Moka.Viewer()
         .layout(if map.layout? then map.layout.split("x") else [1,1])
        .orientation(if map.o then map.o else "lt")
@@ -199,6 +195,7 @@ onLoad = () -># {{{
     #wnd.focus()
     # }}}
 
+    # Moka.Window # {{{
     wnd = new Moka.Window("HELP - <i>JavaScript generated window</i>")
     wnd.append(
         new Moka.Container(true).append(
@@ -216,6 +213,7 @@ onLoad = () -># {{{
        .position(0, 150)
        .show()
        .focus()
+    # }}}
 
     v.zoom(map.zoom)
 # }}}

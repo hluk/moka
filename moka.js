@@ -1,5 +1,5 @@
 (function() {
-  var dbg, doKey, dragScroll, elementToWidget, ensure_visible, focus_timestamp, focused_widget, getKeyName, initDraggable, is_on_screen, keyHintFocus, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, mokaInit, normalizeKeyName, tt, userAgent, userAgents;
+  var dbg, doKey, dragScroll, elementToWidget, ensure_visible, focus_timestamp, focused_widget, getKeyName, initDraggable, isOnScreen, keyHintFocus, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, mokaInit, normalizeKeyName, tt, userAgent, userAgents;
   var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -319,7 +319,7 @@
     ee = e.length ? e[0] : e;
     return ee.blur();
   };
-  Moka.focus_first = function(e) {
+  Moka.focusFirst = function(e) {
     var ee, eee;
     if (e.hasClass("moka-input")) {
       ee = e;
@@ -337,7 +337,7 @@
       return false;
     }
   };
-  is_on_screen = function(w, how) {
+  isOnScreen = function(w, how) {
     var e, max, min, pos, wnd, x;
     if (!w) {
       return false;
@@ -411,7 +411,6 @@
   Moka.lostFocus = function(ev) {
     var e;
     e = $(ev.target);
-    log(e[0], focused_widget[0]);
     e.removeClass("moka-focus").trigger("mokaBlurred");
     if (e[0] === focused_widget[0]) {
       return focused_widget = $();
@@ -650,7 +649,7 @@
       if (id >= 0) {
         w = this.widgets[id];
         if (w) {
-          return Moka.focus_first(w.e);
+          return Moka.focusFirst(w.e);
         }
       }
     };
@@ -798,7 +797,6 @@
           stylesheet: "deps/codemirror/css/jscolors.css",
           path: "deps/codemirror/js/"
         });
-        Moka.editor = editor;
         $(editor.frame).attr("tabindex", -1);
         $(editor.win.document).bind("keydown.moka", this.editorKeyDown.bind(this));
         win = $(editor.win);
@@ -885,7 +883,7 @@
     __extends(Tabs, Moka.Widget);
     Tabs.prototype.default_keys = {
       ENTER: function() {
-        return Moka.focus_first(this.pages[this.current].e);
+        return Moka.focusFirst(this.pages[this.current].e);
       },
       SPACE: function() {
         return this.pages_e.toggle();
@@ -943,7 +941,7 @@
       TAB: function() {
         var page;
         if ((page = this.pages[this.current])) {
-          return Moka.focus_first(page.e.children());
+          return Moka.focusFirst(page.e.children());
         } else {
           return false;
         }
@@ -995,7 +993,7 @@
       return this;
     };
     Tabs.prototype.focusDown = function() {
-      Moka.focus_first(this.pages[this.current].e);
+      Moka.focusFirst(this.pages[this.current].e);
       return this;
     };
     Tabs.prototype.next = function() {
@@ -1210,16 +1208,16 @@
     __extends(Viewer, Moka.Input);
     Viewer.prototype.default_keys = {
       RIGHT: function() {
-        return is_on_screen(focused_widget, "right") && this.focusRight();
+        return isOnScreen(focused_widget, "right") && this.focusRight();
       },
       LEFT: function() {
-        return is_on_screen(focused_widget, "left") && this.focusLeft();
+        return isOnScreen(focused_widget, "left") && this.focusLeft();
       },
       UP: function() {
-        return is_on_screen(focused_widget, "top") && this.focusUp();
+        return isOnScreen(focused_widget, "top") && this.focusUp();
       },
       DOWN: function() {
-        return is_on_screen(focused_widget, "bottom") && this.focusDown();
+        return isOnScreen(focused_widget, "bottom") && this.focusDown();
       },
       'KP6': function() {
         return this.next();
@@ -1352,7 +1350,7 @@
     Viewer.prototype.focus = function(ev) {
       var cell;
       cell = this.cells[this.currentcell > 0 ? this.currentcell : 0];
-      Moka.focus_first(cell.children()) || Moka.focus(cell);
+      Moka.focusFirst(cell.children()) || Moka.focus(cell);
       return this;
     };
     Viewer.prototype.append = function(widget) {
@@ -1451,7 +1449,7 @@
         this.view(id);
       }
       cell = this.cells[id % count];
-      Moka.focus_first(cell.children()) || Moka.focus(cell);
+      Moka.focusFirst(cell.children()) || Moka.focus(cell);
       return this;
     };
     Viewer.prototype.zoom = function(how) {
@@ -1656,7 +1654,7 @@
         if (this.currentcell === id && this.currentindex === this.index + id) {
           return;
         }
-        if (ev.target === cell[0] && Moka.focus_first(cell.children())) {
+        if (ev.target === cell[0] && Moka.focusFirst(cell.children())) {
           return;
         }
         if ((_ref = this.cells[this.currentcell]) != null) {
@@ -2155,7 +2153,7 @@
       }).bind("scroll.moka", this.update.bind(this)).appendTo(e);
       this.title.dblclick = function() {
         body.toggle();
-        Moka.focus_first(body);
+        Moka.focusFirst(body);
         return false;
       };
       this.title.mousedown = __bind(function(ev) {
@@ -2263,7 +2261,7 @@
       return this;
     };
     Window.prototype.focus = function() {
-      Moka.focus_first(this.body);
+      Moka.focusFirst(this.body);
       return this;
     };
     Window.prototype.position = function(x, y) {

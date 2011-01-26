@@ -42,6 +42,7 @@ userAgent = () ->
 # }}}
 
 # KEYBOARD# {{{
+# TODO: add keynames for each web browser
 keycodes = {}# {{{
 keycodes[8] = "BACKSPACE"
 keycodes[9] = "TAB"
@@ -331,7 +332,7 @@ Moka.blur = (e) -># {{{
     ee.blur()
 # }}}
 
-Moka.focus_first = (e) -># {{{
+Moka.focusFirst = (e) -># {{{
     if e.hasClass("moka-input")
         ee = e
     else
@@ -347,7 +348,7 @@ Moka.focus_first = (e) -># {{{
         return false
 # }}}
 
-is_on_screen = (w, how) -># {{{
+isOnScreen = (w, how) -># {{{
     return false if not w
     e = if w.e then w.e else w
 
@@ -417,7 +418,6 @@ doKey = (keyname, keys, default_keys, object) -># {{{
 # widget focusing # {{{
 Moka.lostFocus = (ev) ->
     e = $(ev.target)
-    log e[0], focused_widget[0]
     e.removeClass("moka-focus")
      .trigger("mokaBlurred")
     focused_widget = $() if e[0] is focused_widget[0]
@@ -625,7 +625,7 @@ class Moka.WidgetList extends Moka.Container # {{{
     select: (id) -># {{{
         if id >= 0
             w = @widgets[id]
-            Moka.focus_first(w.e) if w
+            Moka.focusFirst(w.e) if w
     # }}}
 
     next: -># {{{
@@ -768,9 +768,6 @@ class Moka.TextEdit extends Moka.Input# {{{
                 path: "deps/codemirror/js/"
             )
 
-            # FIXME: grab key events only if no action taken in editor
-            Moka.editor = editor
-
             # Chromium: hidden iframe gets focus
             $(editor.frame).attr("tabindex", -1)
 
@@ -852,7 +849,7 @@ class Moka.ButtonBox extends Moka.WidgetList # {{{
 
 class Moka.Tabs extends Moka.Widget # {{{
     default_keys: # {{{
-        ENTER: -> Moka.focus_first(@pages[@current].e)
+        ENTER: -> Moka.focusFirst(@pages[@current].e)
         SPACE: -> @pages_e.toggle()
 
         LEFT: ->  if @vertical() then @focusUp() else @prev()
@@ -867,7 +864,7 @@ class Moka.Tabs extends Moka.Widget # {{{
     # }}}
 
     default_tab_keys: # {{{
-        TAB: -> if (page = @pages[@current]) then Moka.focus_first(page.e.children()) else false
+        TAB: -> if (page = @pages[@current]) then Moka.focusFirst(page.e.children()) else false
     # }}}
 
     constructor: -># {{{
@@ -917,7 +914,7 @@ class Moka.Tabs extends Moka.Widget # {{{
     # }}}
 
     focusDown: () -># {{{
-        Moka.focus_first( @pages[@current].e )
+        Moka.focusFirst( @pages[@current].e )
         return this
     # }}}
 
@@ -1121,10 +1118,10 @@ class Moka.ImageView extends Moka.Input# {{{
 
 class Moka.Viewer extends Moka.Input # {{{
     default_keys: # {{{
-        RIGHT: -> is_on_screen(focused_widget, "right") and @focusRight()
-        LEFT: -> is_on_screen(focused_widget, "left") and @focusLeft()
-        UP: -> is_on_screen(focused_widget, "top") and @focusUp()
-        DOWN: -> is_on_screen(focused_widget, "bottom") and @focusDown()
+        RIGHT: -> isOnScreen(focused_widget, "right") and @focusRight()
+        LEFT: -> isOnScreen(focused_widget, "left") and @focusLeft()
+        UP: -> isOnScreen(focused_widget, "top") and @focusUp()
+        DOWN: -> isOnScreen(focused_widget, "bottom") and @focusDown()
         'KP6': -> @next()
         'KP4': -> @prev()
         'KP2': -> @nextRow()
@@ -1219,7 +1216,7 @@ class Moka.Viewer extends Moka.Input # {{{
 
     focus: (ev) -># {{{
         cell = @cells[if @currentcell > 0 then @currentcell else 0]
-        Moka.focus_first( cell.children() ) or Moka.focus(cell)
+        Moka.focusFirst( cell.children() ) or Moka.focus(cell)
         return this
     # }}}
 
@@ -1320,7 +1317,7 @@ class Moka.Viewer extends Moka.Input # {{{
             @view(id)
 
         cell = @cells[id%count]
-        Moka.focus_first( cell.children() ) or Moka.focus(cell)
+        Moka.focusFirst( cell.children() ) or Moka.focus(cell)
 
         return this
     # }}}
@@ -1514,7 +1511,7 @@ class Moka.Viewer extends Moka.Input # {{{
             .bind("mokaFocused",
                 (ev) =>
                     return if @currentcell is id and @currentindex is @index+id
-                    if ev.target is cell[0] and Moka.focus_first(cell.children())
+                    if ev.target is cell[0] and Moka.focusFirst(cell.children())
                         return
 
                     @cells[@currentcell]?.removeClass("moka-current")
@@ -1926,7 +1923,7 @@ class Moka.Window extends Moka.Input# {{{
                       .bind( "scroll.moka", @update.bind(this) )
                       .appendTo(e)
 
-        @title.dblclick = () -> body.toggle(); Moka.focus_first(body); return false
+        @title.dblclick = () -> body.toggle(); Moka.focusFirst(body); return false
         @title.mousedown = (ev) => @focus(); ev.preventDefault() # prevent selecting text when double-clicking
 
         # window edges
@@ -2026,7 +2023,7 @@ class Moka.Window extends Moka.Input# {{{
     # }}}
 
     focus: () -># {{{
-        Moka.focus_first(@body)
+        Moka.focusFirst(@body)
         return this
     # }}}
 
