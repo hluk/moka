@@ -125,7 +125,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
     display: inline; }
 
 .moka-tabs .moka-tab {
-  border: 1px solid #868069; }
+  border: 1px solid #9c957b; }
   .moka-tabs .moka-tab .moka-focus {
     color: black;
     background-color: rgba(221, 170, 68, 0.7); }
@@ -146,14 +146,11 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
     border-top-right-radius: 0px;
     -moz-border-radius-topright: 0px;
     -webkit-border-radius-topright: 0px;
-    box-shadow: 0 -2px 3px rgba(89, 85, 70, 0.4);
-    -webkit-box-shadow: 0 -2px 3px rgba(89, 85, 70, 0.4);
-    -moz-box-shadow: 0 -2px 3px rgba(89, 85, 70, 0.4);
-    -o-box-shadow: 0 -2px 3px rgba(89, 85, 70, 0.4);
-    padding-bottom: 1em;
-    background-image: -webkit-linear-gradient(-90deg, rgba(255, 255, 255, 0) 65%,#e0d6b0);
-    background-image: -moz-linear-gradient(-90deg, rgba(255, 255, 255, 0) 65%,#e0d6b0);
-    background-image: linear-gradient(-90deg, rgba(255, 255, 255, 0) 65%,#e0d6b0); }
+    box-shadow: 0 -2px 4px rgba(89, 85, 70, 0.2);
+    -webkit-box-shadow: 0 -2px 4px rgba(89, 85, 70, 0.2);
+    -moz-box-shadow: 0 -2px 4px rgba(89, 85, 70, 0.2);
+    -o-box-shadow: 0 -2px 4px rgba(89, 85, 70, 0.2);
+    padding-bottom: 1em; }
 .moka-tabs.moka-vertical {
   float: left; }
   .moka-tabs.moka-vertical > .moka-tab {
@@ -172,15 +169,12 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
     border-bottom-left-radius: 0px;
     -moz-border-radius-bottomleft: 0px;
     -webkit-border-radius-bottomleft: 0px;
-    box-shadow: -2px 0 3px rgba(89, 85, 70, 0.4);
-    -webkit-box-shadow: -2px 0 3px rgba(89, 85, 70, 0.4);
-    -moz-box-shadow: -2px 0 3px rgba(89, 85, 70, 0.4);
-    -o-box-shadow: -2px 0 3px rgba(89, 85, 70, 0.4);
+    box-shadow: -2px 0 4px rgba(89, 85, 70, 0.2);
+    -webkit-box-shadow: -2px 0 4px rgba(89, 85, 70, 0.2);
+    -moz-box-shadow: -2px 0 4px rgba(89, 85, 70, 0.2);
+    -o-box-shadow: -2px 0 4px rgba(89, 85, 70, 0.2);
     padding: 0.3em;
-    padding-right: 1em;
-    background-image: -webkit-linear-gradient(0deg, rgba(255, 255, 255, 0) 75%,#e0d6b0);
-    background-image: -moz-linear-gradient(0deg, rgba(255, 255, 255, 0) 75%,#e0d6b0);
-    background-image: linear-gradient(0deg, rgba(255, 255, 255, 0) 75%,#e0d6b0); }
+    padding-right: 1em; }
 
 .moka-pages {
   float: left; }

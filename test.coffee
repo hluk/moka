@@ -211,8 +211,8 @@ onLoad = () -># {{{
     wnd.addKey("shift-t", test)
     wnd.appendTo("body")
        .position(0, 150)
-       .show()
-       .focus()
+       #.show()
+       #.focus()
     # }}}
 
     v.zoom(map.zoom)

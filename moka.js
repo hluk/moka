@@ -32,9 +32,7 @@
   log = logfn ? logfn.bind(logobj) : function() {
     return;
   };
-  dbg = function() {
-    return;
-  };
+  dbg = log.bind(this, "DEBUG:");
   userAgents = {
     unknown: 0,
     webkit: 1,
@@ -332,7 +330,7 @@
         ee = eee;
       }
     }
-    if (ee.length) {
+    if (ee.length && ee.is(":visible")) {
       Moka.focus(ee);
       return true;
     } else {
@@ -801,37 +799,41 @@
     TextEdit.prototype.update = function() {
       var editor, win;
       if (!this.editor && this.e.is(":visible")) {
-        editor = new CodeMirror(this.e[0], {
-          height: "dynamic",
-          minHeight: 24,
-          parserfile: "parsedummy.js",
-          path: "deps/codemirror/js/",
-          onChange: __bind(function() {
-            return this.text = this.editor.getCode();
-          }, this)
-        });
-        $(editor.frame).attr("tabindex", -1);
-        $(editor.win.document).bind("keydown.moka", this.editorKeyDown.bind(this));
-        win = $(editor.win);
-        win.resize(__bind(function() {
-          if (this.t_sizeupdate) {
-            window.clearTimeout(this.t_sizeupdate);
-          }
-          return this.t_sizeupdate = window.setTimeout((__bind(function() {
-            return this.e.trigger("mokaSizeChanged");
-          }, this)), 100);
-        }, this));
-        win.focus(__bind(function(ev) {
-          this.oldpos = this.editor.cursorPosition();
-          ev.target = editor.wrapping;
-          return Moka.gainFocus(ev);
-        }, this));
-        win.blur(__bind(function(ev) {
-          ev.target = editor.wrapping;
-          return Moka.lostFocus(ev);
-        }, this));
-        this.editor = editor;
-        this.value(this.text);
+        try {
+          editor = new CodeMirror(this.e[0], {
+            height: "dynamic",
+            minHeight: 24,
+            parserfile: "parsedummy.js",
+            path: "deps/codemirror/js/",
+            onChange: __bind(function() {
+              return this.text = this.editor.getCode();
+            }, this)
+          });
+          $(editor.frame).attr("tabindex", -1);
+          $(editor.win.document).bind("keydown.moka", this.editorKeyDown.bind(this));
+          win = $(editor.win);
+          win.resize(__bind(function() {
+            if (this.t_sizeupdate) {
+              window.clearTimeout(this.t_sizeupdate);
+            }
+            return this.t_sizeupdate = window.setTimeout((__bind(function() {
+              return this.e.trigger("mokaSizeChanged");
+            }, this)), 100);
+          }, this));
+          win.focus(__bind(function(ev) {
+            this.oldpos = this.editor.cursorPosition();
+            ev.target = editor.wrapping;
+            return Moka.gainFocus(ev);
+          }, this));
+          win.blur(__bind(function(ev) {
+            ev.target = editor.wrapping;
+            return Moka.lostFocus(ev);
+          }, this));
+          this.editor = editor;
+          this.value(this.text);
+        } catch (e) {
+          dbg("CodeMirror error:", e);
+        }
       }
       return this;
     };
@@ -1165,6 +1167,8 @@
         if (this.ok != null) {
           this.zoom(this.z, this.zhow);
         }
+        this.e.trigger("mokaLoaded");
+        this.e.trigger("mokaDone", [!this.ok]);
       } else {
         onload = __bind(function() {
           this.ok = true;
@@ -1384,7 +1388,7 @@
       this.index = 0;
       this.current = -1;
       this.currentcell = -1;
-      this.preload_count = 2;
+      this.preload_offset = 200;
       this.layout([1, 1]);
       this.orientation("lt");
       this.zoom(1);
@@ -1451,14 +1455,17 @@
       this.index = Math.floor(id / len) * len;
       dbg("displaying views", this.index + ".." + (this.index + len - 1));
       while (i < len) {
-        cell = this.cell(i);
+        cell = this.cell(i).css({
+          height: this.e.height(),
+          width: this.e.width()
+        });
         item = this.at(this.index + i);
         cell.children().detach();
         cell.data("itemindex", i);
         if (item) {
           cell.attr("tabindex", -1).css({
-            width: this.e.width(),
-            height: this.e.height()
+            height: this.e.height(),
+            width: this.e.width()
           });
           item.hide().appendTo(cell);
         } else {
@@ -1509,7 +1516,7 @@
       if (id < this.index || id >= this.index + count) {
         this.view(id);
       }
-      cell = this.cells[id % count];
+      cell = this.cell(id % count);
       Moka.focusFirst(cell.children()) || Moka.focus(cell);
       return this;
     };
@@ -1703,13 +1710,14 @@
     Viewer.prototype.appendRow = function() {
       return $("<tr>", {
         "class": "moka-row"
-      }).appendTo(this.table);
+      }).height(this.e.height).appendTo(this.table);
     };
     Viewer.prototype.appendCell = function(row) {
       var cell, id, td;
       td = $("<td>").appendTo(row);
       cell = new Moka.Input().e;
       id = this.cellCount();
+      cell.data("moka-cell-id", id);
       cell.addClass("moka-view").bind("mokaFocused", __bind(function(ev) {
         var _ref;
         if (this.currentcell === id && this.currentindex === this.index + id) {
@@ -1779,9 +1787,9 @@
         i = this.lay[0];
         j = this.lay[1];
         if (i <= 0) {
-          i = this.length();
+          i = Math.ceil(this.length() / j);
         } else if (j <= 0) {
-          j = this.length();
+          j = Math.ceil(this.length() / i);
         }
         return [i, j];
       }
@@ -1891,30 +1899,8 @@
         });
       }
     };
-    Viewer.prototype.updateSizes = function() {
-      var cell, i, item, len, _results;
-      i = 0;
-      len = this.cellCount();
-      _results = [];
-      while (i < len) {
-        item = this.at(this.index + i);
-        if (!item || item.isLoaded()) {
-          ++i;
-          continue;
-        }
-        cell = this.cell(i);
-        if (cell.width() <= 1) {
-          cell.width(this.e.width());
-        }
-        if (cell.height() <= 1) {
-          cell.height(this.e.height());
-        }
-        _results.push(++i);
-      }
-      return _results;
-    };
     Viewer.prototype.updateVisible = function(now) {
-      var cell, current_item, pos, updateItems, wndbottom, wndleft, wndright, wndtop, _i, _len, _ref;
+      var current_item, pos, updateItems, wndbottom, wndleft, wndright, wndtop;
       if (!now) {
         if (this.t_update) {
           window.clearTimeout(this.t_update);
@@ -1930,32 +1916,28 @@
       if (this.current >= 0) {
         current_item = this.at(this.index + this.current).e;
       }
-      updateItems = __bind(function(index, direction) {
-        var cell, h, item, loaded, next, p, w;
-        next = updateItems.bind(this, index + direction, direction);
-        cell = this.cell(index - this.index);
-        item = this.at(index);
-        if (!item || !cell) {
-          this.updateSizes();
-          return;
-        }
-        if (item.e.is(":visible")) {
-          return next();
-        }
-        p = cell.parent();
-        w = p.width();
-        h = p.height();
-        pos = cell.parent().offset();
-        if (pos.left + w < wndleft || pos.left > wndright || pos.top + h < wndtop || pos.top > wndbottom) {
-          return next();
-        }
+      updateItems = __bind(function(index, direction, topreload) {
+        var cell, d, h, item, loaded, next, p, w;
         loaded = __bind(function() {
-          var hh, left, top, ww;
-          dbg("view", index, "loaded");
-          cell.css({
-            width: "",
-            height: ""
-          });
+          var c, col, hh, i, id, left, max, row, top, ww, x;
+          if (cell) {
+            id = cell.data("moka-cell-id");
+            dbg("view", id, "loaded");
+            x = this.layout()[0];
+            col = id % x;
+            row = Math.floor(id / x);
+            i = row * x;
+            max = i + x;
+            while (i < max && (c = this.cells[i])) {
+              c.height("auto");
+              ++i;
+            }
+            i = id;
+            while (c = this.cells[i]) {
+              c.width("auto");
+              i += x;
+            }
+          }
           left = this.e.scrollLeft();
           top = this.e.scrollTop();
           if (left || top) {
@@ -1972,25 +1954,32 @@
               }
             }
           }
-          return this.updateVisible(true);
-        }, this);
-        dbg("loading view", index);
-        if (item.isLoaded()) {
-          item.show();
           return next();
-        } else {
-          item.e.one("mokaDone", loaded);
-          return item.show();
+        }, this);
+        next = updateItems.bind(this, index + direction, direction, topreload);
+        cell = this.cell(index - this.index);
+        item = this.at(index);
+        if (!item || !cell) {
+          if (this.current >= 0) {
+            this.select(this.index + this.current);
+          }
+          return;
         }
+        if (item.e.is(":visible")) {
+          return next();
+        }
+        p = cell.parent();
+        w = p.width();
+        h = p.height();
+        pos = cell.parent().offset();
+        d = this.preload_offset;
+        if (pos.left + w + d < wndleft || pos.left - d > wndright || pos.top + h + d < wndtop || pos.top - d > wndbottom) {
+          return next();
+        }
+        dbg("loading view", index);
+        item.e.one("mokaDone", loaded);
+        return item.show();
       }, this);
-      _ref = this.cells;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        cell = _ref[_i];
-        cell.css({
-          width: "",
-          height: ""
-        });
-      }
       if (this.current >= 0) {
         updateItems(this.index + this.current, 1);
         return updateItems(this.index + this.current, -1);

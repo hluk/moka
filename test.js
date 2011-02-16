@@ -86,7 +86,7 @@
       return wnd.close();
     }), "Close this window")), new Moka.Image("img/moka.png", 96, 96).show()));
     wnd.addKey("shift-t", test);
-    wnd.appendTo("body").position(0, 150).show().focus();
+    wnd.appendTo("body").position(0, 150);
     return v.zoom(map.zoom);
   };
   $(document).ready(onLoad);
