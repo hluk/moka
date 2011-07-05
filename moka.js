@@ -64,36 +64,34 @@
   keycodes[34] = "PAGEDOWN";
   keycodes[35] = "END";
   keycodes[36] = "HOME";
-  if (userAgent() === userAgents.webkit) {
-    keycodes[96] = "KP0";
-    keycodes[97] = "KP1";
-    keycodes[98] = "KP2";
-    keycodes[99] = "KP3";
-    keycodes[100] = "KP4";
-    keycodes[101] = "KP5";
-    keycodes[102] = "KP6";
-    keycodes[103] = "KP7";
-    keycodes[104] = "KP8";
-    keycodes[105] = "KP9";
-    keycodes[106] = "*";
-    keycodes[107] = "+";
-    keycodes[109] = "MINUS";
-    keycodes[110] = ".";
-    keycodes[111] = "/";
-    keycodes[112] = "F1";
-    keycodes[113] = "F2";
-    keycodes[114] = "F3";
-    keycodes[115] = "F4";
-    keycodes[116] = "F5";
-    keycodes[117] = "F6";
-    keycodes[118] = "F7";
-    keycodes[119] = "F8";
-    keycodes[120] = "F9";
-    keycodes[121] = "F10";
-    keycodes[122] = "F11";
-    keycodes[123] = "F12";
-    keycodes[191] = "?";
-  }
+  keycodes[96] = "KP0";
+  keycodes[97] = "KP1";
+  keycodes[98] = "KP2";
+  keycodes[99] = "KP3";
+  keycodes[100] = "KP4";
+  keycodes[101] = "KP5";
+  keycodes[102] = "KP6";
+  keycodes[103] = "KP7";
+  keycodes[104] = "KP8";
+  keycodes[105] = "KP9";
+  keycodes[106] = "*";
+  keycodes[107] = "+";
+  keycodes[109] = "MINUS";
+  keycodes[110] = ".";
+  keycodes[111] = "/";
+  keycodes[112] = "F1";
+  keycodes[113] = "F2";
+  keycodes[114] = "F3";
+  keycodes[115] = "F4";
+  keycodes[116] = "F5";
+  keycodes[117] = "F6";
+  keycodes[118] = "F7";
+  keycodes[119] = "F8";
+  keycodes[120] = "F9";
+  keycodes[121] = "F10";
+  keycodes[122] = "F11";
+  keycodes[123] = "F12";
+  keycodes[191] = "?";
   last_keyname = last_keyname_timestamp = null;
   normalizeKeyName = function(keyname) {
     var k, key, modifiers;
@@ -229,6 +227,7 @@
       }
     });
   };
+  Moka.scrolling = false;
   tt = 0;
   jQuery.extend(jQuery.easing, {
     easeOutCubic: function(x, t, b, c, d) {
@@ -239,7 +238,7 @@
     }
   });
   dragScroll = function(ev) {
-    var continueDragScroll, dt, dx, dy, from_mouseX, from_mouseY, mouseX, mouseY, pos, scrolling, start, stop, stopDragScroll, t, w, wnd;
+    var continueDragScroll, dt, dx, dy, from_mouseX, from_mouseY, mouseX, mouseY, pos, start, stop, stopDragScroll, t, w, wnd;
     Moka.focus($(ev.target).parents(".moka-input:first"));
     wnd = ev.currentTarget;
     w = $(wnd);
@@ -252,13 +251,13 @@
     from_mouseX = w.scrollLeft() + mouseX;
     from_mouseY = w.scrollTop() + mouseY;
     stop = false;
-    scrolling = false;
+    Moka.scrolling = false;
     continueDragScroll = function(ev) {
       var x, y;
       if (stop) {
         return;
       }
-      scrolling = true;
+      Moka.scrolling = true;
       mouseX = ev.pageX;
       mouseY = ev.pageY;
       x = w.scrollLeft();
@@ -275,7 +274,7 @@
     stopDragScroll = function(ev) {
       var accel, vx, vy;
       stop = true;
-      if (!scrolling) {
+      if (!Moka.scrolling) {
         Moka.focus(ev.target);
         return;
       }
@@ -289,7 +288,9 @@
         w.animate({
           scrollLeft: w.scrollLeft() + vx + "px",
           scrollTop: w.scrollTop() + vy + "px"
-        }, 1000, "easeOutCubic");
+        }, 1000, "easeOutCubic", function() {
+          return Moka.scrolling = false;
+        });
       }
       return false;
     };
@@ -342,6 +343,9 @@
     if (!w) {
       return false;
     }
+    if (!how) {
+      return (isOnScreen(w, "right") || isOnScreen(w, "left")) && (isOnScreen(w, "top") || isOnScreen(w, "bottom"));
+    }
     e = w.e ? w.e : w;
     pos = e.offset();
     if (!pos) {
@@ -358,45 +362,45 @@
       max = min + wnd.height();
     }
     x = pos[how];
-    return x >= min && x <= max;
+    return (x + 8) >= min && (x - 8) <= max;
   };
-  ensureVisible = function(w, wnd) {
-    var bottom, cbottom, cleft, cpos, cright, ctop, e, left, pos, right, top;
-    return;
-    e = w.e ? w.e : w;
+  ensureVisible = function(widget, wnd) {
+    var bottom, cbottom, cleft, cpos, cright, ctop, e, left, pos, right, top, w;
+    e = widget.e ? wideget.e : widget;
     if (!wnd) {
-      wnd = w.parent();
+      wnd = widget.parent();
     }
     if (!wnd.length) {
       return;
     }
-    if (wnd[0].scrollHeight > wnd[0].offsetHeight + 4) {
-      pos = wnd.offset();
-      cpos = e.offset();
-      cleft = cpos.left - pos.left;
-      ctop = cpos.top - pos.top;
-      cright = cleft + e.width();
-      cbottom = ctop + e.height();
-      left = wnd.scrollLeft();
-      cleft += left;
-      cright += left;
-      right = left + wnd.width();
-      if (cleft > left && cright > right) {
-        wnd.scrollLeft(e.width() >= (w = wnd.width()) ? cleft : cright - w);
-      } else if (cright < right && cleft < left) {
-        wnd.scrollLeft(e.width() >= (w = wnd.width()) ? cright - w : cleft);
-      }
-      top = wnd.scrollTop();
-      ctop += top;
-      cbottom += top;
-      bottom = top + wnd.height();
-      if (ctop > top && cbottom > bottom) {
-        wnd.scrollTop(e.height() >= (w = wnd.height()) ? ctop : cbottom - w);
-      } else if (cbottom < bottom && ctop < top) {
-        wnd.scrollTop(e.height() >= (w = wnd.height()) ? cbottom - w : ctop);
-      }
+    pos = wnd.offset() || {
+      top: 0,
+      left: 0
+    };
+    cpos = e.offset();
+    cleft = cpos.left - pos.left;
+    ctop = cpos.top - pos.top;
+    cright = cleft + e.width();
+    cbottom = ctop + e.height();
+    left = wnd.scrollLeft();
+    cleft += left;
+    cright += left;
+    right = left + wnd.width();
+    if (cleft > left && cright > right) {
+      wnd.scrollLeft(e.width() >= (w = wnd.width()) ? cleft : cright - w);
+    } else if (cright < right && cleft < left) {
+      wnd.scrollLeft(e.width() >= (w = wnd.width()) ? cright - w : cleft);
     }
-    return ensureVisible(w, wnd.parent());
+    top = wnd.scrollTop();
+    ctop += top;
+    cbottom += top;
+    bottom = top + wnd.height();
+    if (ctop > top && cbottom > bottom) {
+      wnd.scrollTop(e.height() >= (w = wnd.height()) ? ctop : cbottom - w);
+    } else if (cbottom < bottom && ctop < top) {
+      wnd.scrollTop(e.height() >= (w = wnd.height()) ? cbottom - w : ctop);
+    }
+    return ensureVisible(widget, wnd.parent());
   };
   doKey = function(keyname, keys, default_keys, object) {
     var fn;
@@ -1127,8 +1131,8 @@
         var e;
         this.ok = true;
         e = this.e[0];
-        this.width = e.width ? e.width : e.naturalWidth;
-        this.height = e.height ? e.height : e.naturalHeight;
+        this.width = e.naturalWidth;
+        this.height = e.naturalHeight;
         return typeof onload === "function" ? onload() : void 0;
       }, this));
       this.e.one("error", __bind(function() {
@@ -1163,6 +1167,10 @@
     ImageView.prototype.show = function() {
       var onerror, onload;
       if (this.image) {
+        if (this.t_remove) {
+          window.clearTimeout(this.t_remove);
+          this.t_remove = null;
+        }
         this.e.show();
         if (this.ok != null) {
           this.zoom(this.z, this.zhow);
@@ -1172,19 +1180,17 @@
       } else {
         onload = __bind(function() {
           this.ok = true;
-          this.width = this.image.width;
-          this.height = this.image.height;
           this.zoom(this.z, this.zhow);
           this.e.trigger("mokaLoaded");
           return this.e.trigger("mokaDone", [false]);
         }, this);
         onerror = __bind(function() {
           this.ok = false;
-          this.width = this.height = 0;
           this.e.trigger("mokaError");
           return this.e.trigger("mokaDone", [true]);
         }, this);
         this.image = new Moka.Image(this.src, "", "", onload, onerror);
+        this.zoom(this.z, this.zhow);
         this.image.appendTo(this.e);
         this.e.show();
       }
@@ -1193,9 +1199,14 @@
     ImageView.prototype.hide = function() {
       this.e.hide();
       this.ok = null;
-      if (this.image != null) {
-        this.image.remove();
-        this.image = null;
+      if ((this.image != null) && !this.t_remove) {
+        this.t_remove = window.setTimeout(__bind(function() {
+          dbg("removing image", this.image.e.attr("src"));
+          this.image.e.attr("src", "");
+          this.image.remove();
+          this.image = null;
+          return this.t_remove = null;
+        }, this), 60000);
       }
       return this;
     };
@@ -1203,24 +1214,37 @@
       return this.ok != null;
     };
     ImageView.prototype.zoom = function(how, how2) {
-      var e, h, height, mh, mw, w, width;
+      var d, d2, e, h, height, mh, mw, w, width;
       if (how != null) {
         this.z = how;
         this.zhow = how2;
-        if (this.ok != null) {
+        if (this.image != null) {
           e = this.image.e;
-          width = e.outerWidth();
-          height = e.outerHeight();
+          width = e.outerWidth() || e.width();
+          height = e.outerHeight() || e.height();
           w = h = mw = mh = "";
           if (how instanceof Array) {
             mw = how[0] - width + e.width();
             mh = how[1] - height + e.height();
+            if (how2 === "fill") {
+              d = mw / mh;
+              d2 = width / height;
+              if (d > d2) {
+                w = mw;
+                h = height * mw / width;
+              } else {
+                h = mh;
+                w = width * mh / height;
+              }
+              log(mw, mh, w, h, width, height);
+              mw = mh = "";
+            }
           } else {
             this.z = parseFloat(how) || 1;
-            mw = Math.floor(this.z * this.width);
-            mh = Math.floor(this.z * this.height);
+            mw = Math.floor(this.z * this.image.width);
+            mh = Math.floor(this.z * this.image.height);
           }
-          if (how2 !== "fit") {
+          if (how2 !== "fit" && how2 !== "fill") {
             if (width / height < mw / mh) {
               h = mh;
             } else {
@@ -1259,16 +1283,16 @@
     __extends(Viewer, Moka.Input);
     Viewer.prototype.default_keys = {
       RIGHT: function() {
-        return isOnScreen(focused_widget, "right") && this.focusRight();
+        return isOnScreen(focused_widget, "right") && this.focusRight() || this.e.scrollLeft(this.e.scrollLeft() + 30);
       },
       LEFT: function() {
-        return isOnScreen(focused_widget, "left") && this.focusLeft();
+        return isOnScreen(focused_widget, "left") && this.focusLeft() || this.e.scrollLeft(this.e.scrollLeft() - 30);
       },
       UP: function() {
-        return isOnScreen(focused_widget, "top") && this.focusUp();
+        return isOnScreen(focused_widget, "top") && this.focusUp() || this.e.scrollTop(this.e.scrollTop() - 30);
       },
       DOWN: function() {
-        return isOnScreen(focused_widget, "bottom") && this.focusDown();
+        return isOnScreen(focused_widget, "bottom") && this.focusDown() || this.e.scrollTop(this.e.scrollTop() + 30);
       },
       TAB: function() {
         if (this.index + this.current + 1 < this.length() && this.currentcell < this.cellCount()) {
@@ -1284,16 +1308,16 @@
           return false;
         }
       },
-      'KP6': function() {
+      KP6: function() {
         return this.next();
       },
-      'KP4': function() {
+      KP4: function() {
         return this.prev();
       },
-      'KP2': function() {
+      KP2: function() {
         return this.nextRow();
       },
-      'KP8': function() {
+      KP8: function() {
         return this.prevRow();
       },
       SPACE: function() {
@@ -1303,25 +1327,14 @@
         return this.prevPage();
       },
       ENTER: function() {
-        var lay, z;
-        if (this.oldlay) {
-          lay = this.oldlay;
-          z = this.oldzoom;
-        } else {
-          lay = [1, 1];
-          z = 1;
-        }
-        this.oldlay = this.layout();
-        this.oldzoom = this.zoom();
-        this.zoom(z);
-        return this.layout(lay);
+        return typeof this.dblclick === "function" ? this.dblclick() : void 0;
       },
       '*': function() {
         this.layout([1, 1]);
         return this.zoom(1);
       },
       '/': function() {
-        if (this.zoom() === "fit") {
+        if (this.zhow === "fit") {
           return this.zoom(1);
         } else {
           return this.zoom("fit");
@@ -1330,11 +1343,24 @@
       '+': function() {
         return this.zoom("+");
       },
+      '.': function() {
+        if (this.zhow === "fill") {
+          return this.zoom(1);
+        } else {
+          return this.zoom("fill");
+        }
+      },
       MINUS: function() {
         return this.zoom("-");
       },
+      KP7: function() {
+        return this.select(0);
+      },
       HOME: function() {
         return this.select(0);
+      },
+      KP1: function() {
+        return this.select(this.length() - 1);
       },
       END: function() {
         return this.select(this.length() - 1);
@@ -1442,6 +1468,21 @@
     Viewer.prototype.length = function() {
       return this.items.length;
     };
+    Viewer.prototype.clear = function() {
+      var i, item, len, _results;
+      i = 0;
+      len = this.cellCount();
+      _results = [];
+      while (i < len) {
+        item = this.at(this.index + i);
+        if (item) {
+          item.e.detach();
+          item.hide();
+        }
+        _results.push(++i);
+      }
+      return _results;
+    };
     Viewer.prototype.view = function(id) {
       var cell, i, item, len;
       if (id >= this.length()) {
@@ -1450,6 +1491,8 @@
       if (id < 0) {
         id = 0;
       }
+      this.table.hide();
+      this.clear();
       i = 0;
       len = this.cellCount();
       this.index = Math.floor(id / len) * len;
@@ -1460,7 +1503,6 @@
           width: this.e.width()
         });
         item = this.at(this.index + i);
-        cell.children().detach();
         cell.data("itemindex", i);
         if (item) {
           cell.attr("tabindex", -1).css({
@@ -1473,33 +1515,9 @@
         }
         ++i;
       }
+      this.table.show();
       this.zoom(this.zhow);
       this.updateVisible(true);
-      return this;
-    };
-    Viewer.prototype.preload = function(indexes) {
-      var preloader;
-      preloader = function(indexes) {
-        var i, item, next;
-        if (indexes.length === 0) {
-          return;
-        }
-        i = indexes[0];
-        next = preloader.bind(this, indexes.slice(1));
-        if ((0 < i && i < this.length())) {
-          item = this.items[i];
-          if (item.isLoaded()) {
-            item.show();
-            next();
-          } else {
-            item.e.one("mokaDone", next);
-          }
-          return item.show();
-        } else {
-          return next();
-        }
-      };
-      (preloader.bind(this, indexes))();
       return this;
     };
     Viewer.prototype.select = function(id) {
@@ -1511,6 +1529,8 @@
         return this;
       }
       dbg("selecting view", id);
+      cell = this.cell(this.current) || this.cell(0);
+      Moka.blur(cell.children()) || Moka.blur(cell);
       count = this.cellCount();
       this.current = id % count;
       if (id < this.index || id >= this.index + count) {
@@ -1523,22 +1543,22 @@
     Viewer.prototype.zoom = function(how) {
       var d, factor, h, i, item, layout, len, offset, pos, s, w, wnd, _i, _len, _ref;
       if (how != null) {
-        this.zhow = how;
-        if (how === "fit") {
+        if (how === "fit" || how === "fill") {
           layout = this.layout();
-          if (this.lay[0] <= 0) {
-            layout[0] = 1;
-          } else if (this.lay[1] <= 0) {
-            layout[1] = 1;
-          }
           wnd = this.e.parent();
-          offset = wnd.offset();
+          offset = wnd.offset() || {
+            top: 0,
+            left: 0
+          };
           pos = this.e.offset();
           pos.top -= offset.top;
           pos.left -= offset.left;
+          if (wnd[0] === window.document.body) {
+            wnd = $(window);
+          }
           w = (wnd.width() - pos.left) / layout[0];
           h = (wnd.height() - pos.top) / layout[1];
-          _ref = [this.table.cellSpacing, this.table.cellPadding, this.table.border];
+          _ref = [this.table[0].cellSpacing, this.table[0].cellPadding, this.table[0].border];
           for (_i = 0, _len = _ref.length; _i < _len; _i++) {
             s = _ref[_i];
             if (s) {
@@ -1547,11 +1567,9 @@
             }
           }
           this.z = [w, h];
+          this.zhow = how;
         } else if (how === "+" || how === "-") {
-          d = 1.125;
-          if (how === "-") {
-            d = 1 / d;
-          }
+          d = how === "-" ? 0.889 : 1.125;
           if (!this.z) {
             this.z = 1;
           }
@@ -1561,9 +1579,14 @@
           } else {
             this.z *= d;
           }
-        } else if (!(how instanceof Array)) {
+          this.zhow = null;
+        } else if (how instanceof Array) {
+          this.z = how;
+          this.zhow = null;
+        } else {
           factor = parseFloat(how) || 1;
           this.z = factor;
+          this.zhow = null;
         }
         i = this.index;
         len = i + this.cellCount();
@@ -1583,7 +1606,11 @@
         this.e.trigger("mokaZoomChanged");
         return this;
       } else {
-        return this.z;
+        if (this.zhow) {
+          return this.zhow;
+        } else {
+          return this.z;
+        }
       }
     };
     Viewer.prototype.cellCount = function() {
@@ -1619,7 +1646,7 @@
       id = this.currentcell - 1;
       if ((id + 1) % h === 0) {
         cell = this.cells[id + h];
-        if (cell) {
+        if (cell && cell.width() - 8 <= this.e.width()) {
           id = cell.data("itemindex");
           how = -this.cellCount();
           if (__indexOf.call(this.o, "r") >= 0) {
@@ -1642,7 +1669,7 @@
       id = this.currentcell + 1;
       if (id % h === 0) {
         cell = this.cells[id - h];
-        if (cell) {
+        if (cell && cell.width() - 8 <= this.e.width()) {
           id = cell.data("itemindex");
           how = this.cellCount();
           if (__indexOf.call(this.o, "r") >= 0) {
@@ -1666,7 +1693,7 @@
       if (id < 0) {
         len = this.cellCount();
         cell = this.cells[id + len];
-        if (cell) {
+        if (cell && cell.height() - 8 <= this.e.height()) {
           id = cell.data("itemindex");
           how = -this.cellCount();
           if (__indexOf.call(this.o, "b") >= 0) {
@@ -1690,7 +1717,7 @@
       id = this.currentcell + h;
       if (id >= len) {
         cell = this.cells[id - len];
-        if (cell) {
+        if (cell && cell.height() - 8 <= this.e.height()) {
           id = cell.data("itemindex");
           how = this.cellCount();
           if (__indexOf.call(this.o, "b") >= 0) {
@@ -1718,6 +1745,9 @@
       cell = new Moka.Input().e;
       id = this.cellCount();
       cell.data("moka-cell-id", id);
+      cell.css({
+        "overflow": "hidden"
+      });
       cell.addClass("moka-view").bind("mokaFocused", __bind(function(ev) {
         var _ref;
         if (this.currentcell === id && this.currentindex === this.index + id) {
@@ -1772,6 +1802,7 @@
         if (!((x != null) && (y != null)) || (this.lay && x === this.lay[0] && y === this.lay[1])) {
           return this;
         }
+        this.clear();
         if (this.lay) {
           this.e.removeClass("moka-layout-" + this.lay.join("x"));
         }
@@ -1900,7 +1931,7 @@
       }
     };
     Viewer.prototype.updateVisible = function(now) {
-      var current_item, pos, updateItems, wndbottom, wndleft, wndright, wndtop;
+      var current_item, p, topreload, updateItems;
       if (!now) {
         if (this.t_update) {
           window.clearTimeout(this.t_update);
@@ -1908,21 +1939,18 @@
         this.t_update = window.setTimeout(this.updateVisible.bind(this, true), 100);
         return;
       }
-      pos = this.e.offset();
-      wndleft = pos.left;
-      wndtop = pos.top;
-      wndright = wndleft + this.e.width();
-      wndbottom = wndtop + this.e.height();
+      p = this.cell(0).parent();
+      topreload = 2;
       if (this.current >= 0) {
         current_item = this.at(this.index + this.current).e;
       }
-      updateItems = __bind(function(index, direction, topreload) {
-        var cell, d, h, item, loaded, next, p, w;
+      updateItems = __bind(function(index, direction) {
+        var cell, d, h, item, loaded, next, pos, w, wndbottom, wndleft, wndright, wndtop;
         loaded = __bind(function() {
-          var c, col, hh, i, id, left, max, row, top, ww, x;
+          var c, col, i, id, max, row, x;
           if (cell) {
+            dbg("view", index, "loaded");
             id = cell.data("moka-cell-id");
-            dbg("view", id, "loaded");
             x = this.layout()[0];
             col = id % x;
             row = Math.floor(id / x);
@@ -1932,48 +1960,50 @@
               c.height("auto");
               ++i;
             }
-            i = id;
+            i = col;
             while (c = this.cells[i]) {
               c.width("auto");
               i += x;
             }
-          }
-          left = this.e.scrollLeft();
-          top = this.e.scrollTop();
-          if (left || top) {
-            ww = p.width();
-            hh = p.height();
-            if (current_item) {
-              ensureVisible(current_item);
-            } else {
-              if (pos.left < wndleft + this.e.width() / 2 && ww > w) {
-                this.e.scrollLeft(left + (ww - w) / 2);
-              }
-              if (pos.top < wndtop + this.e.height() / 2 && hh > h) {
-                this.e.scrollTop(top + (hh - h) / 2);
-              }
-            }
+          } else {
+            dbg("view", index, "preloaded");
+            item.hide();
           }
           return next();
         }, this);
-        next = updateItems.bind(this, index + direction, direction, topreload);
+        next = updateItems.bind(this, index + direction, direction);
         cell = this.cell(index - this.index);
         item = this.at(index);
+        if (!cell && item && topreload > 0) {
+          --topreload;
+          dbg("preloading view", index);
+          item.e.one("mokaDone", loaded);
+          item.show();
+          return;
+        }
         if (!item || !cell) {
-          if (this.current >= 0) {
+          if (this.current >= 0 && !Moka.scrolling) {
             this.select(this.index + this.current);
+          }
+          dbg("updateItems finished for direction", direction);
+          if (direction > 0) {
+            updateItems.call(this, this.index + this.current - direction, -direction);
           }
           return;
         }
         if (item.e.is(":visible")) {
           return next();
         }
-        p = cell.parent();
         w = p.width();
         h = p.height();
         pos = cell.parent().offset();
         d = this.preload_offset;
+        wndleft = pos.left;
+        wndtop = pos.top;
+        wndright = wndleft + this.e.width();
+        wndbottom = wndtop + this.e.height();
         if (pos.left + w + d < wndleft || pos.left - d > wndright || pos.top + h + d < wndtop || pos.top - d > wndbottom) {
+          item.hide();
           return next();
         }
         dbg("loading view", index);
@@ -1981,19 +2011,47 @@
         return item.show();
       }, this);
       if (this.current >= 0) {
-        updateItems(this.index + this.current, 1);
-        return updateItems(this.index + this.current, -1);
+        return updateItems(this.index + this.current, 1);
       } else {
         return updateItems(this.index, 1);
       }
     };
     Viewer.prototype.onScroll = function(ev) {
-      return this.updateVisible();
+      var lay;
+      lay = this.layout();
+      if (lay[0] !== 1 || lay[1] !== 1) {
+        return this.updateVisible();
+      }
     };
     Viewer.prototype.mousedown = function(ev) {
       if (ev.button === 0) {
-        return dragScroll(ev);
+        dragScroll(ev);
       }
+      if (ev.button === 1) {
+        if (this.zhow === "fit") {
+          return this.zoom(1);
+        } else {
+          return this.zoom("fit");
+        }
+      }
+    };
+    Viewer.prototype.dblclick = function() {
+      var lay, z;
+      if (this.oldlay) {
+        lay = this.oldlay;
+        z = this.oldzoom;
+      } else {
+        lay = [1, 1];
+        z = 1;
+      }
+      this.oldlay = this.layout();
+      this.oldzoom = this.zhow;
+      if (lay[0] === this.oldlay[0] && lay[1] === this.oldlay[1] && z === this.oldzoom) {
+        lay = [1, 1];
+        z = 1;
+      }
+      this.zoom(z);
+      return this.layout(lay);
     };
     Viewer.prototype.keydown = function(ev) {
       var keyname;
@@ -2041,34 +2099,10 @@
     };
     return Notification;
   })();
-  Moka.NotificationX = (function() {
-    __extends(NotificationX, Moka.Widget);
-    function NotificationX(html, delay) {
-      NotificationX.__super__.constructor.apply(this, arguments);
-      if (!(delay != null)) {
-        delay = 8000;
-      }
-      this.e.addClass("moka-notification").css({
-        top: Moka.notifyTop
-      }).html(html).bind("mouseeter.moka", __bind(function() {
-        return window.clearTimeout(this.t_notify);
-      }, this)).bind("mouseleave.moka", __bind(function() {
-        return this.t_notify = window.setTimeout((__bind(function() {
-          return this.e.remove();
-        }, this)), delay);
-      }, this)).appendTo("body");
-      this.height = this.e.outerHeight(true);
-      Moka.notifyTop += this.height;
-      this.t_notify = window.setTimeout((__bind(function() {
-        return this.e.remove();
-      }, this)), delay);
-    }
-    NotificationX.prototype.remove = function() {
-      this.e.remove();
-      return Moka.notifyTop -= this.e.outerHeight(true);
-    };
-    return NotificationX;
-  })();
+  Moka.clearNotifications = function() {
+    var _ref;
+    return (_ref = Moka.notificationLayer) != null ? _ref.empty() : void 0;
+  };
   Moka.Window = (function() {
     __extends(Window, Moka.Input);
     Window.prototype.default_keys = {

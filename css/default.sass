@@ -1,0 +1,80 @@
+/* serif font */
+@import url('http://fonts.googleapis.com/css?family=Crimson+Text')
+$font: 'Crimson Text', Gentium, 'Liberation Serif', serif
+
+/* sans-serif font */
+@import url('http://fonts.googleapis.com/css?family=Molengo')
+$font_sans: 'Molengo', sans-serif
+
+/* monospace font */
+@import url('http://fonts.googleapis.com/css?family=Inconsolata')
+$font_mono: Inconsolata, Consolas, monospace
+
+$font_general: 11pt $font_sans
+$font_header: 11pt $font_sans
+
+$bg: #444 url('img/bg.png') repeat
+$fg: #eee
+
+// widget colors
+$widget_fg: black
+$widget_bg: #e0d6b0
+// selected
+$widget_selected_fg: black
+$widget_selected_bg: transparentize(#da4, 0.3)
+// current
+$widget_current_fg: transparentize($widget_selected_fg, 0.2)
+$widget_current_bg: transparentize($widget_selected_bg, 0.3)
+// hover
+$widget_hover_fg: black
+$widget_hover_bg: transparentize($widget_selected_bg, 0.4)
+
+$selection_bg: $widget_selected_bg
+
+// button
+$button_selected_fg: black
+$button_selected_bg: transparentize($widget_selected_bg, 0.2)
+$button_hover_fg: black
+$button_hover_bg: transparentize($button_selected_bg, 0.2)
+
+// text edit
+$font_edit: 11pt $font_mono
+$edit_bg: opacify($widget_bg, 1)*1.2
+$edit_fg: #444
+// focused
+$edit_focused_bg: $edit_bg*1.2
+$edit_focused_fg: #222
+
+// image padding in layout >1x1
+$imageview_padding: 4px
+
+$title_fg: white
+$title_bg: black
+$title_selected_fg: black
+$title_selected_bg: $widget_selected_bg
+$title_focused_fg: $title_selected_fg
+$title_focused_bg: opacify($widget_selected_bg, 1)+#444
+
+$window_layer:3
+$top_window_layer:999
+$notification_layer:9999
+$window_opacity: 0.4
+$focused_window_opacity: 1
+$top_window_opacity: 0.7
+
+$selection_transparency: 0.3
+
+$tab_radius: 0px
+$item_radius: 3px
+$title_radius: 0px
+$window_radius: 0px
+
+$notification_fg: $widget_fg
+$notification_bg: $widget_bg
+$notification_opacity: 0.85
+$notification_radius: 50px
+$notification_x: left
+//$notification_x: right
+//$notification_y: top
+$notification_y: bottom
+

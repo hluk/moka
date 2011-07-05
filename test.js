@@ -47,17 +47,25 @@
     return wnd.focus();
   };
   onLoad = function() {
-    var item, items, map, notify, oldid, onLoad, v, wnd, _i, _len;
+    var item, itempath, map, notify, oldid, onLoad, v, wnd, _i, _len;
     onLoad = void 0;
-    items = ["file:///home/lukas/Pictures/paintings/Andrew Gonzales/AlbedoSublimis.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/AeternaSaltatus.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/amore.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Magia of the Heart.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Aura Gloriae.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/In The Wake of the.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Sapientia.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Seraphim Awakening.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/SirensDream.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Soror Mystica.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/Telluric Womb.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Angel of Nekyia.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Breath of Dakini.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Love of Souls.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Oracle of the Pearl.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Summoning of the Muse.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/The Visitation.jpg", "file:///home/lukas/Pictures/paintings/Andrew Gonzales/UnioMystica.jpg"];
+    if (typeof title != "undefined" && title !== null) {
+      document.title = title;
+    }
     map = {};
     location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m, key, value) {
       return map[key] = value;
     });
     v = new Moka.Viewer().layout(map.layout != null ? map.layout.split("x") : [1, 1]).orientation(map.o ? map.o : "lt");
-    for (_i = 0, _len = items.length; _i < _len; _i++) {
-      item = items[_i];
-      v.append(new Moka.ImageView(item));
+    for (_i = 0, _len = ls.length; _i < _len; _i++) {
+      item = ls[_i];
+      if (item instanceof Array) {
+        itempath = item[0];
+      } else {
+        itempath = item;
+      }
+      console.log(itempath);
+      v.append(new Moka.ImageView(itempath));
     }
     v.e.appendTo("body");
     v.show();
@@ -69,11 +77,19 @@
       } else {
         id = oldid;
       }
-      if ((_ref = Moka.notificationLayer) != null) {
-        _ref.empty();
-      }
       img = v.at(id);
-      return new Moka.Notification(("<b>" + (id + 1) + "/" + items.length + "</b><br/>") + ("URL: <i>" + items[id] + "</i><br/>") + (img.width ? "size: <i>" + img.width + "x" + img.height + "</i></br>" : "") + ("zoom: <i>" + (img.width ? Math.floor(100 * img.image.e.width() / img.width) + "%" : img.zhow) + "</i>"), "", 4000, 300);
+      if (img.image) {
+        item = ls[id];
+        if (item instanceof Array) {
+          itempath = item[0];
+        } else {
+          itempath = item;
+        }
+        if ((_ref = Moka.notificationLayer) != null) {
+          _ref.empty();
+        }
+        return new Moka.Notification(("<b>" + (id + 1) + "/" + ls.length + "</b><br/>") + ("URL: <i>" + itempath + "</i><br/>") + (img.width ? "size: <i>" + img.width + "x" + img.height + "</i></br>" : "") + ("zoom: <i>" + (img.width ? Math.floor(100 * img.image.e.width() / img.width) + "%" : img.zhow) + "</i>"), "", 4000, 300);
+      }
     };
     v.e.bind("mokaSelected mokaZoomChanged", function(ev, id) {
       if (ev.target !== this || !((id != null) || (oldid != null))) {
