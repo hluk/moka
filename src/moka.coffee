@@ -704,58 +704,22 @@ class Moka.TextEdit extends Moka.Input
         @e.addClass("moka-textedit")
           .attr("tabindex", 1)
         Moka.createLabel(label_text, @e)
-        @editor = null
         @text = text or ""
+        @textarea = $("<textarea>").appendTo(@e)
+            .focus(Moka.gainFocus)
+            .blur(Moka.lostFocus)
+            .keydown(@keydown)
 
     update: () ->
-        if not @editor and @e.is(":visible")
-            try
-                editor = new CodeMirror( @e[0],
-                    height: "dynamic"
-                    minHeight: 24
-                    parserfile: "parsedummy.js"
-                    #parserfile: ["tokenizejavascript.js", "parsejavascript.js"]
-                    #stylesheet: "deps/codemirror/css/jscolors.css"
-                    path: "deps/codemirror/js/"
-                    onChange: () => @text = @editor.getCode()
-                )
-
-                # Chromium: hidden iframe gets focus
-                $(editor.frame).attr("tabindex", -1)
-
-                $(editor.win.document).bind "keydown.moka", @editorKeyDown.bind(this)
-
-                win = $(editor.win)
-                win.resize () =>
-                    window.clearTimeout(@t_sizeupdate) if @t_sizeupdate
-                    @t_sizeupdate = window.setTimeout( (() => @e.trigger("mokaSizeChanged")), 100 )
-                win.focus (ev) =>
-                    @oldpos = @editor.cursorPosition()
-                    ev.target = editor.wrapping
-                    Moka.gainFocus(ev)
-                win.blur  (ev) =>
-                    ev.target = editor.wrapping
-                    Moka.lostFocus(ev)
-
-                @editor = editor
-                @value(@text)
-            catch e
-                dbg "CodeMirror error:", e
-
         return this
 
     hide: () ->
         @e.hide()
-        if @editor
-            $(@editor.wrapping).remove()
-            @editor = null
-
         return this
 
     value: (text) ->
         if text?
-            if @editor
-                @editor.setCode(text)
+            @textarea.value(text)
             @text = text
             return this
         else
@@ -780,8 +744,11 @@ class Moka.TextEdit extends Moka.Input
             @hide()
             @show()
 
+    focus: (ev) ->
+        Moka.focus(@textarea)
+
     keydown: (ev) ->
-        return if ev.isPropagationStopped()
+        ev.stopPropagation()
         keyname = getKeyName(ev)
 
         if doKey(keyname, @keys, @default_keys, this)
@@ -1107,8 +1074,10 @@ class Moka.Viewer extends Moka.Input
         KP4: -> @prev()
         KP2: -> @nextRow()
         KP8: -> @prevRow()
-        SPACE: -> @nextPage()
-        'S-SPACE': -> @prevPage()
+        SPACE: -> if isOnScreen(focused_widget, "bottom") then @nextPage() else
+            @e.scrollTop( @e.scrollTop()+0.9*@e.parent().height() )
+        'S-SPACE': -> if isOnScreen(focused_widget, "top") then @prevPage() else
+            @e.scrollTop( @e.scrollTop()-0.9*@e.parent().height() )
 
         ENTER: -> @dblclick?()
 

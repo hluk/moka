@@ -614,13 +614,13 @@ def gallery_items(files, allitems):#{{{
 					if not os.path.isdir(fdir):
 						os.makedirs(fdir)
 					cp( os.path.abspath(f), fdir +S+ basename )
+					f = "items" +S+ (destdir and destdir+S or "") + os.path.basename(f)
 
 				# TODO: fetch remote PDF before rendering
 				if t == Type.PDF:
 					for page in renderPDF(f):
 						items["items" +S+ page] = {'.link':"items" +S+ f}
 				else:
-					f = "items" +S+ (destdir and destdir+S or "") + os.path.basename(f)
 					items[f] = {}
 
 		add_sorted(items, allitems)

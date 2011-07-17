@@ -40,6 +40,10 @@
         ctx.arc(x, y, r-w1/2, -pi/2, angle-pi/2, false);
         ctx.stroke();
 
+        ctx.font = "bold "+(r*0.6)+"px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(n+"/"+len, r+w1, r+w1);
+
         ctx.restore();
 
         return e
@@ -69,7 +73,7 @@
     // show notification
     oldid = void 0;
     notify = function(v, id) {
-        var item, itempath, html, notification, counter;
+        var item, itempath, html, notification, counter, label, r, w1, w2, e;
 
         if (id != null) {
             oldid = id;
@@ -85,20 +89,28 @@
             } else {
                 itempath = it;
             }
-            html =  "<b>" + (id + 1) + "/" + ls.length + "</b><br/>";
+            html = "";
             // escape anchor and html
             html += "URL: <a href='"+itempath+"'>" + itempath + "</a></i><br/>";
             if ( item.e.width ) {
                 html += "size: <i>" + item.e.width() + "x" + item.e.height() + "</i></br>";
             }
-            html += "zoom: <i>" + (item.width ? Math.floor(100 * item.image.e.width() / item.width) + "%" : v.zoom()) + "</i>";
+            if ( v.zoom() !== 1 ) {
+                html += "zoom: <i>" + (item.width ? Math.floor(100 * item.image.e.width() / item.width) + "%" : v.zoom()) + "</i>";
+            }
         }
 
         Moka.clearNotifications()
         if (html) {
-            notification = new Moka.Notification("<table><tr><td></td><td>"+html, "", 4000, 300);
-            counter = createCounter(id+1, ls.length, 24, 8, 4, "rgba(100,50,20,0.4)", "white", 12, 10);
-            counter.appendTo(notification.e.find('td:first'));
+            notification = new Moka.Notification("<table><tr><td valign='middle'></div></td><td>"+html, "", 4000, 300);
+            e = notification.e.find('td:first');
+
+            r = 24;
+            w1 = 6;
+            w2 = 4;
+            counter = createCounter(id+1, ls.length, r, w1, w2, "rgba(100,50,20,0.4)", "white", 12, 10);
+            counter.appendTo(e);
+
             return notification;
         }
     }

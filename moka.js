@@ -797,63 +797,19 @@
       TextEdit.__super__.constructor.apply(this, arguments);
       this.e.addClass("moka-textedit").attr("tabindex", 1);
       Moka.createLabel(label_text, this.e);
-      this.editor = null;
       this.text = text || "";
+      this.textarea = $("<textarea>").appendTo(this.e).focus(Moka.gainFocus).blur(Moka.lostFocus).keydown(this.keydown);
     }
     TextEdit.prototype.update = function() {
-      var editor, win;
-      if (!this.editor && this.e.is(":visible")) {
-        try {
-          editor = new CodeMirror(this.e[0], {
-            height: "dynamic",
-            minHeight: 24,
-            parserfile: "parsedummy.js",
-            path: "deps/codemirror/js/",
-            onChange: __bind(function() {
-              return this.text = this.editor.getCode();
-            }, this)
-          });
-          $(editor.frame).attr("tabindex", -1);
-          $(editor.win.document).bind("keydown.moka", this.editorKeyDown.bind(this));
-          win = $(editor.win);
-          win.resize(__bind(function() {
-            if (this.t_sizeupdate) {
-              window.clearTimeout(this.t_sizeupdate);
-            }
-            return this.t_sizeupdate = window.setTimeout((__bind(function() {
-              return this.e.trigger("mokaSizeChanged");
-            }, this)), 100);
-          }, this));
-          win.focus(__bind(function(ev) {
-            this.oldpos = this.editor.cursorPosition();
-            ev.target = editor.wrapping;
-            return Moka.gainFocus(ev);
-          }, this));
-          win.blur(__bind(function(ev) {
-            ev.target = editor.wrapping;
-            return Moka.lostFocus(ev);
-          }, this));
-          this.editor = editor;
-          this.value(this.text);
-        } catch (e) {
-          dbg("CodeMirror error:", e);
-        }
-      }
       return this;
     };
     TextEdit.prototype.hide = function() {
       this.e.hide();
-      if (this.editor) {
-        $(this.editor.wrapping).remove();
-        this.editor = null;
-      }
       return this;
     };
     TextEdit.prototype.value = function(text) {
       if (text != null) {
-        if (this.editor) {
-          this.editor.setCode(text);
-        }
+        this.textarea.value(text);
         this.text = text;
         return this;
       } else {
@@ -877,11 +833,12 @@
         return this.show();
       }
     };
+    TextEdit.prototype.focus = function(ev) {
+      return Moka.focus(this.textarea);
+    };
     TextEdit.prototype.keydown = function(ev) {
       var keyname;
-      if (ev.isPropagationStopped()) {
-        return;
-      }
+      ev.stopPropagation();
       keyname = getKeyName(ev);
       if (doKey(keyname, this.keys, this.default_keys, this)) {
         return false;
@@ -1321,10 +1278,18 @@
         return this.prevRow();
       },
       SPACE: function() {
-        return this.nextPage();
+        if (isOnScreen(focused_widget, "bottom")) {
+          return this.nextPage();
+        } else {
+          return this.e.scrollTop(this.e.scrollTop() + 0.9 * this.e.parent().height());
+        }
       },
       'S-SPACE': function() {
-        return this.prevPage();
+        if (isOnScreen(focused_widget, "top")) {
+          return this.prevPage();
+        } else {
+          return this.e.scrollTop(this.e.scrollTop() - 0.9 * this.e.parent().height());
+        }
       },
       ENTER: function() {
         return typeof this.dblclick === "function" ? this.dblclick() : void 0;
