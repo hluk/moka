@@ -117,7 +117,7 @@
 
 	// onLoad
 	onLoad = function() {
-		var item, itempath, map, onLoad, v, wnd, i, len, hash, value;
+		var item, itempath, map, onLoad, v, wnd, i, len, hash, value, sharpen;
 
 		onLoad = void 0;
 		if (typeof title != "undefined" && title !== null) {
@@ -132,19 +132,24 @@
 		value = hash.zoom;
 		if (value) {
             value = value.split(",");
+            console.log(value);
 			v.zoom(value.length === 1 ? value[0] : value);
 		}
 
-		// layout, orientation
+		// layout
 		value = hash.layout;
 		if (value) {
 			v.layout( value.split("x") );
 		}
 
+        // orientation
 		value = hash.o;
 		if (value) {
 			v.orientation(value);
 		}
+
+        // sharpen
+		sharpen = hash.sharpen || 0;
 
 		for (i = 0, len = ls.length; i < len; i++) {
 			item = ls[i];
@@ -154,7 +159,11 @@
 				itempath = item;
 			}
 			//console.log(itempath);
-			v.append(new Moka.ImageView(itempath));
+            if (sharpen > 0) {
+                v.append(new Moka.ImageView(itempath, true, sharpen));
+            } else {
+                v.append(new Moka.ImageView(itempath));
+            }
 		}
 
         // current item
@@ -174,9 +183,10 @@
 			// URL: remember layout, zoom, orientation, current item number
 			urlHash({
 				layout: v.layout().join("x"),
-				zoom:   v.zoom(),
-                o:      v.orientation(),
-				n:      v.index+v.current
+				zoom:    v.zoom(),
+                sharpen: sharpen,
+                o:       v.orientation(),
+				n:       v.index+v.current
 			})
 
 			return notify(v, id);

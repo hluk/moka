@@ -1084,6 +1084,7 @@
         width: w,
         height: h
       }));
+      this.img = this.e;
       this.e.one("load", __bind(function() {
         var e;
         this.ok = true;
@@ -1113,10 +1114,137 @@
     };
     return Image;
   })();
+  Moka.Canvas = (function() {
+    __extends(Canvas, Moka.Widget);
+    function Canvas(src, w, h, onload, onerror) {
+      this.src = src;
+      Canvas.__super__.constructor.call(this, $("<canvas>", {
+        "class": "moka-widget moka-canvas",
+        width: w,
+        height: h
+      }));
+      this.img = $("<img>", {
+        width: w,
+        height: h
+      });
+      this.img.one("load", __bind(function() {
+        var e, img;
+        this.ok = true;
+        img = this.img[0];
+        e = this.e[0];
+        this.width = e.width = img.naturalWidth;
+        this.height = e.height = img.naturalHeight;
+        this.ctx = e.getContext("2d");
+        this.ctx.clearRect(0, 0, this.width, this.height);
+        this.ctx.drawImage(img, 0, 0, this.width, this.height);
+        return typeof onload === "function" ? onload() : void 0;
+      }, this));
+      this.img.one("error", __bind(function() {
+        this.ok = false;
+        this.width = this.height = 0;
+        return typeof onerror === "function" ? onerror() : void 0;
+      }, this));
+      this.img.attr("src", this.src);
+    }
+    Canvas.prototype.resize = function(w, h) {
+      var e;
+      if (!this.ok) {
+        return this;
+      }
+      e = this.e[0];
+      this.ctx.clearRect(0, 0, e.width, e.height);
+      if (w > 0) {
+        e.width = w;
+      }
+      if (h > 0) {
+        e.height = h;
+      }
+      this.ctx.drawImage(this.img[0], 0, 0, e.width, e.height);
+      return this;
+    };
+    Canvas.prototype.sharpen = function(strength) {
+      var data, dataCopy, dataDesc, filter, h, mul, mulOther, w, w4, weight, y;
+      if (!this.ok) {
+        return this;
+      }
+      if (this.t_sharpen) {
+        window.clearTimeout(this.t_sharpen);
+      }
+      if (strength < 0) {
+        strength = 0;
+      } else if (strength > 1) {
+        strength = 1;
+      }
+      w = Math.ceil(this.width);
+      h = Math.ceil(this.height);
+      dataDesc = this.ctx.getImageData(0, 0, w, h);
+      data = dataDesc.data;
+      dataCopy = this.ctx.getImageData(0, 0, w, h).data;
+      mul = 15;
+      mulOther = 1 + 3 * strength;
+      weight = 1 / (mul - 4 * mulOther);
+      mul *= weight;
+      mulOther *= weight;
+      w4 = w * 4;
+      y = 0;
+      filter = function(miny) {
+        var b, g, nextY, offset, offsetNext, offsetPrev, offsetY, offsetYNext, offsetYPrev, prevY, r, x;
+        while (y < miny) {
+          offsetY = (y - 1) * w4;
+          nextY = y === h ? y - 1 : y;
+          prevY = y === 1 ? 0 : y - 2;
+          offsetYPrev = prevY * w4;
+          offsetYNext = nextY * w4;
+          x = w;
+          while (x) {
+            offset = offsetY + (x * 4 - 4);
+            offsetPrev = offsetYPrev + (x === 1 ? 0 : x - 2) * 4;
+            offsetNext = offsetYNext + (x === w ? x - 1 : x) * 4;
+            r = dataCopy[offset] * mul - mulOther * (dataCopy[offsetPrev] + dataCopy[offset - 4] + dataCopy[offset + 4] + dataCopy[offsetNext]);
+            g = dataCopy[offset + 1] * mul - mulOther * (dataCopy[offsetPrev + 1] + dataCopy[offset - 3] + dataCopy[offset + 5] + dataCopy[offsetNext + 1]);
+            b = dataCopy[offset + 2] * mul - mulOther * (dataCopy[offsetPrev + 2] + dataCopy[offset - 2] + dataCopy[offset + 6] + dataCopy[offsetNext + 2]);
+            if (r < 0) {
+              r = 0;
+            } else if (r > 255) {
+              r = 255;
+            }
+            if (g < 0) {
+              g = 0;
+            } else if (g > 255) {
+              g = 255;
+            }
+            if (b < 0) {
+              b = 0;
+            } else if (b > 255) {
+              b = 255;
+            }
+            data[offset] = r;
+            data[offset + 1] = g;
+            data[offset + 2] = b;
+            --x;
+          }
+          ++y;
+        }
+        this.ctx.putImageData(dataDesc, 0, 0);
+        if (y < h) {
+          miny = Math.min(y + 50, h);
+          return this.t_sharpen = window.setTimeout(filter.bind(this, miny), 0);
+        }
+      };
+      this.t_sharpen = window.setTimeout(filter.bind(this, 50), 0);
+      return this;
+    };
+    Canvas.prototype.isLoaded = function() {
+      return this.ok != null;
+    };
+    return Canvas;
+  })();
   Moka.ImageView = (function() {
     __extends(ImageView, Moka.Input);
     ImageView.prototype.default_keys = {};
-    function ImageView(src) {
+    function ImageView(src, use_canvas, sharpen) {
+      this.use_canvas = use_canvas;
+      this.sharpen = sharpen;
       ImageView.__super__.constructor.apply(this, arguments);
       this.e.addClass("moka-imageview");
       this.src = src;
@@ -1131,9 +1259,9 @@
         this.e.show();
         if (this.ok != null) {
           this.zoom(this.z, this.zhow);
+          this.e.trigger("mokaLoaded");
+          this.e.trigger("mokaDone", [!this.ok]);
         }
-        this.e.trigger("mokaLoaded");
-        this.e.trigger("mokaDone", [!this.ok]);
       } else {
         onload = __bind(function() {
           this.ok = true;
@@ -1146,7 +1274,11 @@
           this.e.trigger("mokaError");
           return this.e.trigger("mokaDone", [true]);
         }, this);
-        this.image = new Moka.Image(this.src, "", "", onload, onerror);
+        if (this.use_canvas) {
+          this.image = new Moka.Canvas(this.src, "", "", onload, onerror);
+        } else {
+          this.image = new Moka.Image(this.src, "", "", onload, onerror);
+        }
         this.zoom(this.z, this.zhow);
         this.image.appendTo(this.e);
         this.e.show();
@@ -1155,11 +1287,11 @@
     };
     ImageView.prototype.hide = function() {
       this.e.hide();
-      this.ok = null;
       if ((this.image != null) && !this.t_remove) {
         this.t_remove = window.setTimeout(__bind(function() {
-          dbg("removing image", this.image.e.attr("src"));
-          this.image.e.attr("src", "");
+          dbg("removing image", this.image.img.attr("src"));
+          this.ok = null;
+          this.image.img.attr("src", "");
           this.image.remove();
           this.image = null;
           return this.t_remove = null;
@@ -1171,21 +1303,23 @@
       return this.ok != null;
     };
     ImageView.prototype.zoom = function(how, how2) {
-      var d, d2, e, h, height, mh, mw, w, width;
+      var d, d2, e, h, height, mh, mw, need_update, w, width;
       if (how != null) {
+        need_update = this.z !== how || this.zhow !== how2;
         this.z = how;
         this.zhow = how2;
+        log(this.src, this.z, this.zhow, need_update);
         if (this.image != null) {
           e = this.image.e;
-          width = e.outerWidth() || e.width();
-          height = e.outerHeight() || e.height();
+          width = e.outerWidth() || e.width() || this.image.width;
+          height = e.outerHeight() || e.height() || this.image.height;
           w = h = mw = mh = "";
           if (how instanceof Array) {
-            mw = how[0] - width + e.width();
-            mh = how[1] - height + e.height();
+            mw = how[0];
+            mh = how[1];
+            d = mw / mh;
+            d2 = width / height;
             if (how2 === "fill") {
-              d = mw / mh;
-              d2 = width / height;
               if (d > d2) {
                 w = mw;
                 h = height * mw / width;
@@ -1193,7 +1327,15 @@
                 h = mh;
                 w = width * mh / height;
               }
-              log(mw, mh, w, h, width, height);
+              mw = mh = "";
+            } else {
+              if (d > d2) {
+                h = mh;
+                w = width * mh / height;
+              } else {
+                w = mw;
+                h = height * mw / width;
+              }
               mw = mh = "";
             }
           } else {
@@ -1214,6 +1356,12 @@
             width: w,
             height: h
           });
+          if (need_update) {
+            this.image.resize(w || mw, h || mh);
+            if (this.image.sharpen && this.sharpen) {
+              this.image.sharpen(this.sharpen);
+            }
+          }
         }
         return this;
       } else {
@@ -1559,7 +1707,7 @@
         dbg("zooming views", i + ".." + (len - 1), "using method", this.z, this.zhow);
         while (i < len) {
           item = this.at(i);
-          if (item.zoom) {
+          if (typeof item.zoom === "function") {
             item.zoom(this.z, this.zhow);
           }
           ++i;
@@ -1933,6 +2081,9 @@
           } else {
             dbg("view", index, "preloaded");
             item.hide();
+          }
+          if (typeof item.zoom === "function") {
+            item.zoom(this.z, this.zhow);
           }
           return next();
         }, this);

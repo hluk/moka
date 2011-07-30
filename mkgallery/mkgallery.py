@@ -68,7 +68,7 @@ resolution = 300 # thumbnail resolution
 d = os.path.dirname(sys.argv[0]) or "." # path to template
 home = 'HOME' in os.environ and os.environ['HOME'] or os.environ['HOMEDRIVE']+os.environ['HOMEPATH']+S+"My Documents"
 gdir = home +S+ "Galleries" +S+ "%s"; # path to gallery
-url = "file:///<path_to_gallery>/index.html" # browser url
+url = "http://localhost:8080/<path_to_gallery>/index.html" # browser url
 progress_len = 40 # progress bar length
 
 force = False # force file deletion?

@@ -921,6 +921,7 @@ class Moka.Tabs extends Moka.Widget
 class Moka.Image extends Moka.Widget
     constructor: (@src, w, h, onload, onerror) ->
         super $("<img>", class:"moka-widget moka-image", width:w, height:h)
+        @img = @e
         @e.one( "load",
             () =>
                 @ok = true
@@ -946,10 +947,137 @@ class Moka.Image extends Moka.Widget
     isLoaded: () ->
         return @ok?
 
+class Moka.Canvas extends Moka.Widget
+    constructor: (@src, w, h, onload, onerror) ->
+        super $("<canvas>", class:"moka-widget moka-canvas", width:w, height:h)
+        @img = $("<img>", width:w, height:h)
+        @img.one( "load",
+            () =>
+                @ok = true
+
+                img = @img[0]
+                e = @e[0]
+                @width = e.width = img.naturalWidth
+                @height = e.height = img.naturalHeight
+
+                @ctx = e.getContext("2d")
+                @ctx.clearRect(0,0,@width,@height)
+                @ctx.drawImage(img,0,0,@width,@height)
+
+                onload?()
+        )
+        @img.one( "error",
+            () =>
+                @ok = false
+                @width = @height = 0
+                onerror?()
+        )
+        @img.attr("src", @src)
+
+    resize: (w,h) ->
+        return this if not @ok
+        e = @e[0]
+        @ctx.clearRect(0,0,e.width,e.height)
+        e.width = w if w>0
+        e.height = h if h>0
+        @ctx.drawImage(@img[0],0,0,e.width,e.height)
+        return this
+
+    sharpen: (strength) ->
+        return this if not @ok
+        window.clearTimeout(@t_sharpen) if @t_sharpen
+        if strength < 0
+            strength = 0
+        else if strength > 1
+            strength = 1
+
+        w = Math.ceil(@width)
+        h = Math.ceil(@height)
+
+        dataDesc = @ctx.getImageData(0, 0, w, h)
+        data = dataDesc.data
+        dataCopy = @ctx.getImageData(0, 0, w, h).data
+
+        mul = 15
+        mulOther = 1 + 3*strength
+        weight = 1 / (mul - 4 * mulOther)
+
+        mul *= weight
+        mulOther *= weight
+
+        w4 = w*4
+        y = 0
+
+        filter = (miny) ->
+            while (y < miny)
+                offsetY = (y-1)*w4
+
+                nextY = if (y is h) then y - 1 else y
+                prevY = if (y is 1) then 0 else y-2
+
+                offsetYPrev = prevY*w4
+                offsetYNext = nextY*w4
+
+                x = w
+                while (x)
+                    offset = offsetY + (x*4-4)
+
+                    offsetPrev = offsetYPrev + (if (x is 1) then 0 else x-2) * 4
+                    offsetNext = offsetYNext + (if (x is w) then x-1 else x) * 4
+
+                    r = dataCopy[offset] * mul - mulOther * (
+                        dataCopy[offsetPrev] +
+                        dataCopy[offset-4] +
+                        dataCopy[offset+4] +
+                        dataCopy[offsetNext])
+
+                    g = dataCopy[offset+1] * mul - mulOther * (
+                        dataCopy[offsetPrev+1] +
+                        dataCopy[offset-3] +
+                        dataCopy[offset+5] +
+                        dataCopy[offsetNext+1])
+
+                    b = dataCopy[offset+2] * mul - mulOther * (
+                        dataCopy[offsetPrev+2] +
+                        dataCopy[offset-2] +
+                        dataCopy[offset+6] +
+                        dataCopy[offsetNext+2])
+
+                    if (r < 0 )
+                        r = 0
+                    else if (r > 255 )
+                        r = 255
+                    if (g < 0 )
+                        g = 0
+                    else if (g > 255 )
+                        g = 255
+                    if (b < 0 )
+                        b = 0
+                    else if (b > 255 )
+                        b = 255
+
+                    data[offset] = r
+                    data[offset+1] = g
+                    data[offset+2] = b
+
+                    --x
+                ++y
+            @ctx.putImageData(dataDesc, 0, 0)
+            if (y < h)
+                miny = Math.min(y+50, h)
+                @t_sharpen = window.setTimeout(filter.bind(this, miny), 0)
+
+        @t_sharpen = window.setTimeout(filter.bind(this, 50), 0)
+
+        return this
+
+    isLoaded: () ->
+        return @ok?
+
 class Moka.ImageView extends Moka.Input
     default_keys: {}
 
-    constructor: (src) ->
+    constructor: (src, @use_canvas, @sharpen) ->
         super
         @e.addClass("moka-imageview")
         @src = src
@@ -962,8 +1090,8 @@ class Moka.ImageView extends Moka.Input
             @e.show()
             if @ok?
                 @zoom(@z, @zhow)
-            @e.trigger("mokaLoaded")
-            @e.trigger("mokaDone", [not @ok])
+                @e.trigger("mokaLoaded")
+                @e.trigger("mokaDone", [not @ok])
         else
             onload = () =>
                 @ok = true
@@ -976,7 +1104,10 @@ class Moka.ImageView extends Moka.Input
                 @ok = false
                 @e.trigger("mokaError")
                 @e.trigger("mokaDone", [true])
-            @image = new Moka.Image(@src, "", "", onload, onerror)
+            if @use_canvas
+                @image = new Moka.Canvas(@src, "", "", onload, onerror)
+            else
+                @image = new Moka.Image(@src, "", "", onload, onerror)
             @zoom(@z, @zhow)
             @image.appendTo(@e)
             @e.show()
@@ -984,13 +1115,13 @@ class Moka.ImageView extends Moka.Input
 
     hide: () ->
         @e.hide()
-        @ok = null
         if @image? and not @t_remove
             # delay resource removal
             @t_remove = window.setTimeout(
                 () =>
-                    dbg "removing image", @image.e.attr("src")
-                    @image.e.attr("src", "")
+                    dbg "removing image", @image.img.attr("src")
+                    @ok = null
+                    @image.img.attr("src", "")
                     @image.remove()
                     @image = null
                     @t_remove = null
@@ -1002,28 +1133,38 @@ class Moka.ImageView extends Moka.Input
 
     zoom: (how, how2) ->
         if how?
+            need_update = @z isnt how or @zhow isnt how2
             @z = how
             @zhow = how2
+            log @src,@z,@zhow,need_update
 
             if @image?
                 e = @image.e
-                width = e.outerWidth() or e.width()
-                height = e.outerHeight() or e.height()
+                width = e.outerWidth() or e.width() or @image.width
+                height = e.outerHeight() or e.height() or @image.height
                 w = h = mw = mh = ""
 
                 if how instanceof Array
-                    mw = how[0] - width + e.width()
-                    mh = how[1] - height + e.height()
+                    mw = how[0]
+                    mh = how[1]
+
+                    d = mw/mh
+                    d2 = width/height
                     if how2 is "fill"
-                        d = mw/mh
-                        d2 = width/height
                         if d > d2
                             w = mw
                             h = height*mw/width
                         else
                             h = mh
                             w = width*mh/height
-                        log mw, mh, w, h, width, height
+                        mw = mh = ""
+                    else
+                        if d > d2
+                            h = mh
+                            w = width*mh/height
+                        else
+                            w = mw
+                            h = height*mw/width
                         mw = mh = ""
                 else
                     @z = parseFloat(how) or 1
@@ -1037,6 +1178,11 @@ class Moka.ImageView extends Moka.Input
                         w = mw
 
                 e.css('max-width': mw, 'max-height': mh, width: w, height: h)
+
+                if need_update
+                    @image.resize(w or mw, h or mh)
+                    if @image.sharpen and @sharpen
+                        @image.sharpen(@sharpen)
 
             return this
         else
@@ -1297,7 +1443,7 @@ class Moka.Viewer extends Moka.Input
             dbg "zooming views", i+".."+(len-1), "using method", @z, @zhow
             while i < len
                 item = @at(i)
-                item.zoom(@z, @zhow) if item.zoom
+                item.zoom?(@z, @zhow)
                 ++i
             if @current >= 0
                 ensureVisible( @at(@index+@current).e )
@@ -1594,6 +1740,8 @@ class Moka.Viewer extends Moka.Input
                     dbg "view", index, "preloaded"
                     # remove preloaded item after timeout
                     item.hide()
+
+                item.zoom?(@z, @zhow)
 
                 # keep relative scroll offset after image is loaded
                 #left = @e.scrollLeft()
