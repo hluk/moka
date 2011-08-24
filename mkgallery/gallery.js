@@ -123,7 +123,7 @@
     // show notification
     oldid = void 0;
     notify = function(v, id) {
-        var item, itempath, html, notification, counter, label, r, w1, w2, e;
+        var item, itempath, html, notification, counter, label, r, w1, w2, e, z;
 
         if (id != null) {
             oldid = id;
@@ -142,12 +142,16 @@
             html = "";
             // escape anchor and html
             html += "URL: <a href='"+itempath+"'>" + itempath.replace(/^items\//,"") + "</a></i><br/>";
-            if ( item.width() )
+            if ( item.width() ) {
                 html += "size: <i>" + item.width() + "x" + item.height() + "</i></br>";
-            else
+            } else {
                 item.one("mokaLoaded", function(){notify(v,id);})
-            if ( v.zoom() !== 1 ) {
-                html += "zoom: <i>" + (item.width ? Math.floor(100 * item.image.e.width() / item.width) + "%" : v.zoom()) + "</i>";
+            }
+            z = v.zoom();
+            if ( z !== 1 ) {
+                html += "zoom: <i>" +
+                        (typeof z == "number" ? (Math.floor(100*z)+"%") : z) +
+                        "</i>";
             }
         }
 
