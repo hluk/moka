@@ -1,4 +1,8 @@
 # requirements: sass, coffee-script, inotify-tools
+# run: npm install -d
+COFFEE = node_modules/coffee-script/bin/coffee
+SASS = /usr/bin/sass
+
 NAME = test
 CSS_CONFIG = css/default.sass
 CSS_CORE = css/core.scss
@@ -24,13 +28,13 @@ deps:
 
 %.js: %.coffee
 	@echo $(DIV)
-	coffee -c -o $(DEST) $^
+	$(COFFEE) -c -o $(DEST) $^
 	@echo $(DIV)
 
 $(DEST)/$(NAME).css: $(CSS_CONFIG) $(CSS_CORE) $(CSS_LIBS)
 	@echo $(DIV)
 	ln -sf $< config.sass
-	sass $(CSS_CORE):$(DEST)/$(NAME).css
+	$(SASS) $(CSS_CORE):$(DEST)/$(NAME).css
 	@echo $(DIV)
 
 

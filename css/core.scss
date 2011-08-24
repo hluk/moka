@@ -9,6 +9,11 @@ body {
     overflow: hidden;
 }
 
+a {
+    font-weight: inherit;
+    color: $url_fg;
+}
+
 .moka-widget {
     @include transitions("opacity .2s ease-in-out, background-color .2s ease-in-out, color .2s ease-in-out");
     z-index: inherit;
@@ -123,11 +128,11 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 }
 .moka-container {
     margin: 3px;
-    &.moka-vertical{
-        float: left;
+    &.moka-vertical > .moka-widget{
+        display: block;
     }
     &.moka-horizontal > .moka-widget{
-        display: inline;
+        float: left;
     }
 }
 .moka-tabs {
@@ -346,7 +351,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     background-color: $notification_bg;
     padding: 0.5em 1.5em;
 
-    border: 2px solid $widget_bg*0.5;
+    border: $notification_border;
 
     @include box-shadow(2px 2px 5px rgba(0,0,0,0.3));
     @include rounded($notification_radius);

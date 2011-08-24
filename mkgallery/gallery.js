@@ -1,5 +1,5 @@
 (function() {
-	var onLoad;
+	var onLoad, viewer, gotownd, menu;
 
     createCounter = function (n, len, r, w1, w2, bg, fg, shadow, blur)
     {
@@ -10,11 +10,13 @@
         ctx = e[0].getContext("2d");
         pi = 3.1415;
         angle = len ? 2*pi*n/len : 0;
-        x = r+blur/2;
-        y = r+blur/2;
+        x = r+blur;
+        y = r+blur;
+        w = r+blur;
+        h = r+blur;
 
-        e[0].setAttribute("width", r*2+blur);
-        e[0].setAttribute("height", r*2+blur);
+        e[0].setAttribute("width", 2*w);
+        e[0].setAttribute("height", 2*h);
 
         ctx.save();
 
@@ -40,9 +42,11 @@
         ctx.arc(x, y, r-w1/2, -pi/2, angle-pi/2, false);
         ctx.stroke();
 
-        ctx.font = "bold "+(r*0.6)+"px sans-serif";
+        ctx.font = (r*0.7)+"px serif";
         ctx.textAlign = "center";
-        ctx.fillText(n+"/"+len, r+w1, r+w1);
+        ctx.fillText(n, w, h);
+        ctx.font = (r*0.45)+"px serif";
+        ctx.fillText(len, w, h+r*0.5);
 
         ctx.restore();
 
@@ -91,10 +95,11 @@
             }
             html = "";
             // escape anchor and html
-            html += "URL: <a href='"+itempath+"'>" + itempath + "</a></i><br/>";
-            if ( item.e.width ) {
-                html += "size: <i>" + item.e.width() + "x" + item.e.height() + "</i></br>";
-            }
+            html += "URL: <a href='"+itempath+"'>" + itempath.replace(/^items\//,"") + "</a></i><br/>";
+            if ( item.width() )
+                html += "size: <i>" + item.width() + "x" + item.height() + "</i></br>";
+            else
+                item.one("mokaLoaded", function(){notify(v,id);})
             if ( v.zoom() !== 1 ) {
                 html += "zoom: <i>" + (item.width ? Math.floor(100 * item.image.e.width() / item.width) + "%" : v.zoom()) + "</i>";
             }
@@ -105,18 +110,108 @@
             notification = new Moka.Notification("<table><tr><td valign='middle'></div></td><td>"+html, "", 4000, 300);
             e = notification.e.find('td:first');
 
-            r = 24;
-            w1 = 6;
-            w2 = 4;
-            counter = createCounter(id+1, ls.length, r, w1, w2, "rgba(100,50,20,0.4)", "white", 12, 10);
+            counter = createCounter(id+1, ls.length, 24, 6, 4, "rgba(100,50,20,0.4)", "white", 12, 10);
+            counter.css("margin", "-12px -10px -12px -24px");
             counter.appendTo(e);
 
             return notification;
         }
     }
 
-	// onLoad
-	onLoad = function() {
+    showGoToDialog = function() {
+        var close, closed, accept, lineedit, buttons;
+
+        if (gotownd) {
+            gotownd.focus();
+            return;
+        }
+
+        gotownd = new Moka.Window("Go to");
+        lineedit = new Moka.LineEdit("_Go to item number:");
+        buttons = new Moka.ButtonBox();
+        gotownd.append(lineedit, buttons);
+
+        close = function() {
+            gotownd.close();
+        }
+        closed = function() {
+            gotownd = null;
+        }
+        accept = function() {
+            viewer.select(lineedit.value());
+            gotownd.close();
+        }
+
+        buttons.append("_Ok", accept);
+        buttons.append("_Close", close);
+        gotownd.addKey("ENTER", accept);
+        gotownd.connect("mokaDestroyed", closed);
+
+        gotownd.appendTo("body").center().show().focus();
+    }
+
+    showMenu = function() {
+        var close, closed, accept, hash,
+            lineedit_order, lineedit_layout, lineedit_zoom, lineedit_sharpen,
+            widgets, buttons;
+
+        if (menu) {
+            menu.focus();
+            return;
+        }
+
+        menu = new Moka.Window("Menu");
+
+        hash = urlHash();
+
+        close = function() {
+            menu.close();
+        }
+        closed = function() {
+            menu = null;
+        }
+        accept = function() {
+            menu.close();
+            hash.layout = lineedit_layout.value();
+            hash.o = lineedit_order.value();
+            hash.zoom = lineedit_zoom.value();
+            hash.sharpen = lineedit_sharpen.value();
+            urlHash(hash);
+            window.location.reload();
+        }
+
+        widgets = new Moka.WidgetList();
+
+        // item order
+        lineedit_order = new Moka.LineEdit("O_rder:", hash.o);
+        widgets.append( new Moka.Container().append(lineedit_order, new Moka.Label("Examples: <i>lt</i> for left-top or <i>br</i> for bottom-right")) );
+
+        // layout
+        lineedit_layout = new Moka.LineEdit("_Layout:", hash.layout);
+        widgets.append( new Moka.Container().append(lineedit_layout, new Moka.Label("Examples: <i>2x3</i> or <i>2x-1</i> (for continuous view)")) )
+
+        // zoom
+        lineedit_zoom = new Moka.LineEdit("_Zoom factor:", hash.zoom);
+        widgets.append( new Moka.Container().append(lineedit_zoom, new Moka.Label("Examples: <i>1</i>, <i>1.5</i>, <i>fit</i>, <i>fill</i>")) )
+
+        // sharpen
+        lineedit_sharpen = new Moka.LineEdit("_Sharpen factor:", hash.sharpen);
+        widgets.append( new Moka.Container().append(lineedit_sharpen, new Moka.Label("Values from <i>0.0</i> to <i>1.0</i>")) )
+
+        // buttons
+        buttons = new Moka.ButtonBox();
+        buttons.append("_Ok", accept);
+        buttons.append("_Close", close);
+
+        menu.append(widgets, buttons);
+
+        menu.addKey("ENTER", accept);
+        menu.connect("mokaDestroyed", closed);
+
+        menu.appendTo("body").center().show().focus();
+    }
+
+    start = function(hash) {
 		var item, itempath, map, onLoad, v, wnd, i, len, hash, value, sharpen;
 
 		onLoad = void 0;
@@ -128,7 +223,6 @@
 		v = new Moka.Viewer();
 
 		// get configuration from URL hash
-		hash = urlHash();
 		value = hash.zoom;
 		if (value) {
             value = value.split(",");
@@ -151,6 +245,7 @@
         // sharpen
 		sharpen = hash.sharpen || 0;
 
+        // TODO: create ImageViews on demand
 		for (i = 0, len = ls.length; i < len; i++) {
 			item = ls[i];
 			if (item instanceof Array) {
@@ -176,7 +271,7 @@
 		v.show();
 
 		// show notification and update URL when viewing new item or changing zoom level
-		v.e.bind("mokaSelected mokaZoomChanged", function(ev, id) {
+		v.bind("mokaSelected mokaZoomChanged", function(ev, id) {
 			if (ev.target !== this || !((id != null) || (oldid != null))) {
 				return;
 			}
@@ -201,11 +296,42 @@
                     v.layout([4,3]);
                     v.zoom("fit");
                 });
+        v.addKey("G", showGoToDialog);
+        v.addKey("C", showMenu);
 
 		Moka.focus(v.e);
 
+        viewer = v;
+    }
+
+	onLoad = function() {
+        var wnd, hash, counter, widgets;
+
+		hash = urlHash();
+
         $("body").height( $(window).height() );
         $(window).resize( function(){$("body").height( $(this).height() );} );
+
+		if (typeof title != "undefined" && title !== null) {
+			document.title = title;
+		}
+
+        if (hash.title === "0") {
+            return start(hash);
+        }
+
+        wnd = new Moka.Window("<b>"+title+"</b> gallery");
+
+        counter = createCounter(hash.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8);
+        wnd.align("center");
+        widgets = new Moka.WidgetList();
+        widgets.append( new Moka.Button("_Browse", function(){wnd.close();}) );
+        widgets.append( new Moka.Button("_Configure", showMenu) )
+        wnd.append( new Moka.Widget(counter), widgets );
+        wnd.addKey("ENTER", function(){wnd.close();});
+        wnd.connect("mokaDestroyed", function(){start(hash);});
+
+        wnd.appendTo("body").center().show().focus();
 	};
 
 	$(document).ready(onLoad);

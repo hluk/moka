@@ -410,8 +410,9 @@ Moka.lostFocus = (ev) ->
     e = $(ev.target)
     e.removeClass("moka-focus")
      .trigger("mokaBlurred")
-    focused_widget = $() if e[0] is focused_widget[0]
-    #dbg "blurred element",e
+    if e[0] is focused_widget[0]
+        focused_widget = $()
+        #dbg "blurred element",e
 
 Moka.gainFocus = (ev) ->
     return if focus_timestamp is ev.timeStamp
@@ -456,7 +457,9 @@ class Moka.Widget
         return this
 
     remove: () ->
-        @e.remove()
+        #@e.remove()
+        @e.trigger("mokaDestroyed")
+        @e.detach()
 
     parent: () ->
         return @parentWidget
@@ -465,6 +468,43 @@ class Moka.Widget
         @keys = {} if not @keys
         @keys[ normalizeKeyName(keyname) ] = fn
         return this
+
+    connect: (event, fn) ->
+        @e.bind(event, (ev) => if ev.target is @e[0] then fn())
+        return this
+
+    bind: (event, fn) ->
+        @e.bind(event, fn)
+        return this
+
+    one: (event, fn) ->
+        @e.one(event, fn)
+        return this
+
+    width: (val) ->
+        if val?
+            @e.width(val)
+            return this
+        else
+            return @e.width()
+
+    height: (val) ->
+        if val?
+            @e.height(val)
+            return this
+        else
+            return @e.height()
+
+    align: (alignment) ->
+        @e.css("text-align", alignment)
+        return this
+
+    css: (prop, val) ->
+        if val?
+            @e.css(prop, val)
+            return this
+        else
+            return @e.css(prop)
 
     do: (fn) ->
         fn.apply(this, [@e])
@@ -493,6 +533,14 @@ class Moka.Input extends Moka.Widget
           .bind( "keydown.moka", (ev) => @keydown?(ev) )
           .bind( "keyup.moka", (ev) => @keyup?(ev) )
 
+    focus: () ->
+        Moka.focus(@e)
+        return this
+
+    remove: () ->
+        Moka.blur(@e)
+        return super
+
 class Moka.Container extends Moka.Widget
     constructor: (horizontal) ->
         super
@@ -500,7 +548,7 @@ class Moka.Container extends Moka.Widget
 
         @widgets = []
 
-        @vertical(if horizontal then false else true)
+        @vertical(if horizontal? then not horizontal else true)
 
     update: ->
         w = @widgets
@@ -515,8 +563,8 @@ class Moka.Container extends Moka.Widget
 
     vertical: (toggle) ->
         if toggle?
-            @e.addClass( if toggle is false then "moka-horizontal" else "moka-vertical" )
-            @e.removeClass(if toggle is false then "moka-vertical" else "moka-horizontal")
+            @e.addClass( if toggle then "moka-vertical" else "moka-horizontal" )
+            @e.removeClass(if toggle then "moka-horizontal" else "moka-vertical")
             return this
         else
             return @e.hasClass("moka-vertical")
@@ -542,6 +590,11 @@ class Moka.Container extends Moka.Widget
         @update()
 
         return this
+
+    remove: () ->
+        for widget in @widgets
+            widget.remove()
+        return super
 
 class Moka.WidgetList extends Moka.Container
     default_keys:
@@ -674,6 +727,10 @@ class Moka.LineEdit extends Moka.Input
         Moka.focus(@edit)
         return this
 
+    remove: () ->
+        Moka.blur(@edit)
+        return super
+
     update: () ->
         @edit.attr( "size", @value().length+2 )
 
@@ -746,6 +803,11 @@ class Moka.TextEdit extends Moka.Input
 
     focus: (ev) ->
         Moka.focus(@textarea)
+        return this
+
+    remove: () ->
+        Moka.blur(@textarea)
+        return super
 
     keydown: (ev) ->
         ev.stopPropagation()
@@ -985,14 +1047,16 @@ class Moka.Canvas extends Moka.Widget
 
     sharpen: (strength) ->
         return this if not @ok
-        window.clearTimeout(@t_sharpen) if @t_sharpen
+        if @t_sharpen
+            window.clearTimeout(@t_sharpen)
         if strength < 0
             strength = 0
         else if strength > 1
             strength = 1
 
-        w = Math.ceil(@width)
-        h = Math.ceil(@height)
+        e = @e[0]
+        w = Math.ceil(e.width)
+        h = Math.ceil(e.height)
 
         dataDesc = @ctx.getImageData(0, 0, w, h)
         data = dataDesc.data
@@ -1006,9 +1070,15 @@ class Moka.Canvas extends Moka.Widget
         mulOther *= weight
 
         w4 = w*4
-        y = 0
+        y = 1
 
         filter = (miny) ->
+            offsetY = (y-1)*w4
+            nextY = if y == h then y - 1 else y
+            prevY = if y == 1 then 0 else y-2
+            offsetYPrev = prevY*w4
+            offsetYNext = nextY*w4
+
             while (y < miny)
                 offsetY = (y-1)*w4
 
@@ -1019,12 +1089,10 @@ class Moka.Canvas extends Moka.Widget
                 offsetYNext = nextY*w4
 
                 x = w
+                offset = offsetY - 4 + w*4
+                offsetPrev = offsetYPrev + (w-2) * 4
+                offsetNext = offsetYNext + (w-1) * 4
                 while (x)
-                    offset = offsetY + (x*4-4)
-
-                    offsetPrev = offsetYPrev + (if (x is 1) then 0 else x-2) * 4
-                    offsetNext = offsetYNext + (if (x is w) then x-1 else x) * 4
-
                     r = dataCopy[offset] * mul - mulOther * (
                         dataCopy[offsetPrev] +
                         dataCopy[offset-4] +
@@ -1043,29 +1111,28 @@ class Moka.Canvas extends Moka.Widget
                         dataCopy[offset+6] +
                         dataCopy[offsetNext+2])
 
-                    if (r < 0 )
-                        r = 0
-                    else if (r > 255 )
-                        r = 255
-                    if (g < 0 )
-                        g = 0
-                    else if (g > 255 )
-                        g = 255
-                    if (b < 0 )
-                        b = 0
-                    else if (b > 255 )
-                        b = 255
+                    data[offset]   = Math.min( Math.max(r,0), 255 )
+                    data[offset+1] = Math.min( Math.max(g,0), 255 )
+                    data[offset+2] = Math.min( Math.max(b,0), 255 )
 
-                    data[offset] = r
-                    data[offset+1] = g
-                    data[offset+2] = b
-
+                    if x < w
+                        offsetNext -= 4
                     --x
+                    offset -= 4
+                    if x > 2
+                        offsetPrev -= 4
+
                 ++y
+                offsetY += w4
+                if y != h
+                    ++nextY
+                    offsetYPrev += w4
+                if y > 2
+                    ++prevY
+                    offsetYNext += w4
             @ctx.putImageData(dataDesc, 0, 0)
-            if (y < h)
-                miny = Math.min(y+50, h)
-                @t_sharpen = window.setTimeout(filter.bind(this, miny), 0)
+            @t_sharpen = if (y > h) then 0 else
+                window.setTimeout(filter.bind(this, Math.min(y+50, h+1)), 0)
 
         @t_sharpen = window.setTimeout(filter.bind(this, 50), 0)
 
@@ -1136,7 +1203,6 @@ class Moka.ImageView extends Moka.Input
             need_update = @z isnt how or @zhow isnt how2
             @z = how
             @zhow = how2
-            log @src,@z,@zhow,need_update
 
             if @image?
                 e = @image.e
@@ -1178,6 +1244,7 @@ class Moka.ImageView extends Moka.Input
                         w = mw
 
                 e.css('max-width': mw, 'max-height': mh, width: w, height: h)
+                log('max-width': mw, 'max-height': mh, width: w, height: h)
 
                 if need_update
                     @image.resize(w or mw, h or mh)
@@ -1210,7 +1277,7 @@ class Moka.Viewer extends Moka.Input
             @e.scrollTop( @e.scrollTop()+30 )
 
         TAB: ->
-            if @index + @current + 1 < @length() and @currentcell < @cellCount()
+            if @index + @current + 1 < @length() and @currentcell + 1 < @cellCount()
                 @next()
             else
                 return false
@@ -1220,9 +1287,9 @@ class Moka.Viewer extends Moka.Input
         KP4: -> @prev()
         KP2: -> @nextRow()
         KP8: -> @prevRow()
-        SPACE: -> if isOnScreen(focused_widget, "bottom") then @nextPage() else
+        SPACE: -> if isOnScreen(focused_widget, "bottom") then @next() else
             @e.scrollTop( @e.scrollTop()+0.9*@e.parent().height() )
-        'S-SPACE': -> if isOnScreen(focused_widget, "top") then @prevPage() else
+        'S-SPACE': -> if isOnScreen(focused_widget, "top") then @prev() else
             @e.scrollTop( @e.scrollTop()-0.9*@e.parent().height() )
 
         ENTER: -> @dblclick?()
@@ -1350,14 +1417,12 @@ class Moka.Viewer extends Moka.Input
         dbg "displaying views", @index+".."+(@index+len-1)
         while i < len
             cell = @cell(i)
-                  .css( height:@e.height(), width:@e.width() )
 
             item = @at(@index+i)
 
             cell.data("itemindex", i)
             if item
                 cell.attr("tabindex", -1)
-                    .css(height: @e.height(), width: @e.width())
                 item.hide()
                     .appendTo(cell)
             else
@@ -1867,12 +1932,12 @@ class Moka.Notification extends Moka.Widget
         @animation_speed = 1000 if not @animation_speed?
 
         @e.addClass("moka-notification "+notification_class)
+          .hide()
           .html(html)
           .bind( "mouseenter.moka", () => window.clearTimeout(@t_notify) )
           .bind( "mouseleave.moka", () => @t_notify = window.setTimeout(@remove.bind(this), delay/2) )
-          .hide()
           .appendTo(Moka.notificationLayer)
-          .show(@animation_speed)
+          .fadeIn(@animation_speed)
 
         @t_notify = window.setTimeout( @remove.bind(this), delay )
 
@@ -1885,11 +1950,7 @@ Moka.clearNotifications = () ->
 
 class Moka.Window extends Moka.Input
     default_keys:
-        'S-TAB': ->
-            if focused_widget[0] isnt @title.e[0]
-                Moka.focus(@title.e)
-            else
-                return false
+        ESCAPE: -> @close()
         F4: -> @close()
         F2: -> @title.do(Moka.focus)
         F3: ->
@@ -2085,14 +2146,22 @@ class Moka.Window extends Moka.Input
     append: (widgets) ->
         for widget in arguments
             widget.parentWidget = this
-            @widgets.push(widget)
             widget.e.appendTo(@body)
+            @widgets.push(widget)
 
         @update()
 
         return this
 
+    center: () ->
+        @e.offset({
+            left:(@e.parent().width()-@e.width())/2,
+            top:(@e.parent().height()-@e.height())/2
+        })
+        return this
+
     focus: () ->
+        Moka.focus(@title)
         Moka.focusFirst(@body)
         return this
 
@@ -2107,6 +2176,10 @@ class Moka.Window extends Moka.Input
     resize: (w, h) ->
         @body.width(w).height(h)
         @update()
+        return this
+
+    align: (alignment) ->
+        @body.css("text-align", alignment)
         return this
 
     maximize: () ->
@@ -2134,8 +2207,22 @@ class Moka.Window extends Moka.Input
                 d = dd
         Moka.focus( e.find(".moka-title:first") )
 
+    remove: () ->
+        for widget in @widgets
+            widget.remove()
+        ee = @e.parent()
+        v = super
+        if focused_widget.length is 0
+            # focus nearest widget in parent
+            e = @e[0]
+            while(ee.length)
+                if Moka.focusFirst(ee) and focused_widget[0] isnt e
+                    break
+                ee = ee.parent()
+        return v
+
     close: () ->
-        @e.remove()
+        @remove()
 
     keydown: (ev) ->
         return if ev.isPropagationStopped()

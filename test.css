@@ -10,6 +10,10 @@ body {
   padding: 0;
   overflow: hidden; }
 
+a {
+  font-weight: inherit;
+  color: #662200; }
+
 .moka-widget {
   -webkit-transition: opacity .2s ease-in-out, background-color .2s ease-in-out, color .2s ease-in-out;
   -moz-transition: opacity .2s ease-in-out, background-color .2s ease-in-out, color .2s ease-in-out;
@@ -120,10 +124,10 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
 
 .moka-container {
   margin: 3px; }
-  .moka-container.moka-vertical {
-    float: left; }
+  .moka-container.moka-vertical > .moka-widget {
+    display: block; }
   .moka-container.moka-horizontal > .moka-widget {
-    display: inline; }
+    float: left; }
 
 .moka-tabs .moka-tab {
   border: 1px solid #9c957b; }
@@ -317,7 +321,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   color: black;
   background-color: #e0d6b0;
   padding: 0.5em 1.5em;
-  border: 2px solid #706b58;
+  border: 0px;
   box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
   -webkit-box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
   -moz-box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
