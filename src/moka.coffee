@@ -321,6 +321,16 @@ Moka.blur = (e) ->
     ee = if e.length then e[0] else e
     ee.blur()
 
+Moka.focusFirstWidget = (w, only_children) ->
+    if not only_children and w.focus
+        w.focus()
+        return true
+    else if w.widgets
+        for ww in w.widgets
+            if Moka.focusFirstWidget(ww, false)
+                return true
+    return false
+
 Moka.focusFirst = (e) ->
     if e.hasClass("moka-input")
         ee = e
@@ -330,7 +340,7 @@ Moka.focusFirst = (e) ->
         eee = ee.siblings(".moka-current")
         if eee.length
             ee = eee
-    if ee.length and ee.is(":visible")
+    if ee.length
         Moka.focus(ee)
         return true
     else
@@ -650,7 +660,7 @@ class Moka.WidgetList extends Moka.Container
     select: (id) ->
         if id >= 0
             w = @widgets[id]
-            Moka.focusFirst(w.e) if w
+            Moka.focusFirstWidget(w) if w
 
     next: ->
         @select(if @current >= 0 and @current < @length()-1 then @current+1 else 0)
@@ -673,7 +683,7 @@ class Moka.WidgetList extends Moka.Container
 class Moka.CheckBox extends Moka.Input
     default_keys:
         SPACE: -> @toggle()
-        ENTER: -> @toggle()
+        #ENTER: -> @toggle()
 
     constructor: (text, checked) ->
         super Moka.createLabel(text).addClass("moka-checkbox")
@@ -721,7 +731,7 @@ class Moka.LineEdit extends Moka.Input
                .blur  (ev) =>
                     ev.target = @edit[0]
                     Moka.lostFocus(ev)
-        @value(text) if text
+        @value(text) if text?
 
     focus: () ->
         Moka.focus(@edit)
@@ -851,7 +861,6 @@ class Moka.ButtonBox extends Moka.WidgetList
 
 class Moka.Tabs extends Moka.Widget
     default_keys:
-        ENTER: -> Moka.focusFirst(@pages[@current].e)
         SPACE: -> @pages_e.toggle()
 
         LEFT: ->  if @vertical() then @focusUp() else @prev()
@@ -865,7 +874,7 @@ class Moka.Tabs extends Moka.Widget
         END: -> if not @vertical() then @tabs.select(@tabs.length()-1)
 
     default_tab_keys:
-        TAB: -> if (page = @pages[@current]) then Moka.focusFirst(page.e.children()) else false
+        TAB: -> if (page = @pages[@current]) then Moka.focusFirstWidget(page, true) else false
 
     constructor: ->
         super
@@ -874,6 +883,7 @@ class Moka.Tabs extends Moka.Widget
           .bind( "mokaFocusUpRequest", () => @select(Math.max(0, @current)); return false )
 
         @tabs = new Moka.WidgetList("moka-tabs", "moka-tab")
+        @widgets = @tabs.widgets
         @tabs_e = @tabs.e
             .appendTo(@e)
             .bind "mokaSelected", (ev, id) =>
@@ -911,7 +921,7 @@ class Moka.Tabs extends Moka.Widget
         return this
 
     focusDown: () ->
-        Moka.focusFirst( @pages[@current].e )
+        Moka.focusFirstWidget(@pages[@current])
         return this
 
     next: () ->
@@ -1361,8 +1371,6 @@ class Moka.Viewer extends Moka.Input
 
         @view(@index)
 
-        w = @items
-        $.each( w, (i) -> if w[i].update then w[i].update?() )
         return this
 
     focus: (ev) ->
@@ -1370,8 +1378,25 @@ class Moka.Viewer extends Moka.Input
         Moka.focusFirst( cell.children() ) or Moka.focus(cell)
         return this
 
+    appendFunction: (fn, length) ->
+        last = @length()
+        itemfn = (index) -> return fn(index-last)
+
+        i = @items.length
+        l = i+length
+        while i<l
+            @items.push(itemfn)
+            ++i
+
+        if @lay[0] <= 0 or @lay[1] <= 0
+            @updateTable()
+
+        @update()
+
+        return this
+
     append: (widget) ->
-        id = @items.length
+        id = @length()
         widget.parentWidget = this
         @items.push(widget)
         if @lay[0] <= 0 or @lay[1] <= 0
@@ -1382,11 +1407,34 @@ class Moka.Viewer extends Moka.Input
         return this
 
     at: (index) ->
-        return @items[index]
+        x = @items[index]
+        if x instanceof Function
+            x = @items[index] = x(index)
+            x.parentWidget = this
+        return x
+
+    clean: () ->
+        i = 0
+        l = @length()
+        while i < l
+            x = @items[i]
+            if x not instanceof Function
+                x.remove()
+            ++i
+        @items = []
+        return this
+
+    remove: () ->
+        @clean()
+        return super
+
+    currentIndex: () ->
+        return if @current >= 0 then @index + @current else -1
 
     currentItem: () ->
-        if @current >= 0
-            return @at(@index+@current)
+        i = @currentIndex()
+        if i >= 0
+            return @at(i)
         else
             return null
 

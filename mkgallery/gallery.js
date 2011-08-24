@@ -1,5 +1,14 @@
 (function() {
-	var onLoad, viewer, gotownd, menu;
+	var onLoad, viewer, gotownd, menu, options, opts;
+
+    options = {
+        n: [0],
+        skiptitle: [false, "Skip _title dialog on start"],
+        zoom: ["1", "_Zoom factor", "Examples: <b>1</b>, <b>1.5</b>, <b>fit</b>, <b>fill</b>"],
+        sharpen: [0.0, "_Sharpen factor", "Values from <b>0.0</b> to <b>1.0</b>"],
+        o: ["lt", "O_rder", "Examples: <b>lt</b> for left-top or <b>br</b> for bottom-right"],
+        layout: ["1x1", "_Layout", "Examples: <b>2x3</b> or <b>2x-1</b> (for continuous view)"]
+    }
 
     createCounter = function (n, len, r, w1, w2, bg, fg, shadow, blur)
     {
@@ -73,6 +82,37 @@
 			return hash;
 		}
 	}
+
+    getOptions = function(hash) {
+        var opts, x, default_value;
+
+        opts = {};
+
+        for (name in options) {
+            x = hash[name];
+            default_value = options[name][0]
+
+            if (typeof x != "undefined" && x !== null) {
+                // value should be same type as the default value
+                switch(typeof default_value) {
+                    case "boolean":
+                        x = (x === "1" || x === "true") ? true : false;
+                        break;
+                    case "string":
+                        x = ""+x;
+                        break;
+                    case "number":
+                        x = parseFloat(x);
+                        break;
+                }
+            } else {
+                x = default_value;
+            }
+            opts[name] = x;
+        }
+
+        return opts;
+    }
 
     // show notification
     oldid = void 0;
@@ -151,18 +191,16 @@
     }
 
     showMenu = function() {
-        var close, closed, accept, hash,
-            lineedit_order, lineedit_layout, lineedit_zoom, lineedit_sharpen,
-            widgets, buttons;
+        var close, closed, accept, w, container, widgets, buttons, opt, label;
 
         if (menu) {
             menu.focus();
             return;
         }
 
-        menu = new Moka.Window("Menu");
+        w = {};
 
-        hash = urlHash();
+        menu = new Moka.Window("Menu");
 
         close = function() {
             menu.close();
@@ -172,35 +210,49 @@
         }
         accept = function() {
             menu.close();
-            hash.layout = lineedit_layout.value();
-            hash.o = lineedit_order.value();
-            hash.zoom = lineedit_zoom.value();
-            hash.sharpen = lineedit_sharpen.value();
-            urlHash(hash);
+            for (name in w) {
+                opts[name] = w[name].value();
+            }
+            urlHash(opts);
             window.location.reload();
+        }
+        reset = function() {
+            var opts = getOptions({});
+            for (name in options) {
+                if ( w[name] ) {
+                    w[name].value( options[name][0] );
+                }
+            }
         }
 
         widgets = new Moka.WidgetList();
 
-        // item order
-        lineedit_order = new Moka.LineEdit("O_rder:", hash.o);
-        widgets.append( new Moka.Container().append(lineedit_order, new Moka.Label("Examples: <i>lt</i> for left-top or <i>br</i> for bottom-right")) );
+        for (name in options) {
+            opt = options[name];
+            label = opt[1];
+            if (label) {
+                container = new Moka.Container();
 
-        // layout
-        lineedit_layout = new Moka.LineEdit("_Layout:", hash.layout);
-        widgets.append( new Moka.Container().append(lineedit_layout, new Moka.Label("Examples: <i>2x3</i> or <i>2x-1</i> (for continuous view)")) )
+                if ( typeof opts[name] == "boolean" ) {
+                    w[name] = new Moka.CheckBox(label, opts[name]);
+                } else {
+                    w[name] = new Moka.LineEdit(label+":", opts[name]);
+                }
+                container.append(w[name]);
 
-        // zoom
-        lineedit_zoom = new Moka.LineEdit("_Zoom factor:", hash.zoom);
-        widgets.append( new Moka.Container().append(lineedit_zoom, new Moka.Label("Examples: <i>1</i>, <i>1.5</i>, <i>fit</i>, <i>fill</i>")) )
+                label = opt[2];
+                if (label) {
+                    container.append( new Moka.Label("<small>"+label+"</small>") );
+                }
 
-        // sharpen
-        lineedit_sharpen = new Moka.LineEdit("_Sharpen factor:", hash.sharpen);
-        widgets.append( new Moka.Container().append(lineedit_sharpen, new Moka.Label("Values from <i>0.0</i> to <i>1.0</i>")) )
+                widgets.append(container);
+            }
+        }
 
         // buttons
         buttons = new Moka.ButtonBox();
         buttons.append("_Ok", accept);
+        buttons.append("R_eset", reset);
         buttons.append("_Close", close);
 
         menu.append(widgets, buttons);
@@ -211,8 +263,8 @@
         menu.appendTo("body").center().show().focus();
     }
 
-    start = function(hash) {
-		var item, itempath, map, onLoad, v, wnd, i, len, hash, value, sharpen;
+    start = function() {
+		var item, itempath, map, onLoad, v, wnd, i, len, value, sharpen;
 
 		onLoad = void 0;
 		if (typeof title != "undefined" && title !== null) {
@@ -222,8 +274,8 @@
 		// gallery widget
 		v = new Moka.Viewer();
 
-		// get configuration from URL hash
-		value = hash.zoom;
+		// parse options
+		value = opts.zoom;
 		if (value) {
             value = value.split(",");
             console.log(value);
@@ -231,38 +283,37 @@
 		}
 
 		// layout
-		value = hash.layout;
+		value = opts.layout;
 		if (value) {
 			v.layout( value.split("x") );
 		}
 
         // orientation
-		value = hash.o;
+		value = opts.o;
 		if (value) {
 			v.orientation(value);
 		}
 
         // sharpen
-		sharpen = hash.sharpen || 0;
+		sharpen = opts.sharpen || 0;
 
-        // TODO: create ImageViews on demand
-		for (i = 0, len = ls.length; i < len; i++) {
+        // items on demand
+        v.appendFunction(function(i){
 			item = ls[i];
 			if (item instanceof Array) {
 				itempath = item[0];
 			} else {
 				itempath = item;
 			}
-			//console.log(itempath);
             if (sharpen > 0) {
-                v.append(new Moka.ImageView(itempath, true, sharpen));
+                return new Moka.ImageView(itempath, true, sharpen);
             } else {
-                v.append(new Moka.ImageView(itempath));
+                return new Moka.ImageView(itempath);
             }
-		}
+        }, ls.length);
 
         // current item
-		value = hash.n;
+		value = opts.n;
 		if (value) {
 			v.view(value);
 		}
@@ -276,13 +327,10 @@
 				return;
 			}
 			// URL: remember layout, zoom, orientation, current item number
-			urlHash({
-				layout: v.layout().join("x"),
-				zoom:    v.zoom(),
-                sharpen: sharpen,
-                o:       v.orientation(),
-				n:       v.index+v.current
-			})
+            opts.zoom = v.zoom();
+		    opts.n = v.currentIndex();
+            opts.layout = v.layout().join("x");
+            urlHash(opts);
 
 			return notify(v, id);
 		});
@@ -305,9 +353,9 @@
     }
 
 	onLoad = function() {
-        var wnd, hash, counter, widgets;
+        var wnd, counter, widgets;
 
-		hash = urlHash();
+		opts = getOptions( urlHash() );
 
         $("body").height( $(window).height() );
         $(window).resize( function(){$("body").height( $(this).height() );} );
@@ -316,20 +364,20 @@
 			document.title = title;
 		}
 
-        if (hash.title === "0") {
-            return start(hash);
+        if (opts.skiptitle) {
+            return start();
         }
 
         wnd = new Moka.Window("<b>"+title+"</b> gallery");
 
-        counter = createCounter(hash.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8);
+        counter = createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8);
         wnd.align("center");
         widgets = new Moka.WidgetList();
         widgets.append( new Moka.Button("_Browse", function(){wnd.close();}) );
         widgets.append( new Moka.Button("_Configure", showMenu) )
         wnd.append( new Moka.Widget(counter), widgets );
         wnd.addKey("ENTER", function(){wnd.close();});
-        wnd.connect("mokaDestroyed", function(){start(hash);});
+        wnd.connect("mokaDestroyed", start);
 
         wnd.appendTo("body").center().show().focus();
 	};

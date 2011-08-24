@@ -318,6 +318,22 @@
     ee = e.length ? e[0] : e;
     return ee.blur();
   };
+  Moka.focusFirstWidget = function(w, only_children) {
+    var ww, _i, _len, _ref;
+    if (!only_children && w.focus) {
+      w.focus();
+      return true;
+    } else if (w.widgets) {
+      _ref = w.widgets;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        ww = _ref[_i];
+        if (Moka.focusFirstWidget(ww, false)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
   Moka.focusFirst = function(e) {
     var ee, eee;
     if (e.hasClass("moka-input")) {
@@ -329,7 +345,7 @@
         ee = eee;
       }
     }
-    if (ee.length && ee.is(":visible")) {
+    if (ee.length) {
       Moka.focus(ee);
       return true;
     } else {
@@ -720,7 +736,7 @@
       if (id >= 0) {
         w = this.widgets[id];
         if (w) {
-          return Moka.focusFirst(w.e);
+          return Moka.focusFirstWidget(w);
         }
       }
     };
@@ -751,9 +767,6 @@
     __extends(CheckBox, Moka.Input);
     CheckBox.prototype.default_keys = {
       SPACE: function() {
-        return this.toggle();
-      },
-      ENTER: function() {
         return this.toggle();
       }
     };
@@ -813,7 +826,7 @@
         ev.target = this.edit[0];
         return Moka.lostFocus(ev);
       }, this));
-      if (text) {
+      if (text != null) {
         this.value(text);
       }
     }
@@ -958,9 +971,6 @@
   Moka.Tabs = (function() {
     __extends(Tabs, Moka.Widget);
     Tabs.prototype.default_keys = {
-      ENTER: function() {
-        return Moka.focusFirst(this.pages[this.current].e);
-      },
       SPACE: function() {
         return this.pages_e.toggle();
       },
@@ -1017,7 +1027,7 @@
       TAB: function() {
         var page;
         if ((page = this.pages[this.current])) {
-          return Moka.focusFirst(page.e.children());
+          return Moka.focusFirstWidget(page, true);
         } else {
           return false;
         }
@@ -1032,6 +1042,7 @@
         return false;
       }, this));
       this.tabs = new Moka.WidgetList("moka-tabs", "moka-tab");
+      this.widgets = this.tabs.widgets;
       this.tabs_e = this.tabs.e.appendTo(this.e).bind("mokaSelected", __bind(function(ev, id) {
         if (this.current === id) {
           return;
@@ -1069,7 +1080,7 @@
       return this;
     };
     Tabs.prototype.focusDown = function() {
-      Moka.focusFirst(this.pages[this.current].e);
+      Moka.focusFirstWidget(this.pages[this.current]);
       return this;
     };
     Tabs.prototype.next = function() {
@@ -1615,18 +1626,10 @@
       return this.update();
     };
     Viewer.prototype.update = function() {
-      var w;
       if (!this.e.is(":visible")) {
         return;
       }
       this.view(this.index);
-      w = this.items;
-      $.each(w, function(i) {
-        var _base;
-        if (w[i].update) {
-          return typeof (_base = w[i]).update === "function" ? _base.update() : void 0;
-        }
-      });
       return this;
     };
     Viewer.prototype.focus = function(ev) {
@@ -1635,9 +1638,27 @@
       Moka.focusFirst(cell.children()) || Moka.focus(cell);
       return this;
     };
+    Viewer.prototype.appendFunction = function(fn, length) {
+      var i, itemfn, l, last;
+      last = this.length();
+      itemfn = function(index) {
+        return fn(index - last);
+      };
+      i = this.items.length;
+      l = i + length;
+      while (i < l) {
+        this.items.push(itemfn);
+        ++i;
+      }
+      if (this.lay[0] <= 0 || this.lay[1] <= 0) {
+        this.updateTable();
+      }
+      this.update();
+      return this;
+    };
     Viewer.prototype.append = function(widget) {
       var id;
-      id = this.items.length;
+      id = this.length();
       widget.parentWidget = this;
       this.items.push(widget);
       if (this.lay[0] <= 0 || this.lay[1] <= 0) {
@@ -1647,11 +1668,44 @@
       return this;
     };
     Viewer.prototype.at = function(index) {
-      return this.items[index];
+      var x;
+      x = this.items[index];
+      if (x instanceof Function) {
+        x = this.items[index] = x(index);
+        x.parentWidget = this;
+      }
+      return x;
+    };
+    Viewer.prototype.clean = function() {
+      var i, l, x;
+      i = 0;
+      l = this.length();
+      while (i < l) {
+        x = this.items[i];
+        if (!(x instanceof Function)) {
+          x.remove();
+        }
+        ++i;
+      }
+      this.items = [];
+      return this;
+    };
+    Viewer.prototype.remove = function() {
+      this.clean();
+      return Viewer.__super__.remove.apply(this, arguments);
+    };
+    Viewer.prototype.currentIndex = function() {
+      if (this.current >= 0) {
+        return this.index + this.current;
+      } else {
+        return -1;
+      }
     };
     Viewer.prototype.currentItem = function() {
-      if (this.current >= 0) {
-        return this.at(this.index + this.current);
+      var i;
+      i = this.currentIndex();
+      if (i >= 0) {
+        return this.at(i);
       } else {
         return null;
       }
