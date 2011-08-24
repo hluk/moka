@@ -6,7 +6,10 @@
         skiptitle: [false, "Skip _title dialog on start"],
         zoom: ["1", "_Zoom factor", "Examples: <b>1</b>, <b>1.5</b>, <b>fit</b>, <b>fill</b>"],
         sharpen: [0.0, "_Sharpen factor", "Values from <b>0.0</b> to <b>1.0</b>"],
-        o: ["lt", "O_rder", "Examples: <b>lt</b> for left-top or <b>br</b> for bottom-right"],
+        o: [
+            ["left top", "right top", "top left", "top right",
+             "bottom left", "bottom right", "left bottom", "right bottom"],
+            "O_rder"],
         layout: ["1x1", "_Layout", "Examples: <b>2x3</b> or <b>2x-1</b> (for continuous view)"]
     }
 
@@ -98,11 +101,14 @@
                     case "boolean":
                         x = (x === "1" || x === "true") ? true : false;
                         break;
+                    case "number":
+                        x = parseFloat(x);
+                        break;
                     case "string":
                         x = ""+x;
                         break;
-                    case "number":
-                        x = parseFloat(x);
+                    case "object":
+                        x = ""+x;
                         break;
                 }
             } else {
@@ -191,7 +197,8 @@
     }
 
     showMenu = function() {
-        var close, closed, accept, w, container, widgets, buttons, opt, label;
+        var close, closed, accept, name, i, def,
+            w, ww, container, widgets, buttons, opt, label;
 
         if (menu) {
             menu.focus();
@@ -233,8 +240,15 @@
             if (label) {
                 container = new Moka.Container();
 
+                def = options[name][0];
                 if ( typeof opts[name] == "boolean" ) {
                     w[name] = new Moka.CheckBox(label, opts[name]);
+                } else if ( typeof def == "object" ) {
+                    ww = w[name] = new Moka.Combo(label);
+                    for (i in def) {
+                        ww.append(def[i]);
+                    }
+                    ww.value(opts[name]);
                 } else {
                     w[name] = new Moka.LineEdit(label+":", opts[name]);
                 }
@@ -374,7 +388,7 @@
         wnd.align("center");
         widgets = new Moka.WidgetList();
         widgets.append( new Moka.Button("_Browse", function(){wnd.close();}) );
-        widgets.append( new Moka.Button("_Configure", showMenu) )
+        widgets.append( new Moka.Button("_Configure", showMenu) );
         wnd.append( new Moka.Widget(counter), widgets );
         wnd.addKey("ENTER", function(){wnd.close();});
         wnd.connect("mokaDestroyed", start);

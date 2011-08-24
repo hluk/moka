@@ -776,7 +776,7 @@
         tabindex: 1,
         type: "checkbox",
         "class": "moka-value"
-      }).prependTo(this.e);
+      }).focus(this.focus.bind(this)).prependTo(this.e);
       this.value(checked);
     }
     CheckBox.prototype.click = function(ev) {
@@ -810,6 +810,55 @@
     };
     return CheckBox;
   })();
+  Moka.Combo = (function() {
+    __extends(Combo, Moka.Input);
+    Combo.prototype.default_keys = {
+      SPACE: function() {
+        return Moka.focus(this.combo);
+      }
+    };
+    function Combo(text) {
+      Combo.__super__.constructor.call(this, Moka.createLabel(text).addClass("moka-combo"));
+      this.combo = $('<select>', {
+        tabindex: 1,
+        "class": "moka-value"
+      }).focus(Moka.gainFocus).blur(Moka.lostFocus).appendTo(this.e);
+    }
+    Combo.prototype.append = function(texts) {
+      var text, _i, _len;
+      for (_i = 0, _len = arguments.length; _i < _len; _i++) {
+        text = arguments[_i];
+        $("<option>").text(text).attr("value", text).appendTo(this.combo);
+      }
+      return this;
+    };
+    Combo.prototype.focus = function() {
+      Moka.focus(this.e);
+      return this;
+    };
+    Combo.prototype.value = function(val) {
+      if (val != null) {
+        this.combo.val(val);
+        return this;
+      } else {
+        return this.combo.val();
+      }
+    };
+    Combo.prototype.keydown = function(ev) {
+      var keyname;
+      if (ev.isPropagationStopped()) {
+        return;
+      }
+      keyname = getKeyName(ev);
+      if (doKey(keyname, this.keys, this.default_keys, this)) {
+        return false;
+      }
+      if (ev.target === this.combo[0] && ["LEFT", "RIGHT", "UP", "DOWN"].indexOf(keyname) >= 0) {
+        return ev.stopPropagation();
+      }
+    };
+    return Combo;
+  })();
   Moka.LineEdit = (function() {
     __extends(LineEdit, Moka.Input);
     LineEdit.prototype.default_keys = {};
@@ -819,13 +868,7 @@
       if (label_text) {
         Moka.createLabel(label_text, this.e);
       }
-      this.edit = $("<input>").appendTo(this.e).keyup(this.update.bind(this)).focus(__bind(function(ev) {
-        ev.target = this.edit[0];
-        return Moka.gainFocus(ev);
-      }, this)).blur(__bind(function(ev) {
-        ev.target = this.edit[0];
-        return Moka.lostFocus(ev);
-      }, this));
+      this.edit = $("<input>").focus(Moka.gainFocus).blur(Moka.lostFocus).keyup(this.update.bind(this)).appendTo(this.e);
       if (text != null) {
         this.value(text);
       }
@@ -2475,7 +2518,7 @@
       this.title.e.addClass("moka-title").appendTo(e);
       $("<div>", {
         'class': "moka-window-button moka-close"
-      }).css('cursor', "pointer").click(this.hide.bind(this)).appendTo(this.title.e);
+      }).css('cursor', "pointer").click(this.close.bind(this)).appendTo(this.title.e);
       $("<div>", {
         'class': "moka-window-button moka-maximize"
       }).css('cursor', "pointer").click(this.maximize.bind(this)).appendTo(this.title.e);

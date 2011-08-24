@@ -683,12 +683,12 @@ class Moka.WidgetList extends Moka.Container
 class Moka.CheckBox extends Moka.Input
     default_keys:
         SPACE: -> @toggle()
-        #ENTER: -> @toggle()
 
     constructor: (text, checked) ->
         super Moka.createLabel(text).addClass("moka-checkbox")
 
         @checkbox = $('<input>', {tabindex:1, type:"checkbox", class:"moka-value"})
+                   .focus(@focus.bind(this))
                    .prependTo(@e)
 
         @value(checked)
@@ -715,6 +715,42 @@ class Moka.CheckBox extends Moka.Input
         if doKey(keyname, @keys, @default_keys, this)
             return false
 
+class Moka.Combo extends Moka.Input
+    default_keys:
+        SPACE: -> Moka.focus(@combo)
+
+    constructor: (text) ->
+        super Moka.createLabel(text).addClass("moka-combo")
+
+        @combo = $('<select>', {tabindex:1, class:"moka-value"})
+                   .focus(Moka.gainFocus)
+                   .blur(Moka.lostFocus)
+                   .appendTo(@e)
+
+    append: (texts) ->
+        for text in arguments
+            $("<option>").text(text).attr("value", text).appendTo(@combo)
+        return this
+
+    focus: () ->
+        Moka.focus(@e)
+        return this
+
+    value: (val) ->
+        if val?
+            @combo.val(val)
+            return this
+        else
+            return @combo.val()
+
+    keydown: (ev) ->
+        return if ev.isPropagationStopped()
+        keyname = getKeyName(ev)
+        if doKey(keyname, @keys, @default_keys, this)
+            return false
+        if ev.target is @combo[0] and ["LEFT", "RIGHT", "UP", "DOWN"].indexOf(keyname) >= 0
+            ev.stopPropagation()
+
 class Moka.LineEdit extends Moka.Input
     default_keys: {}
 
@@ -723,14 +759,10 @@ class Moka.LineEdit extends Moka.Input
         @e.addClass("moka-lineedit")
         Moka.createLabel(label_text, @e) if label_text
         @edit = $("<input>")
-               .appendTo(@e)
+               .focus(Moka.gainFocus)
+               .blur(Moka.lostFocus)
                .keyup( this.update.bind(this) )
-               .focus (ev) =>
-                    ev.target = @edit[0]
-                    Moka.gainFocus(ev)
-               .blur  (ev) =>
-                    ev.target = @edit[0]
-                    Moka.lostFocus(ev)
+               .appendTo(@e)
         @value(text) if text?
 
     focus: () ->
@@ -2091,7 +2123,7 @@ class Moka.Window extends Moka.Input
         # window title buttons
         $("<div>", {'class':"moka-window-button moka-close"})
             .css('cursor', "pointer")
-            .click( @hide.bind(this) )
+            .click( @close.bind(this) )
             .appendTo(@title.e)
         $("<div>", {'class':"moka-window-button moka-maximize"})
             .css('cursor', "pointer")
