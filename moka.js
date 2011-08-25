@@ -536,6 +536,12 @@
         return this.e.height();
       }
     };
+    Widget.prototype.outerWidth = function() {
+      return this.e.outerWidth();
+    };
+    Widget.prototype.outerHeight = function() {
+      return this.e.outerHeight();
+    };
     Widget.prototype.align = function(alignment) {
       this.e.css("text-align", alignment);
       return this;
@@ -1239,12 +1245,13 @@
         height: h
       }));
       this.img = this.e;
+      this.owidth = this.oheight = 0;
       this.e.one("load", __bind(function() {
         var e;
         this.ok = true;
         e = this.e[0];
-        this.width = e.naturalWidth;
-        this.height = e.naturalHeight;
+        this.owidth = img.naturalWidth;
+        this.oheight = img.naturalHeight;
         return typeof onload === "function" ? onload() : void 0;
       }, this));
       this.e.one("error", __bind(function() {
@@ -1265,6 +1272,12 @@
     };
     Image.prototype.isLoaded = function() {
       return this.ok != null;
+    };
+    Image.prototype.originalWidth = function() {
+      return this.owidth;
+    };
+    Image.prototype.originalHeight = function() {
+      return this.oheight;
     };
     return Image;
   })();
@@ -1295,6 +1308,7 @@
         }));
         this.ctx = this.e[0].getContext("2d");
       }
+      this.owidth = this.oheight = 0;
       this.img = $("<img>", {
         width: w,
         height: h
@@ -1303,18 +1317,23 @@
         var img;
         this.ok = true;
         img = this.img[0];
-        this.width = img.naturalWidth;
-        this.height = img.naturalHeight;
-        this.resize(this.width, this.height);
+        this.owidth = img.naturalWidth;
+        this.oheight = img.naturalHeight;
+        this.resize(this.owidth, this.oheight);
         return typeof onload === "function" ? onload() : void 0;
       }, this));
       this.img.one("error", __bind(function() {
         this.ok = false;
-        this.width = this.height = 0;
         return typeof onerror === "function" ? onerror() : void 0;
       }, this));
       this.img.attr("src", this.src);
     }
+    Canvas.prototype.originalWidth = function() {
+      return this.owidth;
+    };
+    Canvas.prototype.originalHeight = function() {
+      return this.oheight;
+    };
     Canvas.prototype.hide = function() {
       var e;
       if (this.t_sharpen) {
@@ -1330,7 +1349,7 @@
         return this;
       }
       e = this.e[0];
-      if (e.width === w && e.height === h && w > 0 && h > 0) {
+      if ((e.width === w && e.height === h) || (w <= 0 && h <= 0)) {
         return this;
       }
       e.width = w;
@@ -1503,15 +1522,20 @@
     ImageView.prototype.isLoaded = function() {
       return this.ok != null;
     };
+    ImageView.prototype.originalWidth = function() {
+      return this.image.originalWidth();
+    };
+    ImageView.prototype.originalHeight = function() {
+      return this.image.originalHeight();
+    };
     ImageView.prototype.zoom = function(how, how2) {
-      var d, d2, e, h, height, mh, mw, w, width;
+      var d, d2, h, height, mh, mw, w, width;
       if (how != null) {
         this.z = how;
         this.zhow = how2;
-        if ((this.image != null) && this.e.parent().length) {
-          e = this.image.e;
-          width = e.outerWidth() || e.width() || this.image.width;
-          height = e.outerHeight() || e.height() || this.image.height;
+        if (this.isLoaded() && this.e.parent().length) {
+          width = this.image.outerWidth();
+          height = this.image.outerHeight();
           w = h = mw = mh = "";
           if (how instanceof Array) {
             mw = how[0];
@@ -1539,8 +1563,8 @@
             }
           } else {
             this.z = parseFloat(how) || 1;
-            mw = Math.floor(this.z * this.image.width);
-            mh = Math.floor(this.z * this.image.height);
+            mw = Math.floor(this.z * this.image.originalWidth());
+            mh = Math.floor(this.z * this.image.originalHeight());
           }
           if (how2 !== "fit" && how2 !== "fill") {
             if (width / height < mw / mh) {
@@ -1549,7 +1573,7 @@
               w = mw;
             }
           }
-          e.css({
+          this.image.css({
             'max-width': mw,
             'max-height': mh,
             width: w,
@@ -1573,9 +1597,9 @@
       keyname = getKeyName(ev);
       if (doKey(keyname, this.keys, this.default_keys, this)) {
         return false;
-      } else if ((keyname === "LEFT" || keyname === "RIGHT") && this.image.e.width() > this.e.width()) {
+      } else if ((keyname === "LEFT" || keyname === "RIGHT") && this.image.width() > this.width()) {
         return ev.stopPropagation();
-      } else if ((keyname === "UP" || keyname === "DOWN") && this.image.e.height() > this.e.height()) {
+      } else if ((keyname === "UP" || keyname === "DOWN") && this.image.height() > this.height()) {
         return ev.stopPropagation();
       }
     };
@@ -2402,19 +2426,6 @@
       }
       this.zoom(z);
       return this.layout(lay);
-    };
-    Viewer.prototype.keydown = function(ev) {
-      var keyname;
-      if (ev.isPropagationStopped()) {
-        return;
-      }
-      keyname = getKeyName(ev);
-      if (doKey(keyname, this.keys, this.default_keys, this)) {
-        return false;
-      }
-      if (keyHintFocus(keyname, this.e)) {
-        return false;
-      }
     };
     return Viewer;
   })();

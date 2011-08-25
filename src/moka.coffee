@@ -512,6 +512,12 @@ class Moka.Widget
         else
             return @e.height()
 
+    outerWidth: () ->
+        return @e.outerWidth()
+
+    outerHeight: () ->
+        return @e.outerHeight()
+
     align: (alignment) ->
         @e.css("text-align", alignment)
         return this
@@ -1051,13 +1057,14 @@ class Moka.Image extends Moka.Widget
     constructor: (@src, w, h, onload, onerror) ->
         super $("<img>", class:"moka-widget moka-image", width:w, height:h)
         @img = @e
+        @owidth = @oheight = 0
         @e.one( "load",
             () =>
                 @ok = true
 
                 e = @e[0]
-                @width = e.naturalWidth
-                @height = e.naturalHeight
+                @owidth  = img.naturalWidth
+                @oheight = img.naturalHeight
                 onload?()
         )
         @e.one( "error",
@@ -1076,14 +1083,20 @@ class Moka.Image extends Moka.Widget
     isLoaded: () ->
         return @ok?
 
+    originalWidth: () ->
+        return @owidth
+
+    originalHeight: () ->
+        return @oheight
+
 class Moka.Canvas extends Moka.Widget
     constructor: (@src, w, h, onload, onerror) ->
         # try to use WebGL
         e = null
         if window.fx and window.fx.canvas
             try
-                @canvas = fx.canvas();
-                e = $(@canvas);
+                @canvas = fx.canvas()
+                e = $(@canvas)
         else
             log "Use glfx.js in HTML for WebGL support."
 
@@ -1096,23 +1109,29 @@ class Moka.Canvas extends Moka.Widget
             super $("<canvas>", class:"moka-widget moka-canvas", width:0, height:0)
             @ctx = @e[0].getContext("2d")
 
+        @owidth = @oheight = 0
         @img = $("<img>", width:w, height:h)
         @img.one( "load",
             () =>
                 @ok = true
                 img = @img[0]
-                @width  = img.naturalWidth
-                @height = img.naturalHeight
-                @resize(@width, @height)
+                @owidth  = img.naturalWidth
+                @oheight = img.naturalHeight
+                @resize(@owidth, @oheight)
                 onload?()
         )
         @img.one( "error",
             () =>
                 @ok = false
-                @width = @height = 0
                 onerror?()
         )
         @img.attr("src", @src)
+
+    originalWidth: () ->
+        return @owidth
+
+    originalHeight: () ->
+        return @oheight
 
     hide: () ->
         if @t_sharpen
@@ -1125,7 +1144,7 @@ class Moka.Canvas extends Moka.Widget
     resize: (w,h) ->
         return this if not @ok
         e = @e[0]
-        return this if e.width is w and e.height is h and w>0 and h>0
+        return this if (e.width is w and e.height is h) or (w<=0 and h<=0)
         e.width = w
         e.height = h
         img = @img[0]
@@ -1307,15 +1326,20 @@ class Moka.ImageView extends Moka.Input
     isLoaded: () ->
         return @ok?
 
+    originalWidth: () ->
+        return @image.originalWidth()
+
+    originalHeight: () ->
+        return @image.originalHeight()
+
     zoom: (how, how2) ->
         if how?
             @z = how
             @zhow = how2
 
-            if @image? and @e.parent().length
-                e = @image.e
-                width = e.outerWidth() or e.width() or @image.width
-                height = e.outerHeight() or e.height() or @image.height
+            if @isLoaded() and @e.parent().length
+                width = @image.outerWidth()
+                height = @image.outerHeight()
                 w = h = mw = mh = ""
 
                 if how instanceof Array
@@ -1342,8 +1366,8 @@ class Moka.ImageView extends Moka.Input
                         mw = mh = ""
                 else
                     @z = parseFloat(how) or 1
-                    mw = Math.floor(@z*@image.width)
-                    mh = Math.floor(@z*@image.height)
+                    mw = Math.floor(@z*@image.originalWidth())
+                    mh = Math.floor(@z*@image.originalHeight())
 
                 if how2 isnt "fit" and how2 isnt "fill"
                     if width/height < mw/mh
@@ -1351,7 +1375,7 @@ class Moka.ImageView extends Moka.Input
                     else
                         w = mw
 
-                e.css('max-width': mw, 'max-height': mh, width: w, height: h)
+                @image.css('max-width':mw, 'max-height':mh, width:w, height:h)
 
                 @image.resize(w or mw, h or mh)
                 if @image.sharpen
@@ -1366,9 +1390,9 @@ class Moka.ImageView extends Moka.Input
         keyname = getKeyName(ev)
         if doKey(keyname, @keys, @default_keys, this)
             return false
-        else if (keyname is "LEFT" or keyname is "RIGHT") and @image.e.width() > @e.width()
+        else if (keyname is "LEFT" or keyname is "RIGHT") and @image.width() > @width()
             ev.stopPropagation()
-        else if (keyname is "UP" or keyname is "DOWN") and @image.e.height() > @e.height()
+        else if (keyname is "UP" or keyname is "DOWN") and @image.height() > @height()
             ev.stopPropagation()
 
 class Moka.Viewer extends Moka.Input
@@ -2052,17 +2076,6 @@ class Moka.Viewer extends Moka.Input
 
         @zoom(z)
         @layout(lay)
-
-    keydown: (ev) ->
-        return if ev.isPropagationStopped()
-        keyname = getKeyName(ev)
-
-        if doKey(keyname, @keys, @default_keys, this)
-            return false
-
-        # keyhints
-        if keyHintFocus(keyname, @e)
-            return false
 
 class Moka.Notification extends Moka.Widget
     constructor: (html, notification_class, delay, @animation_speed) ->

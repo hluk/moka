@@ -148,7 +148,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         padding-bottom:0;
 
         > .moka-tab {
-            border-bottom:0;
+            border-bottom: 0;
             display: inline;
 
             /* don't put tab on multiple lines */
@@ -187,6 +187,9 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 }
 .moka-pages {
     float: left;
+}
+.moka-page {
+    border: 1px solid $widget_bg*0.7;
 }
 .moka-widgetlist {
     margin:auto;
@@ -275,8 +278,8 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 
         .moka-label {
             color: $title_fg;
-            display:inline;
-            text-shadow:transparent 0 0 0;
+            display: inline;
+            text-shadow: transparent 0 0 0;
         }
     }
     // focused window on top

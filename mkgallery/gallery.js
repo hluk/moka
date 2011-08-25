@@ -8,7 +8,8 @@
         },
         _General: {
             skiptitle: [false, "Skip _title dialog on start"],
-            notify: [true, "Show item _informations"]
+            notify: [true, "Show item _info while browsing"],
+            notify_delay: [4000, "Item info _delay in milliseconds"]
         },
         _Images: {
             zoom: ["1", "_Zoom factor", "Examples: <b>1</b>, <b>1.5</b>, <b>fit</b>, <b>fill</b>"],
@@ -42,6 +43,7 @@
 
         e[0].setAttribute("width", 2*w);
         e[0].setAttribute("height", 2*h);
+        e.css("margin","auto")
 
         ctx.save();
 
@@ -102,9 +104,14 @@
 		}
 	}
 
-    getOptions = function(hash) {
+    saveOptions = function(opts) {
+        urlHash( getOptions(opts, true) );
+    }
+
+    getOptions = function(hash, nodefaults) {
         var opts, cat, options_cat, x, default_value;
 
+        hash = hash || {};
         opts = {};
 
         for (cat in options) {
@@ -113,11 +120,15 @@
                 default_value = options_cat[name][0];
                 x = hash[name];
 
+                if (typeof default_value == "object") {
+                    default_value = default_value[0];
+                }
+
                 if (typeof x != "undefined" && x !== null) {
-                    // value should be same type as the default value
+                    // user value should have same type as the default value
                     switch(typeof default_value) {
                         case "boolean":
-                            x = (x === "1" || x === "true") ? true : false;
+                            x = (x === "0" || x === "false" || !x) ? false : true;
                             break;
                         case "number":
                             x = parseFloat(x);
@@ -125,16 +136,15 @@
                         case "string":
                             x = ""+x;
                             break;
-                        case "object":
-                            x = ""+x;
-                            break;
                     }
-                } else if (typeof default_value != "undefined") {
+                } else if (typeof default_value == "undefined") {
                     continue;
                 } else {
                     x = default_value;
                 }
-                opts[name] = x;
+                if (!nodefaults || x !== default_value) {
+                    opts[name] = x;
+                }
             }
         }
 
@@ -142,44 +152,36 @@
     }
 
     // show notification
-    oldid = void 0;
-    notify = function(v, id) {
+    notify = function(id) {
         var item, itempath, html, notification, counter, label, r, w1, w2, e, z;
 
-        if (id != null) {
-            oldid = id;
-        } else {
-            id = oldid;
-        }
-        item = v.at(id);
+        item = viewer.at(id);
 
-        if (item.image) {
-            it = ls[id];
-            if (it instanceof Array) {
-                itempath = it[0];
-            } else {
-                itempath = it;
-            }
-            html = "";
-            // escape anchor and html
-            html += "URL: <a href='"+itempath+"'>" + itempath.replace(/^items\//,"") + "</a></i><br/>";
-            if ( item.width() ) {
-                html += "size: <i>" + item.width() + "x" + item.height() + "</i></br>";
-            } else {
-                item.one("mokaLoaded", function(){notify(v,id);})
-            }
-            z = v.zoom();
-            if ( z !== 1 ) {
-                html += "zoom: <i>" +
-                        (typeof z == "number" ? (Math.floor(100*z)+"%") : z) +
-                        "</i>";
-            }
+        it = ls[id];
+        if (it instanceof Array) {
+            itempath = it[0];
+        } else {
+            itempath = it;
+        }
+        html = "";
+        // escape anchor and html
+        html += "URL: <a href='"+itempath+"'>" + itempath.replace(/^items\//,"") + "</a></i><br/>";
+        if ( item.isLoaded() ) {
+            html += "size: <i>" + item.originalWidth() + "x" + item.originalHeight() + "</i></br>";
+        } else {
+            item.one("mokaLoaded", function(){notify(id);})
+        }
+        z = viewer.zoom();
+        if ( z !== 1 ) {
+            html += "zoom: <i>" +
+                (typeof z == "number" ? (Math.floor(100*z)+"%") : z) +
+                "</i>";
         }
 
         Moka.clearNotifications()
         if (html) {
-            notification = new Moka.Notification("<table><tr><td valign='middle'></div></td><td>"+html, "", 4000, 300);
-            e = notification.e.find('td:first');
+            notification = new Moka.Notification("<table><tr><td valign='middle'></div></td><td>"+html, "", opts.notify_delay, 300);
+            e = notification.element().find('td:first');
 
             counter = createCounter(id+1, ls.length, 24, 6, 4, "rgba(100,50,20,0.4)", "white", 12, 10);
             counter.css("margin", "-12px -10px -12px -24px");
@@ -247,13 +249,14 @@
             }
             if (viewer) {
                 opts.skiptitle_once = 1;
-                urlHash(opts);
+                saveOptions(opts);
                 window.location.reload();
             }
-            urlHash(opts);
+            saveOptions(opts);
+            console.log(opts);
         }
         reset = function() {
-            var opts = getOptions({});
+            var opts = getOptions();
             for (cat in options) {
                 options_cat = options[cat];
                 for (name in options_cat) {
@@ -276,7 +279,7 @@
 
                 val = opts[name];
                 def = opt[0];
-                if ( typeof val == "boolean" ) {
+                if ( typeof def == "boolean" ) {
                     w[name] = new Moka.CheckBox(label, val);
                 } else if ( typeof def == "object" ) {
                     ww = w[name] = new Moka.Combo(label+":");
@@ -314,7 +317,7 @@
     }
 
     start = function() {
-		var item, itempath, map, onLoad, v, wnd, i, len, value, sharpen;
+		var item, itempath, map, onLoad, wnd, i, len, value, sharpen;
 
 		onLoad = void 0;
 		if (typeof title != "undefined" && title !== null) {
@@ -322,33 +325,32 @@
 		}
 
 		// gallery widget
-		v = new Moka.Viewer();
+		viewer = new Moka.Viewer();
 
 		// parse options
 		value = opts.zoom;
 		if (value) {
             value = value.split(",");
-            console.log(value);
-			v.zoom(value.length === 1 ? value[0] : value);
+			viewer.zoom(value.length === 1 ? value[0] : value);
 		}
 
 		// layout
 		value = opts.layout;
 		if (value) {
-			v.layout( value.split("x") );
+			viewer.layout( value.split("x") );
 		}
 
         // orientation
 		value = opts.o;
 		if (value) {
-			v.orientation(value);
+			viewer.orientation(value);
 		}
 
         // sharpen
 		sharpen = opts.sharpen || 0;
 
         // items on demand
-        v.appendFunction(function(i){
+        viewer.appendFunction(function(i){
 			item = ls[i];
 			if (item instanceof Array) {
 				itempath = item[0];
@@ -365,39 +367,36 @@
         // current item
 		value = opts.n;
 		if (value) {
-			v.view(value);
+			viewer.view(value);
 		}
 
-		v.e.appendTo("body");
-		v.show();
+		viewer.appendTo("body").show();
 
 		// show notification and update URL when viewing new item or changing zoom level
-        v.bind("mokaSelected mokaZoomChanged", function(ev, id) {
-            if (ev.target !== this || !((id != null) || (oldid != null))) {
-                return;
+        viewer.bind("mokaSelected mokaZoomChanged", function(ev, id) {
+            if (typeof id == "undefined") {
+                id = opts.n;
             }
             // URL: remember layout, zoom, orientation, current item number
-            opts.zoom = v.zoom();
-            opts.n = v.currentIndex();
-            opts.layout = v.layout().join("x");
-            urlHash(opts);
+            opts.zoom = viewer.zoom();
+            opts.n = viewer.currentIndex();
+            opts.layout = viewer.layout().join("x");
+            saveOptions(opts);
 
             if (opts.notify) {
-                notify(v, id);
+                notify(id);
             }
         });
 
-        v.addKey("KP5",
+        viewer.addKey("KP5",
                 function(){
                     v.layout([4,3]);
                     v.zoom("fit");
                 });
-        v.addKey("G", showGoToDialog);
-        v.addKey("C", showMenu);
+        viewer.addKey("G", showGoToDialog);
+        viewer.addKey("C", showMenu);
 
-		Moka.focus(v.e);
-
-        viewer = v;
+		viewer.focus();
     }
 
 	onLoad = function() {

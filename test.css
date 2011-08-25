@@ -43,15 +43,15 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   color: rgba(0, 0, 0, 0.8);
   font: 11pt "Molengo", sans-serif;
   padding: 0.5em 0.5em;
-  text-shadow: rgba(254, 254, 254, 0.8), 0 1px 0px; }
+  text-shadow: rgba(254, 254, 254, 0.8) 0 1px 0px; }
 
 .moka-current.moka-label {
   color: rgba(0, 0, 0, 0.8);
-  text-shadow: rgba(254, 254, 254, 0.8), 0 1px 0px; }
+  text-shadow: rgba(254, 254, 254, 0.8) 0 1px 0px; }
 
 .moka-focus.moka-label {
   color: black;
-  text-shadow: rgba(254, 254, 254, 0.8), 0 1px 0px; }
+  text-shadow: rgba(254, 254, 254, 0.8) 0 1px 0px; }
 
 .moka-buttonbox {
   width: 95%;
@@ -73,7 +73,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
 
 .moka-button.moka-label {
   padding: 0.15em 0.4em;
-  text-shadow: rgba(254, 254, 254, 0.8), 0 1px 0px; }
+  text-shadow: rgba(254, 254, 254, 0.8) 0 1px 0px; }
 
 .moka-button {
   cursor: pointer;
@@ -101,7 +101,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
     background-image: linear-gradient(-90deg, rgba(243, 187, 74, 0.5),rgba(221, 170, 68, 0.5),rgba(176, 136, 54, 0.5)); }
     .moka-button.moka-focus.moka-label {
       color: black;
-      text-shadow: rgba(254, 254, 254, 0.8), 0 1px 0px; }
+      text-shadow: rgba(254, 254, 254, 0.8) 0 1px 0px; }
 
 .moka-lineedit input, .moka-textedit textarea {
   color: #444444;
@@ -183,6 +183,9 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
 
 .moka-pages {
   float: left; }
+
+.moka-page {
+  border: 1px solid #9c957b; }
 
 .moka-widgetlist {
   margin: auto;

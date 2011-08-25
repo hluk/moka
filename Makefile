@@ -21,7 +21,7 @@ all: js css
 
 js: $(DEST)/$(NAME).js $(SRC)/$(LIB).js
 
-css: $(CSS_CONFIG).css
+css: $(DEST)/$(NAME).css
 
 # TODO: fetch dependencies (git or download and unpack)
 deps:
