@@ -453,6 +453,9 @@
         return $(this).removeClass("moka-focus");
       });
     }
+    Widget.prototype.element = function() {
+      return this.e;
+    };
     Widget.prototype.show = function() {
       this.e.show();
       this.update();
@@ -478,6 +481,16 @@
       return this;
     };
     Widget.prototype.remove = function() {
+      var w, widget, _i, _len, _ref;
+      this.e.hide();
+      w = this.widgets;
+      if (w) {
+        _ref = this.widgets;
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          widget = _ref[_i];
+          widget.remove();
+        }
+      }
       this.e.trigger("mokaDestroyed");
       return this.e.detach();
     };
@@ -575,9 +588,36 @@
       Moka.focus(this.e);
       return this;
     };
+    Input.prototype.hasFocus = function() {
+      return this.e.hasClass("moka-focus");
+    };
     Input.prototype.remove = function() {
-      Moka.blur(this.e);
-      return Input.__super__.remove.apply(this, arguments);
+      var ee, v;
+      ee = this.e.parent();
+      v = Input.__super__.remove.apply(this, arguments);
+      if (this.hasFocus()) {
+        Moka.blur(this.e);
+        while (ee.length) {
+          if (Moka.focusFirst(ee)) {
+            break;
+          }
+          ee = ee.parent();
+        }
+      }
+      return v;
+    };
+    Input.prototype.keydown = function(ev) {
+      var keyname;
+      if (ev.isPropagationStopped()) {
+        return;
+      }
+      keyname = getKeyName(ev);
+      if (doKey(keyname, this.keys, this.default_keys, this)) {
+        return false;
+      }
+      if (keyHintFocus(keyname, this.e)) {
+        return false;
+      }
     };
     return Input;
   })();
@@ -630,15 +670,6 @@
       }
       this.update();
       return this;
-    };
-    Container.prototype.remove = function() {
-      var widget, _i, _len, _ref;
-      _ref = this.widgets;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        widget = _ref[_i];
-        widget.remove();
-      }
-      return Container.__super__.remove.apply(this, arguments);
     };
     return Container;
   })();
@@ -864,7 +895,7 @@
     LineEdit.prototype.default_keys = {};
     function LineEdit(label_text, text) {
       LineEdit.__super__.constructor.apply(this, arguments);
-      this.e.addClass("moka-lineedit");
+      this.e.addClass("moka-lineedit").attr("tabindex", 1);
       if (label_text) {
         Moka.createLabel(label_text, this.e);
       }
@@ -1104,7 +1135,7 @@
         "class": "moka-pages"
       }).appendTo(this.e);
       this.pages = [];
-      this.current = 0;
+      this.current = -1;
       this.vertical(false);
     }
     Tabs.prototype.update = function() {
@@ -1240,26 +1271,41 @@
   Moka.Canvas = (function() {
     __extends(Canvas, Moka.Widget);
     function Canvas(src, w, h, onload, onerror) {
+      var e;
       this.src = src;
-      Canvas.__super__.constructor.call(this, $("<canvas>", {
-        "class": "moka-widget moka-canvas",
-        width: w,
-        height: h
-      }));
+      e = null;
+      if (window.fx && window.fx.canvas) {
+        try {
+          this.canvas = fx.canvas();
+          e = $(this.canvas);
+        } catch (_e) {}
+      } else {
+        log("Use glfx.js in HTML for WebGL support.");
+      }
+      if (e) {
+        e.addClass("moka-widget moka-canvas");
+        e.width(0);
+        e.height(0);
+        Canvas.__super__.constructor.call(this, e);
+      } else {
+        Canvas.__super__.constructor.call(this, $("<canvas>", {
+          "class": "moka-widget moka-canvas",
+          width: 0,
+          height: 0
+        }));
+        this.ctx = this.e[0].getContext("2d");
+      }
       this.img = $("<img>", {
         width: w,
         height: h
       });
       this.img.one("load", __bind(function() {
-        var e, img;
+        var img;
         this.ok = true;
         img = this.img[0];
-        e = this.e[0];
-        this.width = e.width = img.naturalWidth;
-        this.height = e.height = img.naturalHeight;
-        this.ctx = e.getContext("2d");
-        this.ctx.clearRect(0, 0, this.width, this.height);
-        this.ctx.drawImage(img, 0, 0, this.width, this.height);
+        this.width = img.naturalWidth;
+        this.height = img.naturalHeight;
+        this.resize(this.width, this.height);
         return typeof onload === "function" ? onload() : void 0;
       }, this));
       this.img.one("error", __bind(function() {
@@ -1269,32 +1315,59 @@
       }, this));
       this.img.attr("src", this.src);
     }
-    Canvas.prototype.resize = function(w, h) {
+    Canvas.prototype.hide = function() {
       var e;
+      if (this.t_sharpen) {
+        window.clearTimeout(this.t_sharpen);
+        e = this.e[0];
+        e.width = e.height = 0;
+      }
+      return Canvas.__super__.hide.apply(this, arguments);
+    };
+    Canvas.prototype.resize = function(w, h) {
+      var e, img, strength, texture;
       if (!this.ok) {
         return this;
       }
       e = this.e[0];
-      this.ctx.clearRect(0, 0, e.width, e.height);
-      if (w > 0) {
-        e.width = w;
+      if (e.width === w && e.height === h && w > 0 && h > 0) {
+        return this;
       }
-      if (h > 0) {
-        e.height = h;
+      e.width = w;
+      e.height = h;
+      img = this.img[0];
+      if (this.canvas) {
+        texture = e.texture(img);
+        e.draw(texture);
+        texture.destroy();
+      } else {
+        this.ctx.clearRect(0, 0, e.width, e.height);
+        this.ctx.drawImage(img, 0, 0, e.width, e.height);
       }
-      this.ctx.drawImage(this.img[0], 0, 0, e.width, e.height);
+      strength = this.sharpen_strength;
+      this.sharpen_strength = null;
+      if (strength) {
+        this.sharpen(strength);
+      } else if (this.canvas) {
+        e.update();
+      }
       return this;
     };
     Canvas.prototype.sharpen = function(strength) {
       var data, dataCopy, dataDesc, e, filter, h, mul, mulOther, w, w4, weight, y;
-      if (!this.ok) {
+      if (!this.ok || this.sharpen_strength === strength) {
         return this;
       }
       if (this.t_sharpen) {
         window.clearTimeout(this.t_sharpen);
       }
-      if (strength < 0) {
-        strength = 0;
+      this.sharpen_strength = strength;
+      if (!strength || strength < 0) {
+        return this;
+      }
+      if (this.canvas) {
+        this.canvas.unsharpMask(32, strength * 5).update();
+        return this;
       } else if (strength > 1) {
         strength = 1;
       }
@@ -1382,6 +1455,7 @@
         if (this.t_remove) {
           window.clearTimeout(this.t_remove);
           this.t_remove = null;
+          this.image.show();
         }
         this.e.show();
         if (this.ok != null) {
@@ -1406,7 +1480,6 @@
         } else {
           this.image = new Moka.Image(this.src, "", "", onload, onerror);
         }
-        this.zoom(this.z, this.zhow);
         this.image.appendTo(this.e);
         this.e.show();
       }
@@ -1415,6 +1488,7 @@
     ImageView.prototype.hide = function() {
       this.e.hide();
       if ((this.image != null) && !this.t_remove) {
+        this.image.hide();
         this.t_remove = window.setTimeout(__bind(function() {
           dbg("removing image", this.image.img.attr("src"));
           this.ok = null;
@@ -1424,18 +1498,17 @@
           return this.t_remove = null;
         }, this), 60000);
       }
-      return this;
+      return ImageView.__super__.hide.apply(this, arguments);
     };
     ImageView.prototype.isLoaded = function() {
       return this.ok != null;
     };
     ImageView.prototype.zoom = function(how, how2) {
-      var d, d2, e, h, height, mh, mw, need_update, w, width;
+      var d, d2, e, h, height, mh, mw, w, width;
       if (how != null) {
-        need_update = this.z !== how || this.zhow !== how2;
         this.z = how;
         this.zhow = how2;
-        if (this.image != null) {
+        if ((this.image != null) && this.e.parent().length) {
           e = this.image.e;
           width = e.outerWidth() || e.width() || this.image.width;
           height = e.outerHeight() || e.height() || this.image.height;
@@ -1482,17 +1555,9 @@
             width: w,
             height: h
           });
-          log({
-            'max-width': mw,
-            'max-height': mh,
-            width: w,
-            height: h
-          });
-          if (need_update) {
-            this.image.resize(w || mw, h || mh);
-            if (this.image.sharpen && this.sharpen) {
-              this.image.sharpen(this.sharpen);
-            }
+          this.image.resize(w || mw, h || mh);
+          if (this.image.sharpen) {
+            this.image.sharpen(this.sharpen);
           }
         }
         return this;
@@ -1851,15 +1916,15 @@
           this.z = [w, h];
           this.zhow = how;
         } else if (how === "+" || how === "-") {
-          d = how === "-" ? 0.889 : 1.125;
           if (!this.z) {
             this.z = 1;
           }
           if (this.z instanceof Array) {
+            d = how === "-" ? 0.889 : 1.125;
             this.z[0] *= d;
             this.z[1] *= d;
           } else {
-            this.z *= d;
+            this.z += how === "-" ? -0.125 : 0.125;
           }
           this.zhow = null;
         } else if (how instanceof Array) {
@@ -2378,9 +2443,7 @@
     }
     Notification.prototype.remove = function() {
       window.clearTimeout(this.t_notify);
-      return this.e.hide(this.animation_speed, (__bind(function() {
-        return this.e.remove();
-      }, this)));
+      return this.e.hide(this.animation_speed, Notification.__super__.remove.apply(this, arguments));
     };
     return Notification;
   })();
@@ -2621,10 +2684,6 @@
       });
       return this;
     };
-    Window.prototype.hide = function() {
-      this.e.detach();
-      return this;
-    };
     Window.prototype.append = function(widgets) {
       var widget, _i, _len;
       for (_i = 0, _len = arguments.length; _i < _len; _i++) {
@@ -2699,26 +2758,6 @@
         }
       });
       return Moka.focus(e.find(".moka-title:first"));
-    };
-    Window.prototype.remove = function() {
-      var e, ee, v, widget, _i, _len, _ref;
-      _ref = this.widgets;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        widget = _ref[_i];
-        widget.remove();
-      }
-      ee = this.e.parent();
-      v = Window.__super__.remove.apply(this, arguments);
-      if (focused_widget.length === 0) {
-        e = this.e[0];
-        while (ee.length) {
-          if (Moka.focusFirst(ee) && focused_widget[0] !== e) {
-            break;
-          }
-          ee = ee.parent();
-        }
-      }
-      return v;
     };
     Window.prototype.close = function() {
       return this.remove();

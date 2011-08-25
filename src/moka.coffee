@@ -443,6 +443,9 @@ class Moka.Widget
           .bind( "mokaFocused",  () -> $(this).addClass("moka-focus") )
           .bind( "mokaBlurred",  () -> $(this).removeClass("moka-focus") )
 
+    element: ->
+        return @e
+
     show: ->
         @e.show()
         @update()
@@ -467,7 +470,11 @@ class Moka.Widget
         return this
 
     remove: () ->
-        #@e.remove()
+        @e.hide()
+        w = @widgets
+        if w
+            for widget in @widgets
+                widget.remove()
         @e.trigger("mokaDestroyed")
         @e.detach()
 
@@ -547,9 +554,31 @@ class Moka.Input extends Moka.Widget
         Moka.focus(@e)
         return this
 
+    hasFocus: () ->
+        return @e.hasClass("moka-focus")
+
     remove: () ->
-        Moka.blur(@e)
-        return super
+        ee = @e.parent()
+        v = super
+        if @hasFocus()
+            Moka.blur(@e)
+            # focus nearest widget in parent
+            while(ee.length)
+                if Moka.focusFirst(ee)
+                    break
+                ee = ee.parent()
+        return v
+
+    keydown: (ev) ->
+        return if ev.isPropagationStopped()
+        keyname = getKeyName(ev)
+
+        if doKey(keyname, @keys, @default_keys, this)
+            return false
+
+        # keyhints
+        if keyHintFocus(keyname, @e)
+            return false
 
 class Moka.Container extends Moka.Widget
     constructor: (horizontal) ->
@@ -600,11 +629,6 @@ class Moka.Container extends Moka.Widget
         @update()
 
         return this
-
-    remove: () ->
-        for widget in @widgets
-            widget.remove()
-        return super
 
 class Moka.WidgetList extends Moka.Container
     default_keys:
@@ -757,6 +781,7 @@ class Moka.LineEdit extends Moka.Input
     constructor: (label_text, text) ->
         super
         @e.addClass("moka-lineedit")
+          .attr("tabindex", 1)
         Moka.createLabel(label_text, @e) if label_text
         @edit = $("<input>")
                .focus(Moka.gainFocus)
@@ -934,7 +959,7 @@ class Moka.Tabs extends Moka.Widget
                    .appendTo(@e)
 
         @pages = []
-        @current = 0
+        @current = -1
 
         @vertical(false)
 
@@ -1053,21 +1078,32 @@ class Moka.Image extends Moka.Widget
 
 class Moka.Canvas extends Moka.Widget
     constructor: (@src, w, h, onload, onerror) ->
-        super $("<canvas>", class:"moka-widget moka-canvas", width:w, height:h)
+        # try to use WebGL
+        e = null
+        if window.fx and window.fx.canvas
+            try
+                @canvas = fx.canvas();
+                e = $(@canvas);
+        else
+            log "Use glfx.js in HTML for WebGL support."
+
+        if e
+            e.addClass("moka-widget moka-canvas")
+            e.width(0)
+            e.height(0)
+            super e
+        else
+            super $("<canvas>", class:"moka-widget moka-canvas", width:0, height:0)
+            @ctx = @e[0].getContext("2d")
+
         @img = $("<img>", width:w, height:h)
         @img.one( "load",
             () =>
                 @ok = true
-
                 img = @img[0]
-                e = @e[0]
-                @width = e.width = img.naturalWidth
-                @height = e.height = img.naturalHeight
-
-                @ctx = e.getContext("2d")
-                @ctx.clearRect(0,0,@width,@height)
-                @ctx.drawImage(img,0,0,@width,@height)
-
+                @width  = img.naturalWidth
+                @height = img.naturalHeight
+                @resize(@width, @height)
                 onload?()
         )
         @img.one( "error",
@@ -1078,21 +1114,51 @@ class Moka.Canvas extends Moka.Widget
         )
         @img.attr("src", @src)
 
+    hide: () ->
+        if @t_sharpen
+            # cancel sharpening process
+            window.clearTimeout(@t_sharpen)
+            e = @e[0]
+            e.width = e.height = 0
+        return super
+
     resize: (w,h) ->
         return this if not @ok
         e = @e[0]
-        @ctx.clearRect(0,0,e.width,e.height)
-        e.width = w if w>0
-        e.height = h if h>0
-        @ctx.drawImage(@img[0],0,0,e.width,e.height)
+        return this if e.width is w and e.height is h and w>0 and h>0
+        e.width = w
+        e.height = h
+        img = @img[0]
+        if @canvas
+            texture = e.texture(img);
+            e.draw(texture);
+            texture.destroy()
+        else
+            @ctx.clearRect(0,0,e.width,e.height)
+            @ctx.drawImage(img,0,0,e.width,e.height)
+
+        strength = @sharpen_strength
+        @sharpen_strength = null
+        if strength
+            @sharpen(strength)
+        else if @canvas
+            e.update()
+
         return this
 
     sharpen: (strength) ->
-        return this if not @ok
-        if @t_sharpen
-            window.clearTimeout(@t_sharpen)
-        if strength < 0
-            strength = 0
+        return this if not @ok or @sharpen_strength is strength
+
+        window.clearTimeout(@t_sharpen) if @t_sharpen
+
+        @sharpen_strength = strength
+
+        return this if not strength or strength < 0
+
+        if @canvas
+            @canvas.unsharpMask(32, strength*5).update()
+            return this
+
         else if strength > 1
             strength = 1
 
@@ -1196,6 +1262,7 @@ class Moka.ImageView extends Moka.Input
             if @t_remove
                 window.clearTimeout(@t_remove)
                 @t_remove = null
+                @image.show()
             @e.show()
             if @ok?
                 @zoom(@z, @zhow)
@@ -1217,7 +1284,6 @@ class Moka.ImageView extends Moka.Input
                 @image = new Moka.Canvas(@src, "", "", onload, onerror)
             else
                 @image = new Moka.Image(@src, "", "", onload, onerror)
-            @zoom(@z, @zhow)
             @image.appendTo(@e)
             @e.show()
         return this
@@ -1225,6 +1291,7 @@ class Moka.ImageView extends Moka.Input
     hide: () ->
         @e.hide()
         if @image? and not @t_remove
+            @image.hide()
             # delay resource removal
             @t_remove = window.setTimeout(
                 () =>
@@ -1235,18 +1302,17 @@ class Moka.ImageView extends Moka.Input
                     @image = null
                     @t_remove = null
             , 60000 )
-        return this
+        return super
 
     isLoaded: () ->
         return @ok?
 
     zoom: (how, how2) ->
         if how?
-            need_update = @z isnt how or @zhow isnt how2
             @z = how
             @zhow = how2
 
-            if @image?
+            if @image? and @e.parent().length
                 e = @image.e
                 width = e.outerWidth() or e.width() or @image.width
                 height = e.outerHeight() or e.height() or @image.height
@@ -1286,12 +1352,10 @@ class Moka.ImageView extends Moka.Input
                         w = mw
 
                 e.css('max-width': mw, 'max-height': mh, width: w, height: h)
-                log('max-width': mw, 'max-height': mh, width: w, height: h)
 
-                if need_update
-                    @image.resize(w or mw, h or mh)
-                    if @image.sharpen and @sharpen
-                        @image.sharpen(@sharpen)
+                @image.resize(w or mw, h or mh)
+                if @image.sharpen
+                    @image.sharpen(@sharpen)
 
             return this
         else
@@ -1563,16 +1627,15 @@ class Moka.Viewer extends Moka.Input
                 @z = [w,h]
                 @zhow = how
             else if how is "+" or how is "-"
-                d = if how is "-" then 0.889 else 1.125
-
                 if not @z
                     @z = 1
 
                 if @z instanceof Array
+                    d = if how is "-" then 0.889 else 1.125
                     @z[0] *= d
                     @z[1] *= d
                 else
-                    @z *= d
+                    @z += if how is "-" then -0.125 else 0.125
                 @zhow = null
             else if how instanceof Array
                 @z = how
@@ -2023,7 +2086,7 @@ class Moka.Notification extends Moka.Widget
 
     remove: () ->
         window.clearTimeout(@t_notify)
-        @e.hide( @animation_speed, (() => @e.remove()) )
+        @e.hide( @animation_speed, super )
 
 Moka.clearNotifications = () ->
     Moka.notificationLayer?.empty()
@@ -2219,10 +2282,6 @@ class Moka.Window extends Moka.Input
             #)
         return this
 
-    hide: () ->
-        @e.detach()
-        return this
-
     append: (widgets) ->
         for widget in arguments
             widget.parentWidget = this
@@ -2286,20 +2345,6 @@ class Moka.Window extends Moka.Input
                 e = $this
                 d = dd
         Moka.focus( e.find(".moka-title:first") )
-
-    remove: () ->
-        for widget in @widgets
-            widget.remove()
-        ee = @e.parent()
-        v = super
-        if focused_widget.length is 0
-            # focus nearest widget in parent
-            e = @e[0]
-            while(ee.length)
-                if Moka.focusFirst(ee) and focused_widget[0] isnt e
-                    break
-                ee = ee.parent()
-        return v
 
     close: () ->
         @remove()

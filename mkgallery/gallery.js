@@ -2,24 +2,37 @@
 	var onLoad, viewer, gotownd, menu, options, opts;
 
     options = {
-        n: [0],
-        skiptitle: [false, "Skip _title dialog on start"],
-        zoom: ["1", "_Zoom factor", "Examples: <b>1</b>, <b>1.5</b>, <b>fit</b>, <b>fill</b>"],
-        sharpen: [0.0, "_Sharpen factor", "Values from <b>0.0</b> to <b>1.0</b>"],
-        o: [
-            ["left top", "right top", "top left", "top right",
-             "bottom left", "bottom right", "left bottom", "right bottom"],
-            "O_rder"],
-        layout: ["1x1", "_Layout", "Examples: <b>2x3</b> or <b>2x-1</b> (for continuous view)"]
+        "": {
+            n: [0],
+            skiptitle_once: []
+        },
+        _General: {
+            skiptitle: [false, "Skip _title dialog on start"],
+            notify: [true, "Show item _informations"]
+        },
+        _Images: {
+            zoom: ["1", "_Zoom factor", "Examples: <b>1</b>, <b>1.5</b>, <b>fit</b>, <b>fill</b>"],
+            sharpen: [0.0, "_Sharpen factor", "Values from <b>0.0</b> to <b>1.0</b> (slow)"]
+        },
+        _Layout: {
+            o: [
+                ["left top", "right top", "top left", "top right",
+                 "bottom left", "bottom right", "left bottom", "right bottom"],
+                "O_rder"],
+            layout: ["1x1", "L_ayout", "Examples: <b>2x3</b> or <b>2x-1</b> (for continuous view)"]
+        }
     }
 
-    createCounter = function (n, len, r, w1, w2, bg, fg, shadow, blur)
+    createCounter = function (n, len, r, w1, w2, bg, fg, shadow, blur, el)
     {
         var e, ctx, pi, angle, x, y;
 
-        e = $("<canvas class='counter'>");
+        e = el || $("<canvas class='counter'>");
 
         ctx = e[0].getContext("2d");
+        if (el) {
+            ctx.clearRect(0,0,el.width,el.height)
+        }
         pi = 3.1415;
         angle = len ? 2*pi*n/len : 0;
         x = r+blur;
@@ -68,12 +81,15 @@
 
 	// URL hash
 	urlHash = function(values) {
-		var hash, key;
+		var hash, key, v;
 
 		if (typeof values != "undefined" && values !== null) {
 			hash = "";
 			for (var key in values) {
-				hash += (hash ? "&" : "") + key + "=" + values[key];
+                v = values[key];
+                if (typeof v != "undefined") {
+                    hash += (hash ? "&" : "") + key + "=" + v;
+                }
 			}
 			location.hash = hash;
 		} else {
@@ -87,34 +103,39 @@
 	}
 
     getOptions = function(hash) {
-        var opts, x, default_value;
+        var opts, cat, options_cat, x, default_value;
 
         opts = {};
 
-        for (name in options) {
-            x = hash[name];
-            default_value = options[name][0]
+        for (cat in options) {
+            options_cat = options[cat];
+            for (name in options_cat) {
+                default_value = options_cat[name][0];
+                x = hash[name];
 
-            if (typeof x != "undefined" && x !== null) {
-                // value should be same type as the default value
-                switch(typeof default_value) {
-                    case "boolean":
-                        x = (x === "1" || x === "true") ? true : false;
-                        break;
-                    case "number":
-                        x = parseFloat(x);
-                        break;
-                    case "string":
-                        x = ""+x;
-                        break;
-                    case "object":
-                        x = ""+x;
-                        break;
+                if (typeof x != "undefined" && x !== null) {
+                    // value should be same type as the default value
+                    switch(typeof default_value) {
+                        case "boolean":
+                            x = (x === "1" || x === "true") ? true : false;
+                            break;
+                        case "number":
+                            x = parseFloat(x);
+                            break;
+                        case "string":
+                            x = ""+x;
+                            break;
+                        case "object":
+                            x = ""+x;
+                            break;
+                    }
+                } else if (typeof default_value != "undefined") {
+                    continue;
+                } else {
+                    x = default_value;
                 }
-            } else {
-                x = default_value;
+                opts[name] = x;
             }
-            opts[name] = x;
         }
 
         return opts;
@@ -201,8 +222,8 @@
     }
 
     showMenu = function() {
-        var close, closed, accept, name, i, def,
-            w, ww, container, widgets, buttons, opt, label;
+        var close, closed, accept, name, cat, options_cat, i, tabs,
+            val, w, ww, container, tabs, widgets, buttons, opt, label;
 
         if (menu) {
             menu.focus();
@@ -224,37 +245,47 @@
             for (name in w) {
                 opts[name] = w[name].value();
             }
+            if (viewer) {
+                opts.skiptitle_once = 1;
+                urlHash(opts);
+                window.location.reload();
+            }
             urlHash(opts);
-            window.location.reload();
         }
         reset = function() {
             var opts = getOptions({});
-            for (name in options) {
-                if ( w[name] ) {
-                    w[name].value( options[name][0] );
+            for (cat in options) {
+                options_cat = options[cat];
+                for (name in options_cat) {
+                    if ( w[name] ) {
+                        w[name].value( options_cat[name][0] );
+                    }
                 }
             }
         }
 
-        widgets = new Moka.WidgetList();
-
-        for (name in options) {
-            opt = options[name];
-            label = opt[1];
-            if (label) {
+        tabs = new Moka.Tabs();
+        for (cat in options) {
+            if (!cat) continue;
+            widgets = new Moka.WidgetList();
+            options_cat = options[cat];
+            for (name in options_cat) {
+                opt = options_cat[name];
+                label = opt[1];
                 container = new Moka.Container();
 
-                def = options[name][0];
-                if ( typeof opts[name] == "boolean" ) {
-                    w[name] = new Moka.CheckBox(label, opts[name]);
+                val = opts[name];
+                def = opt[0];
+                if ( typeof val == "boolean" ) {
+                    w[name] = new Moka.CheckBox(label, val);
                 } else if ( typeof def == "object" ) {
-                    ww = w[name] = new Moka.Combo(label);
+                    ww = w[name] = new Moka.Combo(label+":");
                     for (i in def) {
                         ww.append(def[i]);
                     }
-                    ww.value(opts[name]);
+                    ww.value(val);
                 } else {
-                    w[name] = new Moka.LineEdit(label+":", opts[name]);
+                    w[name] = new Moka.LineEdit(label+":", val);
                 }
                 container.append(w[name]);
 
@@ -265,6 +296,7 @@
 
                 widgets.append(container);
             }
+            tabs.append(cat, widgets);
         }
 
         // buttons
@@ -273,7 +305,7 @@
         buttons.append("R_eset", reset);
         buttons.append("_Close", close);
 
-        menu.append(widgets, buttons);
+        menu.append(tabs, buttons);
 
         menu.addKey("ENTER", accept);
         menu.connect("mokaDestroyed", closed);
@@ -340,22 +372,20 @@
 		v.show();
 
 		// show notification and update URL when viewing new item or changing zoom level
-		v.bind("mokaSelected mokaZoomChanged", function(ev, id) {
-			if (ev.target !== this || !((id != null) || (oldid != null))) {
-				return;
-			}
-			// URL: remember layout, zoom, orientation, current item number
+        v.bind("mokaSelected mokaZoomChanged", function(ev, id) {
+            if (ev.target !== this || !((id != null) || (oldid != null))) {
+                return;
+            }
+            // URL: remember layout, zoom, orientation, current item number
             opts.zoom = v.zoom();
-		    opts.n = v.currentIndex();
+            opts.n = v.currentIndex();
             opts.layout = v.layout().join("x");
             urlHash(opts);
 
-			return notify(v, id);
-		});
-
-		//wnd = new Moka.Window("HELP - <i>JavaScript generated window</i>");
-		//wnd.addKey("shift-t", test);
-		//wnd.appendTo("body").position(0, 150);
+            if (opts.notify) {
+                notify(v, id);
+            }
+        });
 
         v.addKey("KP5",
                 function(){
@@ -382,21 +412,50 @@
 			document.title = title;
 		}
 
-        if (opts.skiptitle) {
+        if (opts.skiptitle || opts.skiptitle_once) {
+            delete opts.skiptitle_once;
             return start();
         }
 
-        wnd = new Moka.Window("<b>"+title+"</b> gallery");
+        next = function(i){
+            opts.n += i || 1;
+            if (opts.n >= ls.length) {
+                opts.n = 0;
+            }
+            createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8, counter.element());
+        }
+        prev = function(i){
+            opts.n -= i || 1;
+            if (opts.n < 0) {
+                opts.n = ls.length-1;
+            }
+            createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8, counter.element());
+        }
 
-        counter = createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8);
-        wnd.align("center");
+        counter = new Moka.Input( createCounter(opts.n, ls.length, 80, 4, 6,
+                    "rgba(100,50,20,0.4)", "white", 16, 8) );
+
         widgets = new Moka.WidgetList();
         widgets.append( new Moka.Button("_Browse", function(){wnd.close();}) );
         widgets.append( new Moka.Button("_Configure", showMenu) );
-        wnd.append( new Moka.Widget(counter), widgets );
-        wnd.addKey("ENTER", function(){wnd.close();});
-        wnd.connect("mokaDestroyed", start);
+        widgets.append(counter);
 
+        wnd = new Moka.Window("<b>"+title+"</b> gallery");
+        wnd.addKey("RIGHT", next);
+        wnd.addKey("LEFT", prev);
+        wnd.addKey("+", next);
+        wnd.addKey("-", prev);
+        wnd.addKey("PAGEDOWN", function(){next(10);});
+        wnd.addKey("PAGEUP", function(){prev(10);});
+        wnd.addKey("S-RIGHT", function(){next(10);});
+        wnd.addKey("S-LEFT", function(){prev(10);});
+        wnd.addKey("S-+", function(){next(10);});
+        wnd.addKey("S--", function(){prev(10);});
+        wnd.align("center");
+        wnd.addKey("ENTER", function(){wnd.close();});
+        wnd.append(widgets);
+
+        wnd.connect("mokaDestroyed", start);
         wnd.appendTo("body").center().show().focus();
 	};
 
