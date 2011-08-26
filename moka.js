@@ -2502,53 +2502,75 @@
         }, this));
         pos = this.position();
         return wnd.append(w).appendTo(this.e.parent()).position(pos.left, pos.top).show().focus();
-      }
-    };
-    Window.prototype.default_title_keys = {
+      },
       LEFT: function() {
         var pos;
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         pos = this.e.offset();
         pos.left -= 20;
         return this.e.offset(pos);
       },
       RIGHT: function() {
         var pos;
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         pos = this.e.offset();
         pos.left += 20;
         return this.e.offset(pos);
       },
       UP: function() {
         var pos;
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         pos = this.e.offset();
         pos.top -= 20;
         return this.e.offset(pos);
       },
       DOWN: function() {
         var pos;
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         pos = this.e.offset();
         pos.top += 20;
         return this.e.offset(pos);
       },
       'S-LEFT': function() {
         var pos;
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         pos = this.e.offset();
         pos.left = 0;
         return this.e.offset(pos);
       },
       'S-RIGHT': function() {
         var pos;
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         pos = this.e.offset();
         pos.left = this.e.parent().innerWidth() - this.e.outerWidth(true);
         return this.e.offset(pos);
       },
       'S-UP': function() {
         var pos;
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         pos = this.e.offset();
         pos.top = 0;
         return this.e.offset(pos);
       },
       'S-DOWN': function() {
         var pos;
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         pos = this.e.offset();
         pos.top = this.e.parent().innerHeight() - this.e.outerWidth(true);
         return this.e.offset(pos);
@@ -2566,13 +2588,10 @@
         return this.nextWindow("top", 1);
       },
       SPACE: function() {
+        if (!this.titleHasFocus()) {
+          return false;
+        }
         return this.body.toggle();
-      },
-      ESCAPE: function() {
-        return this.close();
-      },
-      TAB: function() {
-        return this.focus();
       }
     };
     function Window(title) {
@@ -2593,16 +2612,19 @@
         height: "100%"
       }).appendTo(this.e);
       $(window).bind("resize.moka", this.update.bind(this));
+      this.widgets = [];
       this.title = new Moka.Input();
-      this.title.keydown = this.keyDownTitle.bind(this);
-      this.title.e.addClass("moka-title").appendTo(e);
-      $("<div>", {
+      this.widgets.push(this.title);
+      this.title.e.addClass("moka-title").css("text-align", "center").appendTo(e);
+      Moka.createLabel(title).appendTo(this.title.e);
+      this.noclose = false;
+      this.e_close = $("<div>", {
         'class': "moka-window-button moka-close"
       }).css('cursor', "pointer").click(this.close.bind(this)).appendTo(this.title.e);
-      $("<div>", {
+      this.nomax = false;
+      this.e_max = $("<div>", {
         'class': "moka-window-button moka-maximize"
       }).css('cursor', "pointer").click(this.maximize.bind(this)).appendTo(this.title.e);
-      Moka.createLabel(title).appendTo(this.title.e);
       this.body = body = $("<div>", {
         "class": "moka-body"
       }).bind("scroll.moka", this.update.bind(this)).appendTo(e);
@@ -2673,7 +2695,6 @@
           return false;
         });
       }
-      this.widgets = [];
       initDraggable(this.e, this.title.e);
       $(window).load((function() {
         return this.update();
@@ -2684,6 +2705,26 @@
         this.hide();
       } else {
         this.show();
+      }
+      return this;
+    };
+    Window.prototype.disableClose = function(noclose) {
+      if (noclose) {
+        this.noclose = true;
+        this.e_close.hide();
+      } else {
+        this.noclose = false;
+        this.e_close.show();
+      }
+      return this;
+    };
+    Window.prototype.disableMaximize = function(nomax) {
+      if (nomax) {
+        this.nomax = true;
+        this.e_max.hide();
+      } else {
+        this.nomax = false;
+        this.e_max.show();
       }
       return this;
     };
@@ -2725,6 +2766,9 @@
       Moka.focus(this.title);
       Moka.focusFirst(this.body);
       return this;
+    };
+    Window.prototype.titleHasFocus = function() {
+      return this.title.hasFocus();
     };
     Window.prototype.position = function(x, y) {
       var pos;
@@ -2779,6 +2823,9 @@
       return Moka.focus(e.find(".moka-title:first"));
     };
     Window.prototype.close = function() {
+      if (this.noclose) {
+        return this;
+      }
       return this.remove();
     };
     Window.prototype.keydown = function(ev) {
@@ -2791,16 +2838,6 @@
         return false;
       }
       if (keyHintFocus(keyname, this.body)) {
-        return false;
-      }
-    };
-    Window.prototype.keyDownTitle = function(ev) {
-      var keyname;
-      if (ev.isPropagationStopped()) {
-        return;
-      }
-      keyname = getKeyName(ev);
-      if (doKey(keyname, this.keys, this.default_title_keys, this)) {
         return false;
       }
     };

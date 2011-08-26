@@ -7,6 +7,7 @@ body {
     margin: 0;
     padding: 0;
     overflow: hidden;
+    font: $font_general;
 }
 
 a {
@@ -44,7 +45,6 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 }
 .moka-label {
     color: transparentize($widget_fg, 0.2);
-    font: $font_general;
     padding: 0.5em 0.5em;
     @include inset-text();
 }
@@ -62,12 +62,12 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     text-align: right;
     > .moka-button {
         &.moka-first {
-            @include rounded(2em, top, left);
-            @include rounded(2em, bottom, left);
+            @include rounded($buttonbox_radius, top, left);
+            @include rounded($buttonbox_radius, bottom, left);
         }
         &.moka-last {
-            @include rounded(2em, top, right);
-            @include rounded(2em, bottom, right);
+            @include rounded($buttonbox_radius, top, right);
+            @include rounded($buttonbox_radius, bottom, right);
         }
     }
 }
@@ -83,7 +83,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 
     border: 1px solid $widget_bg*0.6;
 
-    @include box-shadow(inset 0 0 5px transparentize($widget_bg*1.5, 0.3));
+    @include box-shadow(inset 0 0 10px transparentize($widget_bg*1.5, 0.3));
 
     @include linear-gradient(-90,
         ($widget_bg*1.1) +","+
@@ -131,7 +131,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         display: block;
     }
     &.moka-horizontal > .moka-widget{
-        float: left;
+        display: inline-block;
     }
 }
 .moka-tabs {
@@ -146,12 +146,13 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         > .moka-tab {
             border-bottom: 0;
             display: inline;
+            vertical-align: top;
 
             /* don't put tab on multiple lines */
             display: inline-block;
             white-space: nowrap;
 
-            padding: 0.3em 0.3em;
+            padding: 0.1em 0.3em;
             margin: $tab_pull 0.5em 0 0.5em;
 
             @include rounded($tab_radius, top, left);
@@ -306,6 +307,11 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     }
     // button characters at: http://www.utf8-chartable.de/unicode-utf8-table.pl
     .moka-window-button {
+        @if $window_buttons_right {
+            float: right;
+        } @else {
+            float: left;
+        }
         opacity: 0.6;
         display:inline;
         &:hover, &:focus {

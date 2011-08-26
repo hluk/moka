@@ -206,6 +206,10 @@
         }
     }
 
+    popup = function(wnd) {
+        wnd.appendTo("body").disableMaximize(true).center().show().focus();
+    }
+
     showGoToDialog = function() {
         var closed, accept, lineedit, buttons;
 
@@ -232,7 +236,7 @@
         gotownd.addKey("ENTER", accept);
         gotownd.connect("mokaDestroyed", closed);
 
-        gotownd.appendTo("body").center().show().focus();
+        popup(gotownd);
     }
 
     showMenu = function(opts) {
@@ -326,7 +330,7 @@
         menu.addKey("ENTER", accept);
         menu.connect("mokaDestroyed", closed);
 
-        menu.appendTo("body").center().show().focus();
+        popup(menu);
     }
 
     getItem = function(sharpen, i){
@@ -440,27 +444,28 @@
         widgets.append( new Moka.Button("_Browse", wnd.close.bind(wnd)) );
         widgets.append( new Moka.Button("_Configure", showMenu.bind(null, opts)) );
         widgets.append(counter);
+        wnd.append(widgets);
 
         next1 = next.bind(null, 1, counter.element())
         prev1 = prev.bind(null, 1, counter.element())
         next10 = next.bind(null, 10, counter.element())
         prev10 = prev.bind(null, 10, counter.element())
-        wnd.addKey("RIGHT", next1);
-        wnd.addKey("LEFT", prev1);
+
         wnd.addKey("+", next1);
         wnd.addKey("MINUS", prev1);
         wnd.addKey("PAGEDOWN", next10);
         wnd.addKey("PAGEUP", prev10);
-        wnd.addKey("S-RIGHT", next10);
-        wnd.addKey("S-LEFT", prev10);
         wnd.addKey("S-+", next10);
         wnd.addKey("S-MINUS", prev10);
         wnd.align("center");
         wnd.addKey("ENTER", wnd.close.bind(wnd));
-        wnd.append(widgets);
+        counter.addKey("RIGHT", next1);
+        counter.addKey("LEFT", prev1);
+        counter.addKey("S-RIGHT", next10);
+        counter.addKey("S-LEFT", prev10);
 
         wnd.connect("mokaDestroyed", start.bind(null, opts));
-        wnd.appendTo("body").center().show().focus();
+        popup(wnd);
 	};
 
 	$(document).ready(onLoad);

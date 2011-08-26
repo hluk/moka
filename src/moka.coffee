@@ -2131,37 +2131,43 @@ class Moka.Window extends Moka.Input
                .position(pos.left, pos.top)
                .show()
                .focus()
-
-    default_title_keys:
         LEFT: ->
+            return false if not @titleHasFocus()
             pos = @e.offset()
             pos.left -= 20
             @e.offset(pos)
         RIGHT: ->
+            return false if not @titleHasFocus()
             pos = @e.offset()
             pos.left += 20
             @e.offset(pos)
         UP: ->
+            return false if not @titleHasFocus()
             pos = @e.offset()
             pos.top -= 20
             @e.offset(pos)
         DOWN: ->
+            return false if not @titleHasFocus()
             pos = @e.offset()
             pos.top += 20
             @e.offset(pos)
         'S-LEFT': ->
+            return false if not @titleHasFocus()
             pos = @e.offset()
             pos.left = 0
             @e.offset(pos)
         'S-RIGHT': ->
+            return false if not @titleHasFocus()
             pos = @e.offset()
             pos.left = @e.parent().innerWidth() - @e.outerWidth(true)
             @e.offset(pos)
         'S-UP': ->
+            return false if not @titleHasFocus()
             pos = @e.offset()
             pos.top = 0
             @e.offset(pos)
         'S-DOWN': ->
+            return false if not @titleHasFocus()
             pos = @e.offset()
             pos.top = @e.parent().innerHeight() - @e.outerWidth(true)
             @e.offset(pos)
@@ -2169,9 +2175,9 @@ class Moka.Window extends Moka.Input
         'C-RIGHT': -> @nextWindow("left", 1)
         'C-UP':    -> @nextWindow("top", -1)
         'C-DOWN':  -> @nextWindow("top", 1)
-        SPACE: -> @body.toggle()
-        ESCAPE: -> @close()
-        TAB: -> @focus()
+        SPACE: ->
+            return false if not @titleHasFocus()
+            @body.toggle()
 
     constructor: (title) ->
         super
@@ -2189,24 +2195,29 @@ class Moka.Window extends Moka.Input
 
         $(window).bind( "resize.moka", @update.bind(this) )
 
+        @widgets = []
+
         # title
         @title = new Moka.Input()
-        @title.keydown = @keyDownTitle.bind(this)
+        @widgets.push(@title)
         @title.e.addClass("moka-title")
+                .css("text-align", "center")
                 .appendTo(e)
-
-        # window title buttons
-        $("<div>", {'class':"moka-window-button moka-close"})
-            .css('cursor', "pointer")
-            .click( @close.bind(this) )
-            .appendTo(@title.e)
-        $("<div>", {'class':"moka-window-button moka-maximize"})
-            .css('cursor', "pointer")
-            .click( @maximize.bind(this) )
-            .appendTo(@title.e)
 
         # title name
         Moka.createLabel(title).appendTo(@title.e)
+
+        # window title buttons
+        @noclose = false
+        @e_close = $("<div>", {'class':"moka-window-button moka-close"})
+            .css('cursor', "pointer")
+            .click( @close.bind(this) )
+            .appendTo(@title.e)
+        @nomax = false
+        @e_max = $("<div>", {'class':"moka-window-button moka-maximize"})
+            .css('cursor', "pointer")
+            .click( @maximize.bind(this) )
+            .appendTo(@title.e)
 
         # body
         @body = body = $("<div>", {class:"moka-body"})
@@ -2265,13 +2276,29 @@ class Moka.Window extends Moka.Input
                     $(document).one("mouseup", () -> $(document).unbind("mousemove.moka"))
                     return false
 
-        @widgets = []
-
         initDraggable(@e, @title.e)
         $(window).load( (() -> @update()).bind(this) )
 
     toggleShow: ->
         if @e.is(":visible") then @hide() else @show()
+        return this
+
+    disableClose: (noclose) ->
+        if noclose
+            @noclose = true
+            @e_close.hide()
+        else
+            @noclose = false
+            @e_close.show()
+        return this
+
+    disableMaximize: (nomax) ->
+        if nomax
+            @nomax = true
+            @e_max.hide()
+        else
+            @nomax = false
+            @e_max.show()
         return this
 
     update: ->
@@ -2316,6 +2343,9 @@ class Moka.Window extends Moka.Input
         Moka.focusFirst(@body)
         return this
 
+    titleHasFocus: () ->
+        return @title.hasFocus()
+
     position: (x,y) ->
         if x?
             pos = @e.parent().offset()
@@ -2359,6 +2389,7 @@ class Moka.Window extends Moka.Input
         Moka.focus( e.find(".moka-title:first") )
 
     close: () ->
+        return this if @noclose
         @remove()
 
     keydown: (ev) ->
@@ -2370,13 +2401,6 @@ class Moka.Window extends Moka.Input
 
         # keyhints
         if keyHintFocus(keyname, @body)
-            return false
-
-    keyDownTitle: (ev) ->
-        return if ev.isPropagationStopped()
-        keyname = getKeyName(ev)
-
-        if doKey(keyname, @keys, @default_title_keys, this)
             return false
 
 elementToWidget = (e) ->

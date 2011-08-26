@@ -50,10 +50,12 @@
 }
 
 @mixin inset-text($fg:$widget_fg) {
-    @if opacify($fg, 1) - #800 == black {
-        text-shadow: transparentize(white - opacity($fg), 0.2) 0 1px 0px;
-    } @else {
-        text-shadow: transparentize(white - $fg, 0.2) 0 -1px 0px;
+    @if $use_inset_text {
+        @if opacify($fg, 1) - #800 == black {
+            text-shadow: transparentize(white - opacity($fg), 0.5) 0 1px 0px;
+        } @else {
+            text-shadow: transparentize(white - $fg, 0.5) 0 -1px 0px;
+        }
     }
 }
 
