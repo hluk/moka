@@ -476,7 +476,7 @@ class Moka.Widget
             for widget in @widgets
                 widget.remove()
         @e.trigger("mokaDestroyed")
-        @e.detach()
+        @e.remove()
 
     parent: () ->
         return @parentWidget
@@ -487,7 +487,7 @@ class Moka.Widget
         return this
 
     connect: (event, fn) ->
-        @e.bind(event, (ev) => if ev.target is @e[0] then fn())
+        @e.bind(event, (ev) => if ev.target is @e[0] then fn(ev))
         return this
 
     bind: (event, fn) ->
@@ -1062,7 +1062,7 @@ class Moka.Image extends Moka.Widget
             () =>
                 @ok = true
 
-                e = @e[0]
+                img = @img[0]
                 @owidth  = img.naturalWidth
                 @oheight = img.naturalHeight
                 onload?()
@@ -1149,8 +1149,8 @@ class Moka.Canvas extends Moka.Widget
         e.height = h
         img = @img[0]
         if @canvas
-            texture = e.texture(img);
-            e.draw(texture);
+            texture = e.texture(img)
+            e.draw(texture)
             texture.destroy()
         else
             @ctx.clearRect(0,0,e.width,e.height)
@@ -1273,8 +1273,9 @@ class Moka.ImageView extends Moka.Input
 
     constructor: (src, @use_canvas, @sharpen) ->
         super
-        @e.addClass("moka-imageview")
+        @e.addClass("moka-itemview moka-imageview")
         @src = src
+        @widgets = []
 
     show: () ->
         if @image
@@ -1303,6 +1304,7 @@ class Moka.ImageView extends Moka.Input
                 @image = new Moka.Canvas(@src, "", "", onload, onerror)
             else
                 @image = new Moka.Image(@src, "", "", onload, onerror)
+            @widgets.push(@image)
             @image.appendTo(@e)
             @e.show()
         return this
@@ -1319,6 +1321,7 @@ class Moka.ImageView extends Moka.Input
                     @image.img.attr("src", "")
                     @image.remove()
                     @image = null
+                    @widgets.pop()
                     @t_remove = null
             , 60000 )
         return super
@@ -1332,50 +1335,51 @@ class Moka.ImageView extends Moka.Input
     originalHeight: () ->
         return @image.originalHeight()
 
-    zoom: (how, how2) ->
+    zoom: (how) ->
         if how?
             @z = how
-            @zhow = how2
+            zhow = @zhow = if @z instanceof Array then @z[2] else null
 
             if @isLoaded() and @e.parent().length
-                width = @image.outerWidth()
-                height = @image.outerHeight()
+                width = @image.width()
+                height = @image.height()
                 w = h = mw = mh = ""
 
                 if how instanceof Array
-                    mw = how[0]
-                    mh = how[1]
+                    mw = Math.floor(how[0])
+                    mh = Math.floor(how[1])
 
                     d = mw/mh
                     d2 = width/height
-                    if how2 is "fill"
+                    if zhow is "fill"
                         if d > d2
                             w = mw
-                            h = height*mw/width
+                            h = Math.floor(mw/d2)
                         else
                             h = mh
-                            w = width*mh/height
+                            w = Math.floor(mh*d2)
                         mw = mh = ""
                     else
                         if d > d2
                             h = mh
-                            w = width*mh/height
+                            w = Math.floor(mh*d2)
                         else
                             w = mw
-                            h = height*mw/width
+                            h = Math.floor(mw/d2)
                         mw = mh = ""
                 else
                     @z = parseFloat(how) or 1
                     mw = Math.floor(@z*@image.originalWidth())
                     mh = Math.floor(@z*@image.originalHeight())
 
-                if how2 isnt "fit" and how2 isnt "fill"
+                if zhow isnt "fit" and zhow isnt "fill"
                     if width/height < mw/mh
                         h = mh
                     else
                         w = mw
 
                 @image.css('max-width':mw, 'max-height':mh, width:w, height:h)
+                @e.css('max-width':mw, 'max-height':mh, width:w, height:h)
 
                 @image.resize(w or mw, h or mh)
                 if @image.sharpen
@@ -1482,10 +1486,6 @@ class Moka.Viewer extends Moka.Input
         @orientation("lt")
         @zoom(1)
 
-    show: () ->
-        @e.show()
-        @update()
-
     update: ->
         return if not @e.is(":visible")
 
@@ -1545,7 +1545,11 @@ class Moka.Viewer extends Moka.Input
         return this
 
     remove: () ->
-        @clean()
+        for item in @items
+            if x not instanceof Function
+                item.remove()
+        for cell in @cells
+            cell.remove()
         return super
 
     currentIndex: () ->
@@ -1627,6 +1631,7 @@ class Moka.Viewer extends Moka.Input
 
     zoom: (how) ->
         if how?
+            @zhow = null
             if how is "fit" or how is "fill"
                 layout = @layout()
 
@@ -1643,12 +1648,11 @@ class Moka.Viewer extends Moka.Input
                 w = (wnd.width()-pos.left)/layout[0]
                 h = (wnd.height()-pos.top)/layout[1]
 
-                for s in [@table[0].cellSpacing, @table[0].cellPadding, @table[0].border]
-                    if s
-                        w += layout[0]*s
-                        h += layout[0]*s
+                c = @cells[0]
+                w -= c.outerWidth()-c.width()
+                h -= c.outerHeight()-c.height()
 
-                @z = [w,h]
+                @z = [w, h, how]
                 @zhow = how
             else if how is "+" or how is "-"
                 if not @z
@@ -1660,22 +1664,19 @@ class Moka.Viewer extends Moka.Input
                     @z[1] *= d
                 else
                     @z += if how is "-" then -0.125 else 0.125
-                @zhow = null
             else if how instanceof Array
                 @z = how
-                @zhow = null
             else
                 factor = parseFloat(how) or 1
                 @z = factor
-                @zhow = null
 
             i = @index
             len =i+@cellCount()
             len = Math.min(len, @length())
-            dbg "zooming views", i+".."+(len-1), "using method", @z, @zhow
+            dbg "zooming views", i+".."+(len-1), "using method", @z
             while i < len
                 item = @at(i)
-                item.zoom?(@z, @zhow)
+                item.zoom?(@z)
                 ++i
             if @current >= 0
                 ensureVisible( @at(@index+@current).e )
@@ -1796,7 +1797,7 @@ class Moka.Viewer extends Moka.Input
     appendCell: (row) ->
         td = $("<td>").appendTo(row)
 
-        cell = new Moka.Input().e
+        cell = $("<div>")
         id = @cellCount()
         cell.data("moka-cell-id", id)
         cell.css("overflow":"hidden")
@@ -1826,7 +1827,7 @@ class Moka.Viewer extends Moka.Input
         return @cells[ @indexfn(index) ]
 
     updateTable: () ->
-        cell.children().detach() for cell in @cells
+        @clear()
         @table.empty().hide()
         @cells = []
 
@@ -2038,12 +2039,10 @@ class Moka.Viewer extends Moka.Input
             item.e.one("mokaDone", loaded)
             item.show()
 
-        #cell.css(width:"", height:"") for cell in @cells
         if @current >= 0
-            # TODO: load current item first
-            #updateItems(@index, 1)
-            # calling updateItems multiple times here breaks layout
+            # load current item first
             updateItems(@index+@current, 1)
+            # calling updateItems multiple times here breaks layout
             #updateItems(@index+@current, -1)
         else
             updateItems(@index, 1)
@@ -2275,11 +2274,6 @@ class Moka.Window extends Moka.Input
         if @e.is(":visible") then @hide() else @show()
         return this
 
-    show: ->
-        @e.show()
-        @update()
-        return this
-
     update: ->
         w = @widgets
         $.each( w, (i) -> w[i].update?() )
@@ -2305,11 +2299,16 @@ class Moka.Window extends Moka.Input
 
         return this
 
-    center: () ->
+    center: (once) ->
+        @e.css("opacity",0)
         @e.offset({
             left:(@e.parent().width()-@e.width())/2,
             top:(@e.parent().height()-@e.height())/2
         })
+        if once
+            @e.css("opacity",1)
+        if not once
+            window.setTimeout(@center.bind(this, true), 0)
         return this
 
     focus: () ->

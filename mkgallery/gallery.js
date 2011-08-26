@@ -1,5 +1,19 @@
 (function() {
-	var onLoad, viewer, gotownd, menu, options, opts;
+	var onLoad, viewer, gotownd, menu, options;
+
+    // a_function.bind(object, arg1, ...)
+    Function.prototype.bind = function(thisObj, var_args) {
+      var self = this;
+      var staticArgs = Array.prototype.splice.call(arguments, 1, arguments.length);
+
+      return function() {
+        var args = staticArgs.concat();
+        for (var i = 0; i < arguments.length; i++) {
+          args.push(arguments[i]);
+        }
+        return self.apply(thisObj, args);
+      };
+    }
 
     options = {
         "": {
@@ -16,6 +30,7 @@
             sharpen: [0.0, "_Sharpen factor", "Values from <b>0.0</b> to <b>1.0</b> (slow)"]
         },
         _Layout: {
+            tip: [null, "<b>Tip:</b> Use <b>right top</b> order and <b>2x1</b> layout for Japanese manga."],
             o: [
                 ["left top", "right top", "top left", "top right",
                  "bottom left", "bottom right", "left bottom", "right bottom"],
@@ -120,7 +135,7 @@
                 default_value = options_cat[name][0];
                 x = hash[name];
 
-                if (typeof default_value == "object") {
+                if (default_value instanceof Array) {
                     default_value = default_value[0];
                 }
 
@@ -169,7 +184,7 @@
         if ( item.isLoaded() ) {
             html += "size: <i>" + item.originalWidth() + "x" + item.originalHeight() + "</i></br>";
         } else {
-            item.one("mokaLoaded", function(){notify(id);})
+            item.one("mokaLoaded", notify.bind(null,id))
         }
         z = viewer.zoom();
         if ( z !== 1 ) {
@@ -192,7 +207,7 @@
     }
 
     showGoToDialog = function() {
-        var close, closed, accept, lineedit, buttons;
+        var closed, accept, lineedit, buttons;
 
         if (gotownd) {
             gotownd.focus();
@@ -204,9 +219,6 @@
         buttons = new Moka.ButtonBox();
         gotownd.append(lineedit, buttons);
 
-        close = function() {
-            gotownd.close();
-        }
         closed = function() {
             gotownd = null;
         }
@@ -216,15 +228,15 @@
         }
 
         buttons.append("_Ok", accept);
-        buttons.append("_Close", close);
+        buttons.append("_Close", gotownd.close.bind(gotownd));
         gotownd.addKey("ENTER", accept);
         gotownd.connect("mokaDestroyed", closed);
 
         gotownd.appendTo("body").center().show().focus();
     }
 
-    showMenu = function() {
-        var close, closed, accept, name, cat, options_cat, i, tabs,
+    showMenu = function(opts) {
+        var closed, accept, name, cat, options_cat, i, tabs, page,
             val, w, ww, container, tabs, widgets, buttons, opt, label;
 
         if (menu) {
@@ -236,9 +248,6 @@
 
         menu = new Moka.Window("Menu");
 
-        close = function() {
-            menu.close();
-        }
         closed = function() {
             menu = null;
         }
@@ -253,43 +262,46 @@
                 window.location.reload();
             }
             saveOptions(opts);
-            console.log(opts);
         }
         reset = function() {
-            var opts = getOptions();
-            for (cat in options) {
-                options_cat = options[cat];
-                for (name in options_cat) {
-                    if ( w[name] ) {
-                        w[name].value( options_cat[name][0] );
-                    }
+            var opts, widegt;
+            opts = getOptions();
+            for (name in opts) {
+                widget = w[name];
+                if ( widget ) {
+                    widget.value(opts[name]);
                 }
             }
         }
 
         tabs = new Moka.Tabs();
+        //tabs.vertical(true);
         for (cat in options) {
             if (!cat) continue;
+            page = new Moka.Container();
             widgets = new Moka.WidgetList();
             options_cat = options[cat];
             for (name in options_cat) {
                 opt = options_cat[name];
                 label = opt[1];
-                container = new Moka.Container();
 
                 val = opts[name];
                 def = opt[0];
                 if ( typeof def == "boolean" ) {
                     w[name] = new Moka.CheckBox(label, val);
-                } else if ( typeof def == "object" ) {
+                } else if (def instanceof Array ) {
                     ww = w[name] = new Moka.Combo(label+":");
                     for (i in def) {
                         ww.append(def[i]);
                     }
                     ww.value(val);
+		        } else if (typeof val == "undefined" || val === null) {
+                    page.append( new Moka.Label(label) );
+                    continue;
                 } else {
                     w[name] = new Moka.LineEdit(label+":", val);
                 }
+                container = new Moka.Container();
                 container.append(w[name]);
 
                 label = opt[2];
@@ -298,15 +310,16 @@
                 }
 
                 widgets.append(container);
+                page.append(widgets);
             }
-            tabs.append(cat, widgets);
+            tabs.append(cat, page);
         }
 
         // buttons
         buttons = new Moka.ButtonBox();
         buttons.append("_Ok", accept);
         buttons.append("R_eset", reset);
-        buttons.append("_Close", close);
+        buttons.append("_Close", menu.close.bind(menu));
 
         menu.append(tabs, buttons);
 
@@ -316,59 +329,41 @@
         menu.appendTo("body").center().show().focus();
     }
 
-    start = function() {
-		var item, itempath, map, onLoad, wnd, i, len, value, sharpen;
+    getItem = function(sharpen, i){
+        var item, itempath;
 
-		onLoad = void 0;
-		if (typeof title != "undefined" && title !== null) {
-			document.title = title;
-		}
+        item = ls[i];
+        itempath = (item instanceof Array) ? item[0] : item;
+            return (sharpen > 0) ?
+                    ( new Moka.ImageView(itempath, true, sharpen) ) :
+                    ( new Moka.ImageView(itempath) );
+    }
+
+    start = function(opts) {
+		var map, onLoad, wnd, i, len, value;
 
 		// gallery widget
 		viewer = new Moka.Viewer();
 
 		// parse options
-		value = opts.zoom;
-		if (value) {
-            value = value.split(",");
-			viewer.zoom(value.length === 1 ? value[0] : value);
-		}
+        value = opts.zoom.split(",");
+        if (value.length === 1) {
+            viewer.zoom(value[0]);
+        } else {
+            viewer.zoom(value, value[2]);
+        }
 
 		// layout
-		value = opts.layout;
-		if (value) {
-			viewer.layout( value.split("x") );
-		}
+        viewer.layout( opts.layout.split("x") );
 
         // orientation
-		value = opts.o;
-		if (value) {
-			viewer.orientation(value);
-		}
-
-        // sharpen
-		sharpen = opts.sharpen || 0;
+        viewer.orientation(opts.o);
 
         // items on demand
-        viewer.appendFunction(function(i){
-			item = ls[i];
-			if (item instanceof Array) {
-				itempath = item[0];
-			} else {
-				itempath = item;
-			}
-            if (sharpen > 0) {
-                return new Moka.ImageView(itempath, true, sharpen);
-            } else {
-                return new Moka.ImageView(itempath);
-            }
-        }, ls.length);
+        viewer.appendFunction(getItem.bind(null, opts.sharpen), ls.length);
 
         // current item
-		value = opts.n;
-		if (value) {
-			viewer.view(value);
-		}
+        viewer.view(opts.n);
 
 		viewer.appendTo("body").show();
 
@@ -388,13 +383,13 @@
             }
         });
 
+        viewer.addKey("G", showGoToDialog);
+        viewer.addKey("C", showMenu.bind(null, opts));
         viewer.addKey("KP5",
                 function(){
                     v.layout([4,3]);
                     v.zoom("fit");
                 });
-        viewer.addKey("G", showGoToDialog);
-        viewer.addKey("C", showMenu);
 
 		viewer.focus();
     }
@@ -413,48 +408,58 @@
 
         if (opts.skiptitle || opts.skiptitle_once) {
             delete opts.skiptitle_once;
-            return start();
+            return start(opts);
         }
 
-        next = function(i){
-            opts.n += i || 1;
-            if (opts.n >= ls.length) {
-                opts.n = 0;
-            }
-            createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8, counter.element());
-        }
-        prev = function(i){
-            opts.n -= i || 1;
+        select = function(i, e){
+            opts.n = i;
             if (opts.n < 0) {
                 opts.n = ls.length-1;
             }
-            createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8, counter.element());
+            if (opts.n >= ls.length) {
+                opts.n = 0;
+            }
+            return createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8, e);
         }
 
-        counter = new Moka.Input( createCounter(opts.n, ls.length, 80, 4, 6,
-                    "rgba(100,50,20,0.4)", "white", 16, 8) );
+        next = function(i, e){
+            opts.n += i;
+            select(opts.n, e);
+        }
 
-        widgets = new Moka.WidgetList();
-        widgets.append( new Moka.Button("_Browse", function(){wnd.close();}) );
-        widgets.append( new Moka.Button("_Configure", showMenu) );
-        widgets.append(counter);
+        prev = function(i, e){
+            opts.n -= i;
+            select(opts.n, e);
+        }
 
         wnd = new Moka.Window("<b>"+title+"</b> gallery");
-        wnd.addKey("RIGHT", next);
-        wnd.addKey("LEFT", prev);
-        wnd.addKey("+", next);
-        wnd.addKey("-", prev);
-        wnd.addKey("PAGEDOWN", function(){next(10);});
-        wnd.addKey("PAGEUP", function(){prev(10);});
-        wnd.addKey("S-RIGHT", function(){next(10);});
-        wnd.addKey("S-LEFT", function(){prev(10);});
-        wnd.addKey("S-+", function(){next(10);});
-        wnd.addKey("S--", function(){prev(10);});
+
+        counter = new Moka.Input( select(opts.n) );
+
+        widgets = new Moka.WidgetList();
+        widgets.append( new Moka.Button("_Browse", wnd.close.bind(wnd)) );
+        widgets.append( new Moka.Button("_Configure", showMenu.bind(null, opts)) );
+        widgets.append(counter);
+
+        next1 = next.bind(null, 1, counter.element())
+        prev1 = prev.bind(null, 1, counter.element())
+        next10 = next.bind(null, 10, counter.element())
+        prev10 = prev.bind(null, 10, counter.element())
+        wnd.addKey("RIGHT", next1);
+        wnd.addKey("LEFT", prev1);
+        wnd.addKey("+", next1);
+        wnd.addKey("MINUS", prev1);
+        wnd.addKey("PAGEDOWN", next10);
+        wnd.addKey("PAGEUP", prev10);
+        wnd.addKey("S-RIGHT", next10);
+        wnd.addKey("S-LEFT", prev10);
+        wnd.addKey("S-+", next10);
+        wnd.addKey("S-MINUS", prev10);
         wnd.align("center");
-        wnd.addKey("ENTER", function(){wnd.close();});
+        wnd.addKey("ENTER", wnd.close.bind(wnd));
         wnd.append(widgets);
 
-        wnd.connect("mokaDestroyed", start);
+        wnd.connect("mokaDestroyed", start.bind(null, opts));
         wnd.appendTo("body").center().show().focus();
 	};
 

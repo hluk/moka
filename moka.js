@@ -492,7 +492,7 @@
         }
       }
       this.e.trigger("mokaDestroyed");
-      return this.e.detach();
+      return this.e.remove();
     };
     Widget.prototype.parent = function() {
       return this.parentWidget;
@@ -507,7 +507,7 @@
     Widget.prototype.connect = function(event, fn) {
       this.e.bind(event, __bind(function(ev) {
         if (ev.target === this.e[0]) {
-          return fn();
+          return fn(ev);
         }
       }, this));
       return this;
@@ -1247,9 +1247,9 @@
       this.img = this.e;
       this.owidth = this.oheight = 0;
       this.e.one("load", __bind(function() {
-        var e;
+        var img;
         this.ok = true;
-        e = this.e[0];
+        img = this.img[0];
         this.owidth = img.naturalWidth;
         this.oheight = img.naturalHeight;
         return typeof onload === "function" ? onload() : void 0;
@@ -1465,8 +1465,9 @@
       this.use_canvas = use_canvas;
       this.sharpen = sharpen;
       ImageView.__super__.constructor.apply(this, arguments);
-      this.e.addClass("moka-imageview");
+      this.e.addClass("moka-itemview moka-imageview");
       this.src = src;
+      this.widgets = [];
     }
     ImageView.prototype.show = function() {
       var onerror, onload;
@@ -1499,6 +1500,7 @@
         } else {
           this.image = new Moka.Image(this.src, "", "", onload, onerror);
         }
+        this.widgets.push(this.image);
         this.image.appendTo(this.e);
         this.e.show();
       }
@@ -1514,6 +1516,7 @@
           this.image.img.attr("src", "");
           this.image.remove();
           this.image = null;
+          this.widgets.pop();
           return this.t_remove = null;
         }, this), 60000);
       }
@@ -1528,36 +1531,36 @@
     ImageView.prototype.originalHeight = function() {
       return this.image.originalHeight();
     };
-    ImageView.prototype.zoom = function(how, how2) {
-      var d, d2, h, height, mh, mw, w, width;
+    ImageView.prototype.zoom = function(how) {
+      var d, d2, h, height, mh, mw, w, width, zhow;
       if (how != null) {
         this.z = how;
-        this.zhow = how2;
+        zhow = this.zhow = this.z instanceof Array ? this.z[2] : null;
         if (this.isLoaded() && this.e.parent().length) {
-          width = this.image.outerWidth();
-          height = this.image.outerHeight();
+          width = this.image.width();
+          height = this.image.height();
           w = h = mw = mh = "";
           if (how instanceof Array) {
-            mw = how[0];
-            mh = how[1];
+            mw = Math.floor(how[0]);
+            mh = Math.floor(how[1]);
             d = mw / mh;
             d2 = width / height;
-            if (how2 === "fill") {
+            if (zhow === "fill") {
               if (d > d2) {
                 w = mw;
-                h = height * mw / width;
+                h = Math.floor(mw / d2);
               } else {
                 h = mh;
-                w = width * mh / height;
+                w = Math.floor(mh * d2);
               }
               mw = mh = "";
             } else {
               if (d > d2) {
                 h = mh;
-                w = width * mh / height;
+                w = Math.floor(mh * d2);
               } else {
                 w = mw;
-                h = height * mw / width;
+                h = Math.floor(mw / d2);
               }
               mw = mh = "";
             }
@@ -1566,7 +1569,7 @@
             mw = Math.floor(this.z * this.image.originalWidth());
             mh = Math.floor(this.z * this.image.originalHeight());
           }
-          if (how2 !== "fit" && how2 !== "fill") {
+          if (zhow !== "fit" && zhow !== "fill") {
             if (width / height < mw / mh) {
               h = mh;
             } else {
@@ -1574,6 +1577,12 @@
             }
           }
           this.image.css({
+            'max-width': mw,
+            'max-height': mh,
+            width: w,
+            height: h
+          });
+          this.e.css({
             'max-width': mw,
             'max-height': mh,
             width: w,
@@ -1753,10 +1762,6 @@
       this.orientation("lt");
       this.zoom(1);
     }
-    Viewer.prototype.show = function() {
-      this.e.show();
-      return this.update();
-    };
     Viewer.prototype.update = function() {
       if (!this.e.is(":visible")) {
         return;
@@ -1823,7 +1828,19 @@
       return this;
     };
     Viewer.prototype.remove = function() {
-      this.clean();
+      var cell, item, _i, _j, _len, _len2, _ref, _ref2;
+      _ref = this.items;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        item = _ref[_i];
+        if (!(x instanceof Function)) {
+          item.remove();
+        }
+      }
+      _ref2 = this.cells;
+      for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+        cell = _ref2[_j];
+        cell.remove();
+      }
       return Viewer.__super__.remove.apply(this, arguments);
     };
     Viewer.prototype.currentIndex = function() {
@@ -1912,8 +1929,9 @@
       return this;
     };
     Viewer.prototype.zoom = function(how) {
-      var d, factor, h, i, item, layout, len, offset, pos, s, w, wnd, _i, _len, _ref;
+      var c, d, factor, h, i, item, layout, len, offset, pos, w, wnd;
       if (how != null) {
+        this.zhow = null;
         if (how === "fit" || how === "fill") {
           layout = this.layout();
           wnd = this.e.parent();
@@ -1929,15 +1947,10 @@
           }
           w = (wnd.width() - pos.left) / layout[0];
           h = (wnd.height() - pos.top) / layout[1];
-          _ref = [this.table[0].cellSpacing, this.table[0].cellPadding, this.table[0].border];
-          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-            s = _ref[_i];
-            if (s) {
-              w += layout[0] * s;
-              h += layout[0] * s;
-            }
-          }
-          this.z = [w, h];
+          c = this.cells[0];
+          w -= c.outerWidth() - c.width();
+          h -= c.outerHeight() - c.height();
+          this.z = [w, h, how];
           this.zhow = how;
         } else if (how === "+" || how === "-") {
           if (!this.z) {
@@ -1950,23 +1963,20 @@
           } else {
             this.z += how === "-" ? -0.125 : 0.125;
           }
-          this.zhow = null;
         } else if (how instanceof Array) {
           this.z = how;
-          this.zhow = null;
         } else {
           factor = parseFloat(how) || 1;
           this.z = factor;
-          this.zhow = null;
         }
         i = this.index;
         len = i + this.cellCount();
         len = Math.min(len, this.length());
-        dbg("zooming views", i + ".." + (len - 1), "using method", this.z, this.zhow);
+        dbg("zooming views", i + ".." + (len - 1), "using method", this.z);
         while (i < len) {
           item = this.at(i);
           if (typeof item.zoom === "function") {
-            item.zoom(this.z, this.zhow);
+            item.zoom(this.z);
           }
           ++i;
         }
@@ -2113,7 +2123,7 @@
     Viewer.prototype.appendCell = function(row) {
       var cell, id, td;
       td = $("<td>").appendTo(row);
-      cell = new Moka.Input().e;
+      cell = $("<div>");
       id = this.cellCount();
       cell.data("moka-cell-id", id);
       cell.css({
@@ -2143,12 +2153,8 @@
       return this.cells[this.indexfn(index)];
     };
     Viewer.prototype.updateTable = function() {
-      var cell, i, ilen, j, jlen, layout, row, _i, _len, _ref;
-      _ref = this.cells;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        cell = _ref[_i];
-        cell.children().detach();
-      }
+      var i, ilen, j, jlen, layout, row;
+      this.clear();
       this.table.empty().hide();
       this.cells = [];
       layout = this.layout();
@@ -2681,11 +2687,6 @@
       }
       return this;
     };
-    Window.prototype.show = function() {
-      this.e.show();
-      this.update();
-      return this;
-    };
     Window.prototype.update = function() {
       var w;
       w = this.widgets;
@@ -2706,11 +2707,18 @@
       this.update();
       return this;
     };
-    Window.prototype.center = function() {
+    Window.prototype.center = function(once) {
+      this.e.css("opacity", 0);
       this.e.offset({
         left: (this.e.parent().width() - this.e.width()) / 2,
         top: (this.e.parent().height() - this.e.height()) / 2
       });
+      if (once) {
+        this.e.css("opacity", 1);
+      }
+      if (!once) {
+        window.setTimeout(this.center.bind(this, true), 0);
+      }
       return this;
     };
     Window.prototype.focus = function() {
