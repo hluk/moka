@@ -176,11 +176,13 @@
     e.css("cursor", "pointer");
     return e;
   };
-  Moka.findInput = function(e, str) {
-    var find, query, res;
+  Moka.findInput = function(e, str, next) {
+    var find, first, prev_found, query, res;
     if (!str) {
       return null;
     }
+    prev_found = !next;
+    first = null;
     query = str.toUpperCase();
     res = null;
     find = function() {
@@ -188,11 +190,19 @@
       $this = $(this);
       if ($this.text().toUpperCase().search(query) >= 0) {
         res = $this.closest(".moka-input");
+        if (!first) {
+          first = res;
+        }
+        if (!prev_found) {
+          prev_found = res.hasClass("moka-found");
+          res = null;
+          return;
+        }
         return false;
       }
     };
     e.find(".moka-input.moka-label:visible, .moka-input > .moka-label:visible").each(find);
-    return res;
+    return res || first;
   };
   initDraggable = function(e, handle_e) {
     if (!handle_e) {
@@ -536,11 +546,11 @@
         return this.e.height();
       }
     };
-    Widget.prototype.outerWidth = function() {
-      return this.e.outerWidth();
+    Widget.prototype.outerWidth = function(include_margin) {
+      return this.e.outerWidth(include_margin);
     };
-    Widget.prototype.outerHeight = function() {
-      return this.e.outerHeight();
+    Widget.prototype.outerHeight = function(include_margin) {
+      return this.e.outerHeight(include_margin);
     };
     Widget.prototype.align = function(alignment) {
       this.e.css("text-align", alignment);
@@ -611,6 +621,9 @@
         }
       }
       return v;
+    };
+    Input.prototype.change = function(fn) {
+      return this.e.bind("mokaValueChanged", fn);
     };
     Input.prototype.keydown = function(ev) {
       var keyname;
@@ -827,6 +840,10 @@
       this.value(!this.value());
       return this;
     };
+    CheckBox.prototype.remove = function() {
+      this.checkbox.remove();
+      return CheckBox.__super__.remove.apply(this, arguments);
+    };
     CheckBox.prototype.value = function(val) {
       if (val != null) {
         this.checkbox.attr("checked", val);
@@ -881,6 +898,11 @@
         return this.combo.val();
       }
     };
+    Combo.prototype.remove = function() {
+      Moka.blur(this.combo);
+      this.combo.remove();
+      return Combo.__super__.remove.apply(this, arguments);
+    };
     Combo.prototype.keydown = function(ev) {
       var keyname;
       if (ev.isPropagationStopped()) {
@@ -906,6 +928,15 @@
         Moka.createLabel(label_text, this.e);
       }
       this.edit = $("<input>").focus(Moka.gainFocus).blur(Moka.lostFocus).keyup(this.update.bind(this)).appendTo(this.e);
+      this.edit.keyup(__bind(function() {
+        var v;
+        v = this.value();
+        if (v === this.oldvalue) {
+          return;
+        }
+        this.oldvalue = v;
+        return this.e.trigger("mokaValueChanged", [v]);
+      }, this));
       if (text != null) {
         this.value(text);
       }
@@ -916,6 +947,7 @@
     };
     LineEdit.prototype.remove = function() {
       Moka.blur(this.edit);
+      this.edit.remove();
       return LineEdit.__super__.remove.apply(this, arguments);
     };
     LineEdit.prototype.update = function() {
@@ -960,9 +992,10 @@
     TextEdit.prototype.update = function() {
       return this;
     };
-    TextEdit.prototype.hide = function() {
-      this.e.hide();
-      return this;
+    TextEdit.prototype.remove = function() {
+      Moka.blur(this.textarea);
+      this.textarea.remove();
+      return TextEdit.__super__.remove.apply(this, arguments);
     };
     TextEdit.prototype.value = function(text) {
       if (text != null) {
@@ -1948,8 +1981,8 @@
           w = (wnd.width() - pos.left) / layout[0];
           h = (wnd.height() - pos.top) / layout[1];
           c = this.cells[0];
-          w -= c.outerWidth() - c.width();
-          h -= c.outerHeight() - c.height();
+          w -= c.outerWidth(true) - c.width();
+          h -= c.outerHeight(true) - c.height();
           this.z = [w, h, how];
           this.zhow = how;
         } else if (how === "+" || how === "-") {
@@ -2298,13 +2331,13 @@
       cell = this.cell(index % this.cellCount());
       if (item.e.is(":visible")) {
         dbg("hiding item", index);
-        h = cell.outerHeight();
-        w = cell.outerWidth();
-        item.hide();
-        return cell.css({
+        h = cell.height() + "px";
+        w = cell.width() + "px";
+        cell.css({
           width: w,
           height: h
         });
+        return item.hide();
       }
     };
     Viewer.prototype.updateVisible = function(now) {
@@ -2481,24 +2514,45 @@
         return this.title["do"](Moka.focus);
       },
       F3: function() {
-        var e, edit, last_focused, pos, w, wnd;
+        var e, edit, last_focused, mainwnd, pos, search, tofocus, val, w, wnd;
         last_focused = focused_widget;
         wnd = new Moka.Window("Search");
         w = new Moka.LineEdit("Find string:");
         e = w.e;
         edit = w.edit;
-        edit.blur(function() {
-          return wnd.close();
+        tofocus = null;
+        val = "";
+        mainwnd = this.e;
+        search = function(next) {
+          var newtofocus;
+          newtofocus = Moka.findInput(mainwnd, val, next);
+          if (newtofocus) {
+            if (tofocus) {
+              tofocus.removeClass("moka-found");
+            }
+            tofocus = newtofocus;
+            return tofocus.addClass("moka-found");
+          }
+        };
+        wnd.addKey("F3", function() {
+          return search(true);
         });
         wnd.addKey("ESCAPE", function() {
           Moka.focus(last_focused);
           return wnd.close();
         });
+        w.change(__bind(function(ev, value) {
+          val = value;
+          return search();
+        }, this));
         wnd.addKey("ENTER", __bind(function() {
-          var tofocus;
-          tofocus = Moka.findInput(this.e, edit.attr("value"));
           Moka.focus(tofocus ? tofocus : last_focused);
           return wnd.close();
+        }, this));
+        wnd.connect("mokaDestroyed", __bind(function() {
+          if (tofocus) {
+            return tofocus.removeClass("moka-found");
+          }
         }, this));
         pos = this.position();
         return wnd.append(w).appendTo(this.e.parent()).position(pos.left, pos.top).show().focus();
@@ -2572,7 +2626,7 @@
           return false;
         }
         pos = this.e.offset();
-        pos.top = this.e.parent().innerHeight() - this.e.outerWidth(true);
+        pos.top = this.e.parent().innerHeight() - this.e.outerHeight(true);
         return this.e.offset(pos);
       },
       'C-LEFT': function() {
@@ -2621,10 +2675,10 @@
       this.e_close = $("<div>", {
         'class': "moka-window-button moka-close"
       }).css('cursor', "pointer").click(this.close.bind(this)).appendTo(this.title.e);
-      this.nomax = false;
+      this.nomax = true;
       this.e_max = $("<div>", {
         'class': "moka-window-button moka-maximize"
-      }).css('cursor', "pointer").click(this.maximize.bind(this)).appendTo(this.title.e);
+      }).css('cursor', "pointer").click(this.maximize.bind(this)).hide().appendTo(this.title.e);
       this.body = body = $("<div>", {
         "class": "moka-body"
       }).bind("scroll.moka", this.update.bind(this)).appendTo(e);

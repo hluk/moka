@@ -369,3 +369,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     &:hover {opacity:1}
 }
 
+.moka-found {
+    outline: $found_outline;
+}
+

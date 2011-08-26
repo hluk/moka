@@ -172,8 +172,11 @@ Moka.createLabel = (text, e) ->
 
     return e
 
-Moka.findInput = (e, str) ->
+Moka.findInput = (e, str, next) ->
     return null if not str
+
+    prev_found = not next
+    first = null
 
     # case-insensitive search
     query = str.toUpperCase()
@@ -183,12 +186,17 @@ Moka.findInput = (e, str) ->
         $this = $(this)
         if $this.text().toUpperCase().search(query) >= 0
             res = $this.closest(".moka-input")
+            first = res if not first
+            if not prev_found
+                prev_found = res.hasClass("moka-found")
+                res = null
+                return
             return false
 
     # search in labels inside each moka-input element
     e.find(".moka-input.moka-label:visible, .moka-input > .moka-label:visible").each(find)
 
-    return res
+    return res or first
 
 initDraggable = (e, handle_e) ->
     if not handle_e
@@ -512,11 +520,11 @@ class Moka.Widget
         else
             return @e.height()
 
-    outerWidth: () ->
-        return @e.outerWidth()
+    outerWidth: (include_margin) ->
+        return @e.outerWidth(include_margin)
 
-    outerHeight: () ->
-        return @e.outerHeight()
+    outerHeight: (include_margin) ->
+        return @e.outerHeight(include_margin)
 
     align: (alignment) ->
         @e.css("text-align", alignment)
@@ -574,6 +582,9 @@ class Moka.Input extends Moka.Widget
                     break
                 ee = ee.parent()
         return v
+
+    change: (fn) ->
+        return @e.bind("mokaValueChanged", fn)
 
     keydown: (ev) ->
         return if ev.isPropagationStopped()
@@ -732,6 +743,10 @@ class Moka.CheckBox extends Moka.Input
         @value(not @value())
         return this
 
+    remove: () ->
+        @checkbox.remove()
+        return super
+
     value: (val) ->
         if val?
             @checkbox.attr("checked", val)
@@ -773,6 +788,11 @@ class Moka.Combo extends Moka.Input
         else
             return @combo.val()
 
+    remove: () ->
+        Moka.blur(@combo)
+        @combo.remove()
+        return super
+
     keydown: (ev) ->
         return if ev.isPropagationStopped()
         keyname = getKeyName(ev)
@@ -794,6 +814,11 @@ class Moka.LineEdit extends Moka.Input
                .blur(Moka.lostFocus)
                .keyup( this.update.bind(this) )
                .appendTo(@e)
+        @edit.keyup () =>
+                   v = @value()
+                   return if v is @oldvalue
+                   @oldvalue = v
+                   @e.trigger("mokaValueChanged", [v])
         @value(text) if text?
 
     focus: () ->
@@ -802,6 +827,7 @@ class Moka.LineEdit extends Moka.Input
 
     remove: () ->
         Moka.blur(@edit)
+        @edit.remove()
         return super
 
     update: () ->
@@ -843,9 +869,10 @@ class Moka.TextEdit extends Moka.Input
     update: () ->
         return this
 
-    hide: () ->
-        @e.hide()
-        return this
+    remove: () ->
+        Moka.blur(@textarea)
+        @textarea.remove()
+        return super
 
     value: (text) ->
         if text?
@@ -1011,6 +1038,8 @@ class Moka.Tabs extends Moka.Widget
         if page.parent().length is 0
             page.appendTo(@pages_e)
         page.keydown(@keydown.bind(this))
+
+        # TODO: select tab if something was programatically focused on the page
 
         if @current < 0 or @current is @tabs.length()-1
             @select( Math.max(0, @current) )
@@ -1649,8 +1678,8 @@ class Moka.Viewer extends Moka.Input
                 h = (wnd.height()-pos.top)/layout[1]
 
                 c = @cells[0]
-                w -= c.outerWidth()-c.width()
-                h -= c.outerHeight()-c.height()
+                w -= c.outerWidth(true)-c.width()
+                h -= c.outerHeight(true)-c.height()
 
                 @z = [w, h, how]
                 @zhow = how
@@ -1929,10 +1958,10 @@ class Moka.Viewer extends Moka.Input
         cell = @cell( index % @cellCount() )
         if item.e.is(":visible")
             dbg "hiding item", index
-            h = cell.outerHeight()
-            w = cell.outerWidth()
-            item.hide()
+            h = cell.height()+"px"
+            w = cell.width()+"px"
             cell.css(width:w, height:h)
+            item.hide()
 
     updateVisible: (now) ->
         if not now
@@ -2115,15 +2144,29 @@ class Moka.Window extends Moka.Input
             w = new Moka.LineEdit("Find string:")
             e = w.e
             edit = w.edit
+            tofocus = null
+            val = ""
+            mainwnd = @e
 
-            edit.blur   () -> wnd.close()
+            search = (next) ->
+                newtofocus = Moka.findInput(mainwnd, val, next)
+                if newtofocus
+                    tofocus.removeClass("moka-found") if tofocus
+                    tofocus = newtofocus
+                    tofocus.addClass("moka-found")
+            wnd.addKey "F3", () ->
+                search(true)
             wnd.addKey "ESCAPE", () ->
                 Moka.focus(last_focused)
                 wnd.close()
+            w.change (ev, value) =>
+                val = value
+                search()
             wnd.addKey "ENTER", () =>
-                tofocus = Moka.findInput( @e, edit.attr("value") )
                 Moka.focus(if tofocus then tofocus else last_focused)
                 wnd.close()
+            wnd.connect "mokaDestroyed", () =>
+                tofocus.removeClass("moka-found") if tofocus
 
             pos = @position()
             wnd.append(w)
@@ -2169,7 +2212,7 @@ class Moka.Window extends Moka.Input
         'S-DOWN': ->
             return false if not @titleHasFocus()
             pos = @e.offset()
-            pos.top = @e.parent().innerHeight() - @e.outerWidth(true)
+            pos.top = @e.parent().innerHeight() - @e.outerHeight(true)
             @e.offset(pos)
         'C-LEFT':  -> @nextWindow("left", -1)
         'C-RIGHT': -> @nextWindow("left", 1)
@@ -2213,10 +2256,11 @@ class Moka.Window extends Moka.Input
             .css('cursor', "pointer")
             .click( @close.bind(this) )
             .appendTo(@title.e)
-        @nomax = false
+        @nomax = true
         @e_max = $("<div>", {'class':"moka-window-button moka-maximize"})
             .css('cursor', "pointer")
             .click( @maximize.bind(this) )
+            .hide()
             .appendTo(@title.e)
 
         # body

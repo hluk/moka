@@ -328,3 +328,6 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   opacity: 0.85; }
   .moka-notification:hover {
     opacity: 1; }
+
+.moka-found {
+  outline: 2px dashed red; }

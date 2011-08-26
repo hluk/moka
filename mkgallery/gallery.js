@@ -207,7 +207,7 @@
     }
 
     popup = function(wnd) {
-        wnd.appendTo("body").disableMaximize(true).center().show().focus();
+        wnd.appendTo("body").center().show().focus();
     }
 
     showGoToDialog = function() {
