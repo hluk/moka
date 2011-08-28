@@ -20,21 +20,21 @@ a {
     z-index: inherit;
 }
 
-.moka-widgetlistitem.moka-current, .moka-tab.moka-current, .moka-view.moka-current > .moka-widget {
+.moka-widgetlist-item.moka-current, .moka-tab.moka-current, .moka-view.moka-current > .moka-widget {
     color: $widget_current_fg;
     background-color: $widget_current_bg;
 }
 
 input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 
-.moka-window .moka-title, .moka-tab, .moka-widgetlistitem, .moka-button, .moka-imageview {
+.moka-window .moka-title, .moka-tab, .moka-widgetlist-item, .moka-button, .moka-imageview {
     &.moka-focus {
         color: $widget_selected_fg;
         background-color: $widget_selected_bg;
     }
 }
 // hover
-.moka-window .moka-title, .moka-tab, .moka-tabs, .moka-widgetlistitem, .moka-button, .moka-imageviewer {
+.moka-window .moka-title, .moka-tab, .moka-widgetlist-item, .moka-button, .moka-imageviewer {
     &:hover {
         color: $widget_hover_fg;
         background-color: $widget_hover_bg;
@@ -60,7 +60,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 .moka-buttonbox {
     width: 95%;
     text-align: right;
-    > .moka-button {
+    .moka-buttonbox-item {
         &.moka-first {
             @include rounded($buttonbox_radius, top, left);
             @include rounded($buttonbox_radius, bottom, left);
@@ -109,11 +109,15 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         );
     }
 }
-.moka-lineedit input, .moka-textedit textarea {
+.moka-textedit textarea {
+    vertical-align: top;
+}
+.moka-lineedit input, .moka-textedit textarea, .moka-combo select {
     color: $edit_fg;
     background-color: $edit_bg;
     border-color: $widget_bg * 1.6;
     text-shadow: white 0 0 0;
+    min-width: 4em;
 
     font: $font_edit;
     margin: 0.2em 0.5em;
@@ -126,7 +130,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         text-shadow: black 0 0 0;
     }
 }
-.moka-container {
+.moka-container, .moka-widgetlist {
     &.moka-vertical > .moka-widget{
         display: block;
     }
@@ -134,7 +138,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         display: inline-block;
     }
 }
-.moka-tabs {
+.moka-tabs-container {
     .moka-tab {
         border: 1px solid $widget_bg*0.7;
         .moka-focus {
@@ -199,16 +203,16 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     border: 1px solid $widget_bg*0.7;
 }
 .moka-widgetlist {
-    margin:auto;
-    padding: 1em;
+    margin: auto;
+    padding: 0.2em;
     text-align: left;
 
-    &.moka-focus .moka-widgetlistitem.moka-current {
+    &.moka-focus .moka-widgetlist-item.moka-current {
         color: $widget_selected_fg;
         background-color: $widget_selected_bg;
     }
 }
-.moka-widgetlistitem {
+.moka-widgetlist-item {
     &:nth-child(even) {
         background-color: $widget_bg*1.05;
     }
@@ -230,16 +234,29 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     }
 }
 .moka-viewer, .moka-viewer .moka-table {
-    width: 100%;
     height: 100%;
-    overflow: hidden;
+
+    &, &.moka-table {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    // book layout
+    &.moka-layout-2x1 , &.moka-layout-2x1 .moka-table {
+        width: auto;
+        margin: auto;
+        & .moka-view {
+            padding-left: 0;
+            padding-right: 0;
+        }
+    }
 }
-.moka-itemview {
+.moka-view > .moka-widget {
     margin: auto;
 }
 .moka-viewer:not(.moka-layout-1x1) .moka-view {
     padding: $view_padding;
-    &.moka-current .moka-itemview {
+    &.moka-current > .moka-widget {
         outline: $view_padding solid $view_selected_bg;
         // FIXME: missing bottom part of outline in Firefox
         img {margin-bottom:-$view_padding;}
@@ -270,6 +287,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     .moka-title {
         font: $font_header;
         padding: 0.1em 0.5em;
+        text-align: center;
 
         color: $title_fg;
         background-color: $title_bg;

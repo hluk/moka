@@ -1,3 +1,2 @@
-- avoid scrolling when bigger items loaded in viewer
-- canvas for image rendering (+sharpen filter)
+- trigger mokaValueChanged on Input with value
 

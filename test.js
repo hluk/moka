@@ -47,63 +47,19 @@
     return wnd.focus();
   };
   onLoad = function() {
-    var item, itempath, map, notify, oldid, onLoad, v, wnd, _i, _len;
-    onLoad = void 0;
-    if (typeof title != "undefined" && title !== null) {
-      document.title = title;
-    }
-    map = {};
-    location.search.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m, key, value) {
-      return map[key] = value;
-    });
-    v = new Moka.Viewer().layout(map.layout != null ? map.layout.split("x") : [1, 1]).orientation(map.o ? map.o : "lt");
-    for (_i = 0, _len = ls.length; _i < _len; _i++) {
-      item = ls[_i];
-      if (item instanceof Array) {
-        itempath = item[0];
-      } else {
-        itempath = item;
-      }
-      console.log(itempath);
-      v.append(new Moka.ImageView(itempath));
-    }
-    v.e.appendTo("body");
-    v.show();
-    oldid = void 0;
-    notify = function(id) {
-      var img, _ref;
-      if (id != null) {
-        oldid = id;
-      } else {
-        id = oldid;
-      }
-      img = v.at(id);
-      if (img.image) {
-        item = ls[id];
-        if (item instanceof Array) {
-          itempath = item[0];
-        } else {
-          itempath = item;
-        }
-        if ((_ref = Moka.notificationLayer) != null) {
-          _ref.empty();
-        }
-        return new Moka.Notification(("<b>" + (id + 1) + "/" + ls.length + "</b><br/>") + ("URL: <i>" + itempath + "</i><br/>") + (img.width ? "size: <i>" + img.width + "x" + img.height + "</i></br>" : "") + ("zoom: <i>" + (img.width ? Math.floor(100 * img.image.e.width() / img.width) + "%" : img.zhow) + "</i>"), "", 4000, 300);
-      }
-    };
-    v.e.bind("mokaSelected mokaZoomChanged", function(ev, id) {
-      if (ev.target !== this || !((id != null) || (oldid != null))) {
-        return;
-      }
-      return notify(id);
+    var wnd;
+    $("body").css({
+      width: "100%",
+      height: "100%"
+    }).bind("mokaValueChanged", function(ev, value) {
+      return console.log("New value (" + value + ") for", ev.target);
     });
     wnd = new Moka.Window("HELP - <i>JavaScript generated window</i>");
-    wnd.append(new Moka.Container(true).append(new Moka.Container().append(new Moka.Label("Moka is JavaScript GUI framework."), new Moka.ButtonBox().append("Add _New Window", test, "Create new window").append("_Close", (function() {
+    wnd.append(new Moka.WidgetList().append(new Moka.CheckBox("test _1:"), new Moka.TextEdit("test _2:", "test"), new Moka.Combo("test _3:").append("a", "b", "c", "d"), new Moka.LineEdit("test _4:")), new Moka.Container().append(new Moka.Container().append(new Moka.Label("Moka is JavaScript GUI framework."), new Moka.ButtonBox().append("Add _New Window", test, "Create new window").append("_Close", (function() {
       return wnd.close();
     }), "Close this window")), new Moka.Image("img/moka.png", 96, 96).show()));
     wnd.addKey("shift-t", test);
-    wnd.appendTo("body").position(0, 150);
-    return v.zoom(map.zoom);
+    return wnd.appendTo("body").center().disableClose().show().focus();
   };
   $(document).ready(onLoad);
 }).call(this);

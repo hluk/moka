@@ -26,7 +26,9 @@
             notify_delay: [4000, "Item info _delay in milliseconds"]
         },
         _Images: {
-            zoom: ["1", "_Zoom factor", "Examples: <b>1</b>, <b>1.5</b>, <b>fit</b>, <b>fill</b>"],
+            zoom: ["1", "_Zoom factor",
+            "Examples: <b>1</b>; <b>1.5</b>; <b>fit</b>; <b>fill</b>; fit to rectangle 100x100: <b>100,100,fit</b>"
+                ],
             sharpen: [0.0, "_Sharpen factor", "Values from <b>0.0</b> to <b>1.0</b> (slow)"]
         },
         _Layout: {
@@ -308,6 +310,7 @@
                 container = new Moka.Container();
                 container.append(w[name]);
 
+                // additional info
                 label = opt[2];
                 if (label) {
                     container.append( new Moka.Label("<small>"+label+"</small>") );
@@ -367,7 +370,7 @@
         viewer.appendFunction(getItem.bind(null, opts.sharpen), ls.length);
 
         // current item
-        viewer.view(opts.n);
+        viewer.select(opts.n);
 
 		viewer.appendTo("body").show();
 
@@ -410,8 +413,13 @@
 			document.title = title;
 		}
 
-        if (opts.skiptitle || opts.skiptitle_once) {
+        if (opts.skiptitle_once) {
             delete opts.skiptitle_once;
+            saveOptions(opts)
+            return start(opts);
+        }
+
+        if (opts.skiptitle) {
             return start(opts);
         }
 

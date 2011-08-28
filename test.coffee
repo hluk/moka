@@ -1,5 +1,5 @@
 wnd_count = 0
-window.test = () -># {{{
+window.test = () ->
     wnd = new Moka.Window("Widget Test - Window #{++wnd_count}")
 
     p0 = new Moka.WidgetList()
@@ -66,85 +66,21 @@ window.test = () -># {{{
     wnd.e.prependTo("body")
     wnd.show()
     wnd.focus()
-# }}}
 
-onLoad = () -># {{{
-    onLoad = undefined
+onLoad = () ->
+    $("body").css(width:"100%", height:"100%")
+        .bind("mokaValueChanged", (ev, value) ->
+            console.log("New value ("+value+") for", ev.target) )
 
-    if title?
-        document.title = title
-
-    # variables from URL
-    map = {}
-    location.search.replace( /[?&]+([^=&]+)=([^&]*)/gi,
-        (m,key,value) -> map[key] = value )
-
-    # Moka.Viewer {{{
-    v = new Moka.Viewer()
-        .layout(if map.layout? then map.layout.split("x") else [1,1])
-       .orientation(if map.o then map.o else "lt")
-       #.layout([2,1])
-       #.layout([0,1])
-    #v.append(
-        #new Moka.ButtonBox().append("Button _1", () -> alert "click 1!")
-                       #.append("Button _2", () -> alert "click 2!")
-    #)
-    #v.append( new Moka.ImageView(item) ) for item in items
-    for item in ls
-        if item instanceof Array
-            itempath = item[0]
-        else
-            itempath = item
-        console.log itempath
-        v.append( new Moka.ImageView(itempath) )
-    #v.append( new Moka.Image(item) ) for item in items
-    #v.append( new Moka.Button(i, ((x) ->-> alert x)(i)) ) for i in [0..36]
-
-    # Viwer in document
-    v.e.appendTo("body")
-    v.show()
-
-    # notifications
-    oldid = undefined
-    notify = (id) ->
-        if id?
-            oldid = id
-        else
-            id = oldid
-        img = v.at(id)
-        if img.image
-            item = ls[id]
-            if item instanceof Array
-                itempath = item[0]
-                # TODO: get item properties from item[1]
-            else
-                itempath = item
-            Moka.notificationLayer?.empty()
-            new Moka.Notification(
-                "<b>#{id+1}/#{ls.length}</b><br/>"+
-                "URL: <i>#{itempath}</i><br/>"+
-                (if img.width then "size: <i>#{img.width}x#{img.height}</i></br>" else "") +
-                "zoom: <i>#{if img.width then Math.floor(100*img.image.e.width()/img.width)+"%" else img.zhow}</i>",
-                "", 4000, 300
-            )
-
-    v.e.bind "mokaSelected mokaZoomChanged", (ev, id) ->
-        return if ev.target isnt this or not (id? or oldid?)
-        notify(id)
-
-    # Viewer in window
-    #wnd = new Window("Viewer")
-         #.append(v)
-         #.resize(500, 300)
-         #.show()
-    #wnd.e.appendTo("body")
-    #wnd.focus()
-    # }}}
-
-    # Moka.Window # {{{
     wnd = new Moka.Window("HELP - <i>JavaScript generated window</i>")
     wnd.append(
-        new Moka.Container(true).append(
+        new Moka.WidgetList().append(
+            new Moka.CheckBox("test _1:"),
+            new Moka.TextEdit("test _2:", "test"),
+            new Moka.Combo("test _3:").append("a", "b", "c", "d"),
+            new Moka.LineEdit("test _4:")
+        ),
+        new Moka.Container().append(
             new Moka.Container().append(
                 new Moka.Label("Moka is JavaScript GUI framework."),
                 new Moka.ButtonBox()
@@ -156,13 +92,10 @@ onLoad = () -># {{{
     )
     wnd.addKey("shift-t", test)
     wnd.appendTo("body")
-       .position(0, 150)
-       #.show()
-       #.focus()
-    # }}}
-
-    v.zoom(map.zoom)
-# }}}
+       .center()
+       .disableClose()
+       .show()
+       .focus()
 
 $(document).ready(onLoad)
 

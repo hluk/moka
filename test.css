@@ -21,18 +21,18 @@ a {
   transition: opacity .2s ease-in-out, background-color .2s ease-in-out, color .2s ease-in-out;
   z-index: inherit; }
 
-.moka-widgetlistitem.moka-current, .moka-tab.moka-current, .moka-view.moka-current > .moka-widget {
+.moka-widgetlist-item.moka-current, .moka-tab.moka-current, .moka-view.moka-current > .moka-widget {
   color: rgba(0, 0, 0, 0.8);
   background-color: rgba(221, 170, 68, 0.4); }
 
 input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   outline: 0; }
 
-.moka-window .moka-title.moka-focus, .moka-tab.moka-focus, .moka-widgetlistitem.moka-focus, .moka-button.moka-focus, .moka-imageview.moka-focus {
+.moka-window .moka-title.moka-focus, .moka-tab.moka-focus, .moka-widgetlist-item.moka-focus, .moka-button.moka-focus, .moka-imageview.moka-focus {
   color: black;
   background-color: rgba(221, 170, 68, 0.7); }
 
-.moka-window .moka-title:hover, .moka-tab:hover, .moka-tabs:hover, .moka-widgetlistitem:hover, .moka-button:hover, .moka-imageviewer:hover {
+.moka-window .moka-title:hover, .moka-tab:hover, .moka-widgetlist-item:hover, .moka-button:hover, .moka-imageviewer:hover {
   color: black;
   background-color: rgba(221, 170, 68, 0.3); }
 
@@ -55,14 +55,14 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
 .moka-buttonbox {
   width: 95%;
   text-align: right; }
-  .moka-buttonbox > .moka-button.moka-first {
+  .moka-buttonbox .moka-buttonbox-item.moka-first {
     border-top-left-radius: 2em;
     -moz-border-radius-topleft: 2em;
     -webkit-border-radius-topleft: 2em;
     border-bottom-left-radius: 2em;
     -moz-border-radius-bottomleft: 2em;
     -webkit-border-radius-bottomleft: 2em; }
-  .moka-buttonbox > .moka-button.moka-last {
+  .moka-buttonbox .moka-buttonbox-item.moka-last {
     border-top-right-radius: 2em;
     -moz-border-radius-topright: 2em;
     -webkit-border-radius-topright: 2em;
@@ -102,11 +102,15 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
       color: black;
       text-shadow: rgba(254, 254, 254, 0.5) 0 1px 0px; }
 
-.moka-lineedit input, .moka-textedit textarea {
+.moka-textedit textarea {
+  vertical-align: top; }
+
+.moka-lineedit input, .moka-textedit textarea, .moka-combo select {
   color: #444444;
   background-color: #ffffd3;
   border-color: white;
   text-shadow: white 0 0 0;
+  min-width: 4em;
   font: 11pt Inconsolata, Consolas, monospace;
   margin: 0.2em 0.5em;
   border: 1px solid #b2aa8c;
@@ -116,22 +120,22 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   -webkit-box-shadow: inset 0 0 4px rgba(112, 107, 88, 0.4);
   -moz-box-shadow: inset 0 0 4px rgba(112, 107, 88, 0.4);
   -o-box-shadow: inset 0 0 4px rgba(112, 107, 88, 0.4); }
-  .moka-lineedit input.moka-focus, .moka-textedit textarea.moka-focus {
+  .moka-lineedit input.moka-focus, .moka-textedit textarea.moka-focus, .moka-combo select.moka-focus {
     color: #222222;
     background-color: #fffffd;
     text-shadow: black 0 0 0; }
 
-.moka-container.moka-vertical > .moka-widget {
+.moka-container.moka-vertical > .moka-widget, .moka-widgetlist.moka-vertical > .moka-widget {
   display: block; }
-.moka-container.moka-horizontal > .moka-widget {
+.moka-container.moka-horizontal > .moka-widget, .moka-widgetlist.moka-horizontal > .moka-widget {
   display: inline-block; }
 
-.moka-tabs .moka-tab {
+.moka-tabs-container .moka-tab {
   border: 1px solid #9c957b; }
-  .moka-tabs .moka-tab .moka-focus {
+  .moka-tabs-container .moka-tab .moka-focus {
     color: black;
     background-color: rgba(221, 170, 68, 0.7); }
-.moka-tabs.moka-horizontal > .moka-tab {
+.moka-tabs-container.moka-horizontal > .moka-tab {
   border-bottom: 0;
   display: inline;
   vertical-align: top;
@@ -151,12 +155,12 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   -moz-box-shadow: 0 -2px 4px rgba(89, 85, 70, 0.2);
   -o-box-shadow: 0 -2px 4px rgba(89, 85, 70, 0.2);
   padding-bottom: 0.4em; }
-  .moka-tabs.moka-horizontal > .moka-tab:hover, .moka-tabs.moka-horizontal > .moka-tab.moka-current {
+  .moka-tabs-container.moka-horizontal > .moka-tab:hover, .moka-tabs-container.moka-horizontal > .moka-tab.moka-current {
     margin-top: 0;
     padding-bottom: 0.8em; }
-.moka-tabs.moka-vertical {
+.moka-tabs-container.moka-vertical {
   float: left; }
-  .moka-tabs.moka-vertical > .moka-tab {
+  .moka-tabs-container.moka-vertical > .moka-tab {
     border-right: 0;
     display: block;
     margin: 1.2em 0 1.2em 0.4em;
@@ -178,7 +182,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
     -o-box-shadow: -2px 0 4px rgba(89, 85, 70, 0.2);
     padding: 0.3em;
     padding-right: 0.4em; }
-    .moka-tabs.moka-vertical > .moka-tab:hover, .moka-tabs.moka-vertical > .moka-tab.moka-current {
+    .moka-tabs-container.moka-vertical > .moka-tab:hover, .moka-tabs-container.moka-vertical > .moka-tab.moka-current {
       margin-left: 0;
       padding-right: 0.8em; }
 
@@ -190,41 +194,48 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
 
 .moka-widgetlist {
   margin: auto;
-  padding: 1em;
+  padding: 0.2em;
   text-align: left; }
-  .moka-widgetlist.moka-focus .moka-widgetlistitem.moka-current {
+  .moka-widgetlist.moka-focus .moka-widgetlist-item.moka-current {
     color: black;
     background-color: rgba(221, 170, 68, 0.7); }
 
-.moka-widgetlistitem:nth-child(even) {
+.moka-widgetlist-item:nth-child(even) {
   background-color: #ebe0b8; }
-.moka-widgetlistitem, .moka-widgetlistitem:nth-child(even) {
+.moka-widgetlist-item, .moka-widgetlist-item:nth-child(even) {
   padding-top: 0.2em;
   padding-bottom: 0.2em;
   margin: 0.3em;
   border-radius: 3px;
   -moz-border-radius: 3px;
   -webkit-border-radius: 3px; }
-  .moka-widgetlistitem.moka-focus, .moka-widgetlistitem:nth-child(even).moka-focus {
+  .moka-widgetlist-item.moka-focus, .moka-widgetlist-item:nth-child(even).moka-focus {
     background-color: rgba(221, 170, 68, 0.7); }
-  .moka-widgetlistitem.moka-current, .moka-widgetlistitem:nth-child(even).moka-current {
+  .moka-widgetlist-item.moka-current, .moka-widgetlist-item:nth-child(even).moka-current {
     background-color: rgba(221, 170, 68, 0.4); }
-  .moka-widgetlistitem:hover, .moka-widgetlistitem:nth-child(even):hover {
+  .moka-widgetlist-item:hover, .moka-widgetlist-item:nth-child(even):hover {
     background-color: rgba(221, 170, 68, 0.3); }
 
 .moka-viewer, .moka-viewer .moka-table {
-  width: 100%;
-  height: 100%;
-  overflow: hidden; }
+  height: 100%; }
+  .moka-viewer, .moka-viewer.moka-table, .moka-viewer .moka-table, .moka-viewer .moka-table.moka-table {
+    width: 100%;
+    overflow: hidden; }
+  .moka-viewer.moka-layout-2x1, .moka-viewer.moka-layout-2x1 .moka-table, .moka-viewer .moka-table.moka-layout-2x1, .moka-viewer .moka-table.moka-layout-2x1 .moka-table {
+    width: auto;
+    margin: auto; }
+    .moka-viewer.moka-layout-2x1 .moka-view, .moka-viewer.moka-layout-2x1 .moka-table .moka-view, .moka-viewer .moka-table.moka-layout-2x1 .moka-view, .moka-viewer .moka-table.moka-layout-2x1 .moka-table .moka-view {
+      padding-left: 0;
+      padding-right: 0; }
 
-.moka-itemview {
+.moka-view > .moka-widget {
   margin: auto; }
 
 .moka-viewer:not(.moka-layout-1x1) .moka-view {
   padding: 4px; }
-  .moka-viewer:not(.moka-layout-1x1) .moka-view.moka-current .moka-itemview {
+  .moka-viewer:not(.moka-layout-1x1) .moka-view.moka-current > .moka-widget {
     outline: 4px solid rgba(165, 127, 51, 0.7); }
-    .moka-viewer:not(.moka-layout-1x1) .moka-view.moka-current .moka-itemview img {
+    .moka-viewer:not(.moka-layout-1x1) .moka-view.moka-current > .moka-widget img {
       margin-bottom: -4px; }
 
 .moka-viewer .moka-table {
@@ -258,6 +269,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   .moka-window .moka-title {
     font: 11pt "Molengo", sans-serif;
     padding: 0.1em 0.5em;
+    text-align: center;
     color: white;
     background-color: black;
     border-radius: 0px;
@@ -308,7 +320,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
 #moka-notification-layer {
   position: fixed;
   z-index: 9999;
-  right: 0;
+  left: 0;
   bottom: 0; }
 
 .moka-notification {
