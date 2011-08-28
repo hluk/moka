@@ -288,7 +288,7 @@
         vx = dx * accel;
         vy = dy * accel;
         tt = 100;
-        w.animate({
+        w.stop(true).animate({
           scrollLeft: w.scrollLeft() + vx + "px",
           scrollTop: w.scrollTop() + vy + "px"
         }, 1000, "easeOutCubic", function() {
@@ -377,34 +377,27 @@
       return false;
     }
   };
-  Moka.onScreen = function(w, how) {
-    var e, max, min, pos, wnd, x;
-    if (!w) {
-      return false;
-    }
+  Moka.onScreen = function(e, how) {
+    var d, pos, wnd, _ref, _ref2, _ref3, _ref4;
     if (!how) {
-      return (Moka.onScreen(w, "right") || Moka.onScreen(w, "left")) && (Moka.onScreen(w, "top") || Moka.onScreen(w, "bottom"));
+      return (Moka.onScreen(e, 'r') || Moka.onScreen(e, 'l')) && (Moka.onScreen(e, 't') || Moka.onScreen(e, 'b'));
     }
-    e = w.e ? w.e : w;
     pos = e.offset();
-    if (!pos) {
-      return false;
-    }
-    pos.right = pos.left + e.width();
-    pos.bottom = pos.top + e.height();
     wnd = $(window);
-    if (how === "right" || how === "left") {
-      min = wnd.scrollLeft();
-      max = min + wnd.width();
-    } else {
-      min = wnd.scrollTop();
-      max = min + wnd.height();
+    d = 8;
+    switch (how[0]) {
+      case 'b':
+        return (-d < (_ref = pos.top + e.height()) && _ref < wnd.height() + d);
+      case 't':
+        return (-d < (_ref2 = pos.top) && _ref2 < wnd.height() + d);
+      case 'r':
+        return (-d < (_ref3 = pos.left + e.width()) && _ref3 < wnd.width() + d);
+      case 'l':
+        return (-d < (_ref4 = pos.left) && _ref4 < wnd.width() + d);
     }
-    x = pos[how];
-    return (x + 8) >= min && (x - 8) <= max;
   };
   Moka.toScreen = function(e, wnd, o) {
-    var a, b, ca, cb, ch, cleft, cpos, ctop, cw, h, left, top, w;
+    var a, b, ca, cb, ch, cleft, cpos, ctop, cw, h, left, pos, top, w;
     if (!o) {
       o = "lt";
     }
@@ -420,6 +413,7 @@
     if (!wnd.length || wnd[0] === e[0]) {
       return;
     }
+    pos = wnd.offset();
     w = wnd.width();
     h = wnd.height();
     left = wnd.scrollLeft();
@@ -427,8 +421,8 @@
     cpos = e.offset();
     cw = e.width();
     ch = e.height();
-    cleft = cpos.left;
-    ctop = cpos.top;
+    cleft = cpos.left - pos.left;
+    ctop = cpos.top - pos.top;
     a = left;
     b = a + w;
     ca = cleft + a;
@@ -479,7 +473,7 @@
         }
       }
     }
-    return wnd.animate({
+    return wnd.stop(true).animate({
       'scrollLeft': left,
       'scrollTop': top
     }, 500);
@@ -1753,16 +1747,16 @@
     Viewer.prototype.mainclass = "moka-viewer " + Moka.Input.prototype.mainclass;
     Viewer.prototype.default_keys = {
       RIGHT: function() {
-        return Moka.onScreen(Moka.focused(), "right") && this.focusRight() || this.e.scrollLeft(this.e.scrollLeft() + 30);
+        return Moka.onScreen(Moka.focused(), 'r') && this.focusRight() || this.e.scrollLeft(this.e.scrollLeft() + 30);
       },
       LEFT: function() {
-        return Moka.onScreen(Moka.focused(), "left") && this.focusLeft() || this.e.scrollLeft(this.e.scrollLeft() - 30);
+        return Moka.onScreen(Moka.focused(), 'l') && this.focusLeft() || this.e.scrollLeft(this.e.scrollLeft() - 30);
       },
       UP: function() {
-        return Moka.onScreen(Moka.focused(), "top") && this.focusUp() || this.e.scrollTop(this.e.scrollTop() - 30);
+        return Moka.onScreen(Moka.focused(), 't') && this.focusUp() || this.e.scrollTop(this.e.scrollTop() - 30);
       },
       DOWN: function() {
-        return Moka.onScreen(Moka.focused(), "bottom") && this.focusDown() || this.e.scrollTop(this.e.scrollTop() + 30);
+        return Moka.onScreen(Moka.focused(), 'b') && this.focusDown() || this.e.scrollTop(this.e.scrollTop() + 30);
       },
       KP6: function() {
         if (__indexOf.call(this.orientation(), 'l') >= 0) {
@@ -1807,17 +1801,52 @@
         }
       },
       SPACE: function() {
-        if (Moka.onScreen(Moka.focused(), "bottom")) {
+        var f, how, x;
+        how = this.orientation()[1];
+        switch (how) {
+          case 't':
+            how = 'b';
+            break;
+          case 'l':
+            how = 'r';
+            break;
+          case 'r':
+            how = 'l';
+            break;
+          default:
+            how = 't';
+        }
+        if (Moka.onScreen(Moka.focused(), how)) {
           return this.next();
         } else {
-          return this.e.scrollTop(this.e.scrollTop() + 0.9 * this.e.parent().height());
+          f = how === 'l' || how === 'r' ? "scrollLeft" : "scrollTop";
+          x = how === 'r' || how === 'b' ? 1 : -1;
+          return this.e[f](this.e[f]() + x * 0.9 * this.e.parent().height());
         }
       },
       'S-SPACE': function() {
-        if (Moka.onScreen(Moka.focused(), "top")) {
-          return this.prev();
+        var f, how, x;
+        how = this.orientation()[1];
+        if (Moka.onScreen(Moka.focused(), how)) {
+          this.prev();
+          switch (how) {
+            case 't':
+              how = 'b';
+              break;
+            case 'l':
+              how = 'r';
+              break;
+            case 'r':
+              how = 'l';
+              break;
+            default:
+              how = 't';
+          }
+          return Moka.toScreen(Moka.focused(), this.e, how);
         } else {
-          return this.e.scrollTop(this.e.scrollTop() - 0.9 * this.e.parent().height());
+          f = how === 'l' || how === 'r' ? "scrollLeft" : "scrollTop";
+          x = how === 'r' || how === 'b' ? 1 : -1;
+          return this.e[f](this.e[f]() + x * 0.9 * this.e.parent().height());
         }
       },
       ENTER: function() {
@@ -1922,7 +1951,7 @@
     };
     Viewer.prototype.focus = function(ev) {
       var cell;
-      cell = this.cells[this.currentcell > 0 ? this.currentcell : 0];
+      cell = this.cells[this.currentcell] || this.cells[0];
       Moka.focusFirst(cell.children(), this.o) || Moka.focus(cell, this.o);
       return this;
     };

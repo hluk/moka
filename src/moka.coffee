@@ -284,7 +284,7 @@ Moka.dragScroll = (ev) ->
             vy = dy*accel
 
             tt = 100
-            w.animate(
+            w.stop(true).animate(
                 scrollLeft: w.scrollLeft()+vx+"px",
                 scrollTop: w.scrollTop()+vy+"px",
                 1000, "easeOutCubic",
@@ -362,29 +362,19 @@ Moka.focusFirst = (e, o) ->
     else
         return false
 
-Moka.onScreen = (w, how) ->
-    return false if not w
+Moka.onScreen = (e, how) ->
     if not how
-        return (Moka.onScreen(w, "right") or Moka.onScreen(w, "left")) and
-               (Moka.onScreen(w, "top") or Moka.onScreen(w, "bottom"))
-
-    e = if w.e then w.e else w
+        return (Moka.onScreen(e, 'r') or Moka.onScreen(e, 'l')) and
+               (Moka.onScreen(e, 't') or Moka.onScreen(e, 'b'))
 
     pos = e.offset()
-    return false if not pos
-    pos.right = pos.left + e.width()
-    pos.bottom = pos.top + e.height()
-
     wnd = $(window)
-    if how is "right" or how is "left"
-        min = wnd.scrollLeft()
-        max = min + wnd.width()
-    else
-        min = wnd.scrollTop()
-        max = min + wnd.height()
-
-    x = pos[how]
-    return (x+8) >= min and (x-8) <= max
+    d = 8
+    switch how[0]
+        when 'b' then return -d < pos.top+e.height() < wnd.height()+d
+        when 't' then return -d < pos.top < wnd.height()+d
+        when 'r' then return -d < pos.left+e.width() < wnd.width()+d
+        when 'l' then return -d < pos.left < wnd.width()+d
 
 Moka.toScreen = (e, wnd, o) ->
     o = "lt" if not o
@@ -396,6 +386,7 @@ Moka.toScreen = (e, wnd, o) ->
             wnd = wnd.parent()
     return if not wnd.length or wnd[0] is e[0]
 
+    pos = wnd.offset()
     w = wnd.width()
     h = wnd.height()
     left = wnd.scrollLeft()
@@ -404,8 +395,8 @@ Moka.toScreen = (e, wnd, o) ->
     cpos = e.offset()
     cw = e.width()
     ch = e.height()
-    cleft = cpos.left
-    ctop = cpos.top
+    cleft = cpos.left - pos.left
+    ctop = cpos.top - pos.top
 
     a  = left
     b  = a + w
@@ -449,7 +440,7 @@ Moka.toScreen = (e, wnd, o) ->
             else
                 top = ca
 
-    wnd.animate({'scrollLeft':left, 'scrollTop':top}, 500)
+    wnd.stop(true).animate({'scrollLeft':left, 'scrollTop':top}, 500)
 
 Moka.ensureVisible = (e, wnd) ->
     toScreen(e, wnd)
@@ -1530,13 +1521,13 @@ class Moka.Viewer extends Moka.Input
     mainclass: "moka-viewer "+Moka.Input.prototype.mainclass
 
     default_keys:
-        RIGHT: -> Moka.onScreen(Moka.focused(), "right") and @focusRight() or
+        RIGHT: -> Moka.onScreen(Moka.focused(), 'r') and @focusRight() or
             @e.scrollLeft( @e.scrollLeft()+30 )
-        LEFT: -> Moka.onScreen(Moka.focused(), "left") and @focusLeft() or
+        LEFT: -> Moka.onScreen(Moka.focused(), 'l') and @focusLeft() or
             @e.scrollLeft( @e.scrollLeft()-30 )
-        UP: -> Moka.onScreen(Moka.focused(), "top") and @focusUp() or
+        UP: -> Moka.onScreen(Moka.focused(), 't') and @focusUp() or
             @e.scrollTop( @e.scrollTop()-30 )
-        DOWN: -> Moka.onScreen(Moka.focused(), "bottom") and @focusDown() or
+        DOWN: -> Moka.onScreen(Moka.focused(), 'b') and @focusDown() or
             @e.scrollTop( @e.scrollTop()+30 )
         KP6: -> if 'l' in @orientation() then @next() else @prev()
         KP4: -> if 'r' in @orientation() then @next() else @prev()
@@ -1550,10 +1541,33 @@ class Moka.Viewer extends Moka.Input
                 return false
         'S-TAB': -> if @currentcell > 0 then @prev() else false
 
-        SPACE: -> if Moka.onScreen(Moka.focused(), "bottom") then @next() else
-            @e.scrollTop( @e.scrollTop()+0.9*@e.parent().height() )
-        'S-SPACE': -> if Moka.onScreen(Moka.focused(), "top") then @prev() else
-            @e.scrollTop( @e.scrollTop()-0.9*@e.parent().height() )
+        SPACE: ->
+            how = @orientation()[1]
+            switch how
+                when 't' then how = 'b'
+                when 'l' then how = 'r'
+                when 'r' then how = 'l'
+                else how = 't'
+            if Moka.onScreen(Moka.focused(), how)
+                @next()
+            else
+                f = if how is 'l' or how is 'r' then "scrollLeft" else "scrollTop"
+                x = if how is 'r' or how is 'b' then 1 else -1
+                @e[f]( @e[f]()+x*0.9*@e.parent().height() )
+        'S-SPACE': ->
+            how = @orientation()[1]
+            if Moka.onScreen(Moka.focused(), how)
+                @prev()
+                switch how
+                    when 't' then how = 'b'
+                    when 'l' then how = 'r'
+                    when 'r' then how = 'l'
+                    else how = 't'
+                Moka.toScreen(Moka.focused(), @e, how)
+            else
+                f = if how is 'l' or how is 'r' then "scrollLeft" else "scrollTop"
+                x = if how is 'r' or how is 'b' then 1 else -1
+                @e[f]( @e[f]()+x*0.9*@e.parent().height() )
 
         ENTER: -> @next()
 
@@ -1627,7 +1641,7 @@ class Moka.Viewer extends Moka.Input
         return this
 
     focus: (ev) ->
-        cell = @cells[if @currentcell > 0 then @currentcell else 0]
+        cell = @cells[@currentcell] or @cells[0]
         Moka.focusFirst( cell.children(), @o ) or Moka.focus(cell, @o)
         return this
 
