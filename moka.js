@@ -473,10 +473,38 @@
         }
       }
     }
-    return wnd.stop(true).animate({
-      'scrollLeft': left,
-      'scrollTop': top
-    }, 500);
+    return Moka.scroll(wnd, {
+      left: left,
+      top: top,
+      animate: true
+    });
+  };
+  Moka.scroll = function(e, opts) {
+    var a, duration, l, t;
+    l = opts.left;
+    t = opts.top;
+    a = {};
+    if (l) {
+      a.scrollLeft = l + (opts.relative ? e.scrollLeft() : 0);
+    }
+    if (t) {
+      a.scrollTop = t + (opts.relative ? e.scrollTop() : 0);
+    }
+    if (opts.animate) {
+      l = l || 0;
+      t = t || 0;
+      duration = Math.min(1500, Math.sqrt(l * l + t * t) * (opts.speed || 1));
+      return e.stop(true).animate(a, duration, opts.easing, opts.complete);
+    } else {
+      e.stop(true, true);
+      if (l && t) {
+        return e.scrollLeft(a.scrollLeft).scrollTop(a.scrollTop);
+      } else if (l) {
+        return e.scrollLeft(a.scrollLeft);
+      } else if (t) {
+        return e.scrollTop(a.scrollTop);
+      }
+    }
   };
   Moka.ensureVisible = function(e, wnd) {
     return toScreen(e, wnd);
@@ -1664,7 +1692,7 @@
       if (how != null) {
         this.z = how;
         zhow = this.zhow = this.z instanceof Array ? this.z[2] : null;
-        if (this.isLoaded() && this.e.parent().length) {
+        if (this.ok && this.e.parent().length) {
           width = this.image.width();
           height = this.image.height();
           w = h = mw = mh = "";
@@ -1747,16 +1775,28 @@
     Viewer.prototype.mainclass = "moka-viewer " + Moka.Input.prototype.mainclass;
     Viewer.prototype.default_keys = {
       RIGHT: function() {
-        return Moka.onScreen(Moka.focused(), 'r') && this.focusRight() || this.e.scrollLeft(this.e.scrollLeft() + 30);
+        return Moka.onScreen(Moka.focused(), 'r') && this.focusRight() || Moka.scroll(this.e, {
+          left: 30,
+          relative: true
+        });
       },
       LEFT: function() {
-        return Moka.onScreen(Moka.focused(), 'l') && this.focusLeft() || this.e.scrollLeft(this.e.scrollLeft() - 30);
+        return Moka.onScreen(Moka.focused(), 'l') && this.focusLeft() || Moka.scroll(this.e, {
+          left: -30,
+          relative: true
+        });
       },
       UP: function() {
-        return Moka.onScreen(Moka.focused(), 't') && this.focusUp() || this.e.scrollTop(this.e.scrollTop() - 30);
+        return Moka.onScreen(Moka.focused(), 't') && this.focusUp() || Moka.scroll(this.e, {
+          top: -30,
+          relative: true
+        });
       },
       DOWN: function() {
-        return Moka.onScreen(Moka.focused(), 'b') && this.focusDown() || this.e.scrollTop(this.e.scrollTop() + 30);
+        return Moka.onScreen(Moka.focused(), 'b') && this.focusDown() || Moka.scroll(this.e, {
+          top: 30,
+          relative: true
+        });
       },
       KP6: function() {
         if (__indexOf.call(this.orientation(), 'l') >= 0) {
@@ -1801,7 +1841,7 @@
         }
       },
       SPACE: function() {
-        var f, how, x;
+        var how, opts, val;
         how = this.orientation()[1];
         switch (how) {
           case 't':
@@ -1819,13 +1859,20 @@
         if (Moka.onScreen(Moka.focused(), how)) {
           return this.next();
         } else {
-          f = how === 'l' || how === 'r' ? "scrollLeft" : "scrollTop";
-          x = how === 'r' || how === 'b' ? 1 : -1;
-          return this.e[f](this.e[f]() + x * 0.9 * this.e.parent().height());
+          opts = {
+            relative: true
+          };
+          val = how === 'l' || how === 't' ? -1 : 1;
+          if (how === 'l' || how === 'r') {
+            opts.left = val * 0.9 * this.e.parent().width();
+          } else {
+            opts.top = val * 0.9 * this.e.parent().height();
+          }
+          return Moka.scroll(this.e, opts);
         }
       },
       'S-SPACE': function() {
-        var f, how, x;
+        var how, opts, val;
         how = this.orientation()[1];
         if (Moka.onScreen(Moka.focused(), how)) {
           this.prev();
@@ -1842,11 +1889,21 @@
             default:
               how = 't';
           }
-          return Moka.toScreen(Moka.focused(), this.e, how);
+          Moka.toScreen(Moka.focused(), this.e, how);
+          return Moka.scroll(this.e, {
+            animate: false
+          });
         } else {
-          f = how === 'l' || how === 'r' ? "scrollLeft" : "scrollTop";
-          x = how === 'r' || how === 'b' ? 1 : -1;
-          return this.e[f](this.e[f]() + x * 0.9 * this.e.parent().height());
+          opts = {
+            relative: true
+          };
+          val = how === 'l' || how === 't' ? -1 : 1;
+          if (how === 'l' || how === 'r') {
+            opts.left = val * 0.9 * this.e.parent().width();
+          } else {
+            opts.top = val * 0.9 * this.e.parent().height();
+          }
+          return Moka.scroll(this.e, opts);
         }
       },
       ENTER: function() {

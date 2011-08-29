@@ -440,7 +440,31 @@ Moka.toScreen = (e, wnd, o) ->
             else
                 top = ca
 
-    wnd.stop(true).animate({'scrollLeft':left, 'scrollTop':top}, 500)
+    Moka.scroll(wnd, {left:left, top:top, animate:true})
+
+Moka.scroll = (e, opts) ->
+    l = opts.left
+    t = opts.top
+
+    a = {}
+    if l
+        a.scrollLeft = l + (if opts.relative then e.scrollLeft() else 0)
+    if t
+        a.scrollTop = t + (if opts.relative then e.scrollTop() else 0)
+
+    if opts.animate
+        l = l or 0
+        t = t or 0
+        duration = Math.min( 1500, Math.sqrt(l*l+t*t) * (opts.speed or 1) )
+        e.stop(true).animate(a, duration, opts.easing, opts.complete)
+    else
+        e.stop(true, true)
+        if l and t
+            e.scrollLeft(a.scrollLeft).scrollTop(a.scrollTop)
+        else if l
+            e.scrollLeft(a.scrollLeft)
+        else if t
+            e.scrollTop(a.scrollTop)
 
 Moka.ensureVisible = (e, wnd) ->
     toScreen(e, wnd)
@@ -1458,7 +1482,7 @@ class Moka.ImageView extends Moka.Input
             @z = how
             zhow = @zhow = if @z instanceof Array then @z[2] else null
 
-            if @isLoaded() and @e.parent().length
+            if @ok and @e.parent().length
                 width = @image.width()
                 height = @image.height()
                 w = h = mw = mh = ""
@@ -1522,13 +1546,13 @@ class Moka.Viewer extends Moka.Input
 
     default_keys:
         RIGHT: -> Moka.onScreen(Moka.focused(), 'r') and @focusRight() or
-            @e.scrollLeft( @e.scrollLeft()+30 )
+            Moka.scroll(@e, {left:30, relative:true})
         LEFT: -> Moka.onScreen(Moka.focused(), 'l') and @focusLeft() or
-            @e.scrollLeft( @e.scrollLeft()-30 )
+            Moka.scroll(@e, {left:-30, relative:true})
         UP: -> Moka.onScreen(Moka.focused(), 't') and @focusUp() or
-            @e.scrollTop( @e.scrollTop()-30 )
+            Moka.scroll(@e, {top:-30, relative:true})
         DOWN: -> Moka.onScreen(Moka.focused(), 'b') and @focusDown() or
-            @e.scrollTop( @e.scrollTop()+30 )
+            Moka.scroll(@e, {top:30, relative:true})
         KP6: -> if 'l' in @orientation() then @next() else @prev()
         KP4: -> if 'r' in @orientation() then @next() else @prev()
         KP8: -> if 't' in @orientation() then @next() else @prev()
@@ -1551,9 +1575,13 @@ class Moka.Viewer extends Moka.Input
             if Moka.onScreen(Moka.focused(), how)
                 @next()
             else
-                f = if how is 'l' or how is 'r' then "scrollLeft" else "scrollTop"
-                x = if how is 'r' or how is 'b' then 1 else -1
-                @e[f]( @e[f]()+x*0.9*@e.parent().height() )
+                opts = {relative:true}
+                val = if how is 'l' or how is 't' then -1 else 1
+                if how is 'l' or how is 'r'
+                    opts.left = val*0.9*@e.parent().width()
+                else
+                    opts.top = val*0.9*@e.parent().height()
+                Moka.scroll(@e, opts)
         'S-SPACE': ->
             how = @orientation()[1]
             if Moka.onScreen(Moka.focused(), how)
@@ -1564,10 +1592,15 @@ class Moka.Viewer extends Moka.Input
                     when 'r' then how = 'l'
                     else how = 't'
                 Moka.toScreen(Moka.focused(), @e, how)
+                Moka.scroll(@e, {animate:false})
             else
-                f = if how is 'l' or how is 'r' then "scrollLeft" else "scrollTop"
-                x = if how is 'r' or how is 'b' then 1 else -1
-                @e[f]( @e[f]()+x*0.9*@e.parent().height() )
+                opts = {relative:true}
+                val = if how is 'l' or how is 't' then -1 else 1
+                if how is 'l' or how is 'r'
+                    opts.left = val*0.9*@e.parent().width()
+                else
+                    opts.top = val*0.9*@e.parent().height()
+                Moka.scroll(@e, opts)
 
         ENTER: -> @next()
 
