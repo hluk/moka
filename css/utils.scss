@@ -39,7 +39,7 @@
     border: $depth solid $outset_bg * 0.4 + $outset_shadow * 0.4;
     border-left: $depth solid $outset_bg * 0.4 + $outset_shadow * 1.1;
     border-top: $depth solid $outset_bg * 0.4 + $outset_shadow * 1.1;
-    @include box-shadow(0 0 8px transparentize(black, 0.2));
+    @include box-shadow(0 0 8px rgba(0,0,0,0.5));
 }
 
 @mixin inset($inset_bg:$widget_bg, $inset_shadow:$widget_bg, $depth:1px) {

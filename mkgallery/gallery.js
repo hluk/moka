@@ -170,7 +170,7 @@
 
     // show notification
     notify = function(id) {
-        var item, itempath, html, notification, counter, label, r, w1, w2, e, z;
+        var item, itempath, html, notification, counter, r, w1, w2, e, z;
 
         item = viewer.at(id);
 
@@ -326,7 +326,7 @@
         buttons = new Moka.ButtonBox();
         buttons.append("_Ok", accept);
         buttons.append("R_eset", reset);
-        buttons.append("_Close", menu.close.bind(menu));
+        buttons.append("_Cancel", menu.close.bind(menu));
 
         menu.append(tabs, buttons);
 
@@ -375,7 +375,7 @@
 		viewer.appendTo("body").show();
 
 		// show notification and update URL when viewing new item or changing zoom level
-        viewer.bind("mokaSelected mokaZoomChanged", function(ev, id) {
+        viewer.connect("mokaSelected mokaZoomChanged", function(ev, id) {
             if (typeof id == "undefined") {
                 id = opts.n;
             }

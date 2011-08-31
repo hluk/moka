@@ -101,96 +101,53 @@ Moka.getKeyName = (ev) ->
 
     return keyname
 
-Moka.keyHintFocus = (keyname, root) ->
+Moka.getKeyHint = (keyname) ->
     if keyname.length is 1
-        keyhint = keyname
+        return keyname
     else
         # digit (1, KP1, S-1 ... not F1)
         n = keyname.replace(/^S-/,"").replace(/^KP/,"")
         if n >= "0" and n <= "9"
-            keyhint = n
+            return n
+    return null
 
-    e = null
-    if keyhint?
-        root.find(".moka-keyhint").each () ->
-                $this = $(this)
-                if $this.is(":visible") and keyhint is $this.text().toUpperCase()
-                    parent = $this.parent()
-                    if not parent.hasClass("moka-focus")
-                        if parent.hasClass("moka-tab") or parent.hasClass("moka-input")
-                            e = parent
-                        else
-                            e = parent.find(".moka-input:first")
 
-                        if e.length
-                            Moka.focus(e)
-                            return false #break
+Moka.findInput = (w, opts) ->
+    return null if not opts.text
 
-    return e and e.length
-
-Moka.createLabel = (text, e) ->
-    e = $("<div>") if not e
-    e.addClass("moka-label")
-
-    # replace _x with underlined character and assign x key
-    if text
-        i=0
-        while i < text.length
-            c = text[i]
-            if c is '_'
-                break
-            else if c is '\\'
-                text = text.slice(0,i) + text.slice(i+1)
-                ++i
-            ++i
-
-        if i+1 < text.length
-            key = text[i+1]
-            text = text.substr(0, i) +
-                '<span class="moka-keyhint"' +
-                # delegate click to parent
-                ' onclick="this.parentNode.click(event)">' +
-                key + '</span>' +
-                text.substr(i+2)
-
-        e.html(text)
-
-    e.css("cursor","pointer")
-
-    return e
-
-Moka.findInput = (e, str, next) ->
-    return null if not str
-
-    prev_found = not next
+    prev_found = false
     first = null
-
+    last = null
     # case-insensitive search
-    query = str.toUpperCase()
+    query = opts.text.toUpperCase()
 
-    res = null
-    find = () ->
-        $this = $(this)
-        if $this.text().toUpperCase().search(query) >= 0
-            res = $this.closest(".moka-input")
-            first = res if not first
-            if not prev_found
-                prev_found = res.hasClass("moka-found")
-                res = null
-                return
-            return false
+    find = (w) ->
+        return null if not w.isVisible()
+        if w.length
+            i = 0
+            l = w.length()
+            while i<l
+                res = find( w.at(i++) )
+                return res if res
+        if w.focus and w not instanceof Moka.WidgetList and
+           w.text().toUpperCase().search(query) >= 0
+            if (opts.next and prev_found) or not (opts.next or opts.prev)
+                return w
+            if w.hasClass("moka-found")
+                return last if opts.prev
+                prev_found = true
+            first = w if not first
+            last = w
+        return null
 
-    # search in labels inside each moka-input element
-    e.find(".moka-input.moka-label:visible, .moka-input > .moka-label:visible").each(find)
-
-    return res or first
+    return find(w) or (opts.prev and last) or first
 
 Moka.initDraggable = (e, handle_e) ->
     if not handle_e
         handle_e = e
     return handle_e
       .css('cursor', "pointer")
-      .mousedown (ev) ->
+      .bind "mousedown", (ev) ->
           if ev.button is 0
               stop = false
               $(document).one( "mouseup", () -> stop = true )
@@ -469,15 +426,6 @@ Moka.scroll = (e, opts) ->
 Moka.ensureVisible = (e, wnd) ->
     toScreen(e, wnd)
 
-Moka.doKey = (keyname, keys, default_keys, object) ->
-    if (keys and fn = keys[keyname]) or
-       (default_keys and fn = default_keys[keyname])
-        if fn.apply(object) is false
-            return false
-        else
-            return true
-    return false
-
 # GUI classes
 # only one widget can can be focused at a time
 class Moka.Widget
@@ -493,11 +441,14 @@ class Moka.Widget
         @bind "mokaFocused", @addClass.bind(this, "moka-focus")
         @bind "mokaBlurred", @removeClass.bind(this, "moka-focus")
 
-    mainClass: (cls) ->
+    mainClass: (cls, replace_all) ->
         if cls?
             @removeClass(@mainclass)
-            @mainclass = cls
-            @addClass(cls)
+            if replace_all
+                @mainclass = cls
+            else
+                @mainclass = @mainclass.replace(/\s*[^ ]*/, cls)
+            @addClass(@mainclass)
             return this
         else
             return @mainclass
@@ -547,11 +498,6 @@ class Moka.Widget
     parent: () ->
         return @parentWidget
 
-    addKey: (keyname, fn) ->
-        @keys = {} if not @keys
-        @keys[ Moka.normalizeKeyName(keyname) ] = fn
-        return this
-
     connect: (event, fn) ->
         @e.bind(event, (ev) => if ev.target is @e[0] then fn.apply(this,arguments))
         return this
@@ -592,6 +538,9 @@ class Moka.Widget
     hasFocus: () ->
         return @e.hasClass("moka-focus")
 
+    hasClass: (cls) ->
+        return @e.hasClass(cls)
+
     addClass: (cls) ->
         @e.addClass(cls)
         return this
@@ -624,45 +573,99 @@ class Moka.Widget
         else
             return @e.css(prop)
 
+    text: (text) ->
+        if text?
+            @e.text(text)
+            return this
+        else
+            return @e.text()
+
     do: (fn) ->
         fn.apply(this, [@e])
         return this
 
+    keyHintFocus: (hint, skip_parent, w_to_skip) ->
+        if this instanceof Moka.Input and @keyHint() is hint and not @hasFocus()
+            @focus()
+            return true
+
+        l = if @length then @length() else 0
+        i = 0
+        while i<l
+            w = @at(i)
+            if w isnt w_to_skip and w.isVisible() and w.keyHintFocus(hint, true)
+                return true
+            ++i
+
+        p = @parent()
+        if p and not skip_parent
+            return true if p.keyHintFocus?(hint, false, this)
+
+        return false
+
 class Moka.Label extends Moka.Widget
     mainclass: "moka-label "+Moka.Widget.prototype.mainclass
 
-    constructor: (@text) ->
-        super Moka.createLabel(@text)
+    constructor: (text, from_element) ->
+        if text instanceof $
+            e = text
+            text = from_element
+        else
+            e = from_element
+        super e
+        @addClass("moka-label")
+        @label(text) if text
 
-class Moka.Input extends Moka.Widget
-    mainclass: "moka-input "+Moka.Widget.prototype.mainclass
+    label: (text) ->
+        if text?
+            # replace _x with underlined character and assign x key
+            keyhint = null
+            html = text.replace /_[a-z]/i, (key) ->
+                        '<span class="moka-keyhint"' +
+                        # delegate click to parent
+                        ' onclick="this.parentNode.click(event)">' +
+                        (keyhint=key[1]) + '</span>'
 
-    constructor: () ->
+            @e.html(html).css("cursor","pointer")
+            @e.data("keyhint", keyhint.toUpperCase()) if keyhint
+            return this
+        else
+            return @e.text()
+
+    keyHint: ->
+        return @e.data("keyhint")
+
+
+class Moka.Input extends Moka.Label
+    mainclass: "moka-input "+Moka.Label.prototype.mainclass
+
+    default_keys: {}
+
+    constructor: (text, from_element) ->
         super
-        @bind "mokaFocused", @onChildFocus.bind(this)
-        @bind "mokaBlurred",  @onChildBlur.bind(this)
-        e = @e
-          .css("cursor","pointer")
-          .bind( "keydown.moka", (ev) => @onKeyDown(ev) )
-        @bind "focus.moka", (ev) =>
-            @onFocus(ev)
-            return false
-        @bind "blur.moka", (ev) =>
-            @onBlur(ev)
-            return false
+        this
+            .connect( "focus.moka", (ev) => @onFocus(ev); return false )
+            .bind( "mokaFocusUpRequest", () => @focus(); return false )
+            .bind( "mokaFocused", @onChildFocus.bind(this) )
+            .bind( "mokaBlurred",  @onChildBlur.bind(this) )
+            .bind( "keydown.moka", (ev) =>
+                if !ev.isPropagationStopped()
+                    return @onKeyDown(ev)
+            )
+            .bind( "blur.moka", (ev) => @onBlur(ev); return false )
+            .css("cursor","pointer")
 
         @e_focus = @e
         @tabindex(1)
-        @focusableElement(e)
+        @focusableElement(@e)
 
     focusableElement: (e) ->
         # if widget is focused then element e will recieve focus
         if e?
             ee = @e_focus
-            tabindex = @tabindex()
             @other_focusable = @e[0] isnt e[0]
+            e.attr("tabindex", -1) if @other_focusable
             @e_focus = e
-            @tabindex(tabindex)
             return this
         else
             return @e_focus
@@ -689,15 +692,27 @@ class Moka.Input extends Moka.Widget
 
     tabindex: (index) ->
         if index?
-            if @other_focusable
-                @e.attr("tabindex", -1)
-            @e_focus.attr("tabindex", index)
+            @e.attr("tabindex", index)
             return this
         else
-            return @e_focus.attr("tabindex", index)
+            return @e.attr("tabindex", index)
 
     focus: () ->
-        Moka.focus(@e_focus)
+        Moka.focus(@e) if Moka.focused()?[0] isnt @e[0]
+        if @other_focusable
+            swap_index = (a, b) ->
+                a.attr("tabindex", b.attr("tabindex"))
+                b.attr("tabindex", -1)
+            # in firefox if DOWN key is pressed and <select> element is
+            # focused and current <option> changes when DOWN key is released
+            # - so focus to focusableElement (e.g. <select>) after
+            # a small delay (can be 0)
+            window.setTimeout( (() =>
+                if Moka.focused()?[0] is @e[0]
+                    swap_index.apply(null, [@e_focus, @e])
+                    @e_focus.one("blur.moka", swap_index.bind(null, @e, @e_focus))
+                    Moka.focus(@e_focus)
+            ), 200 )
         return this
 
     blur: () ->
@@ -719,9 +734,18 @@ class Moka.Input extends Moka.Widget
     change: (fn) ->
         return @e.bind("mokaValueChanged", fn)
 
+    addKey: (keyname, fn) ->
+        @keys = {} if not @keys
+        k = Moka.normalizeKeyName(keyname)
+        if @keys[k]
+            @keys[k].shift(fn)
+        else
+            @keys[k] = [fn]
+        return this
+
     onFocus: (ev) ->
         if @other_focusable
-            Moka.focus(@e_focus)
+            @focus()
         else
             Moka.focused(@e_focus)
 
@@ -729,16 +753,23 @@ class Moka.Input extends Moka.Widget
         Moka.unfocused()
         return
 
+    doKey: (keyname) ->
+        if @keys? and (fns = @keys[keyname])
+            for fn in fns
+                return true if fn.apply(this) isnt false
+        if (fn = @default_keys[keyname])
+            return true if fn.apply(this) isnt false
+
+        return false
+
     onKeyDown: (ev) ->
-        return if ev.isPropagationStopped()
         keyname = Moka.getKeyName(ev)
-
-        if Moka.doKey(keyname, @keys, @default_keys, this)
-            return false
-
-        # keyhints
-        if Moka.keyHintFocus(keyname, @e)
-            return false
+        return false if @doKey(keyname)
+        # keyhint focusing only once per event
+        if ev.target is @e[0]
+            hint = Moka.getKeyHint(keyname)
+            if hint isnt null
+                return false if @keyHintFocus(hint)
 
 class Moka.Container extends Moka.Widget
     mainclass: "moka-container "+Moka.Widget.prototype.mainclass
@@ -827,7 +858,7 @@ class Moka.WidgetList extends Moka.Input
             .bind( "mokaFocusPrevRequest", () => @prev(); return false )
 
         @c = new Moka.Container(false)
-            .addClass( @mainclass.split(" ")[0]+"-container" )
+            .mainClass("moka-widgetlist-container moka-container")
             .itemClass(@itemclass)
             .appendTo(@e)
         @current = -1
@@ -835,15 +866,14 @@ class Moka.WidgetList extends Moka.Input
 
     mainClass: (cls) ->
         if cls?
-            @c.removeClass( @mainclass.split(" ")[0]+"-container" )
-            @c.addClass( cls.split(" ")[0]+"-container" )
+            @c.mainClass(cls.split(" ")[0]+"-container")
         return super
-
 
     itemClass: (cls) ->
         if cls?
             @c.itemClass(cls)
             @itemclass = cls
+            return this
         else
             return @itemclass
 
@@ -862,23 +892,25 @@ class Moka.WidgetList extends Moka.Input
 
     append: (widgets) ->
         bindfocus = (widget, id) =>
-            widget.bind( "mokaFocused", () =>
-                if @current >= 0
-                    @c.at(@current)
-                        .removeClass("moka-current")
-                        .trigger("mokaDeselected", [@current])
-                @current = id
-                widget
-                    .addClass("moka-current")
-                    .trigger("mokaSelected", [id])
-                @update()
-            )
+            widget
+                .bind "mokaFocused", () =>
+                    if @current >= 0
+                        @c.at(@current)
+                            .removeClass("moka-current")
+                            .trigger("mokaDeselected", [@current])
+                    @current = id
+                    widget.addClass("moka-current")
+                    @trigger("mokaSelected", [id])
+                    @update()
+                .bind "mousedown.moka", () ->
+                    Moka.focusFirstWidget(widget)
+                    return
 
         for widget in arguments
             id = @length()
             e = widget.e
-            widget.parentWidget = this
             @c.append(widget)
+            widget.parentWidget = this
             bindfocus(widget, id)
 
         @current = 0 if @current < 0
@@ -890,6 +922,9 @@ class Moka.WidgetList extends Moka.Input
             w = @at(id)
             Moka.focusFirstWidget(w) if w
         return this
+
+    currentIndex: ->
+        return @current
 
     next: ->
         @select(if @current >= 0 and @current < @length()-1 then @current+1 else 0)
@@ -912,7 +947,7 @@ class Moka.CheckBox extends Moka.Input
         SPACE: -> @toggle()
 
     constructor: (text, checked) ->
-        super Moka.createLabel(text)
+        super text
 
         @checkbox = $('<input>', {type:"checkbox", class:"moka-value"})
             .bind("change.moka", () => @e.trigger("mokaValueChanged", [@value()]) )
@@ -941,24 +976,21 @@ class Moka.CheckBox extends Moka.Input
         else
             return @checkbox.is(":checked")
 
-    onKeyDown: (ev) ->
-        return if ev.isPropagationStopped()
-        keyname = Moka.getKeyName(ev)
-        if Moka.doKey(keyname, @keys, @default_keys, this)
-            return false
-
 class Moka.Combo extends Moka.Input
     mainclass: "moka-combo "+Moka.Input.prototype.mainclass
 
     default_keys:
+        TAB: -> Moka.focus(@combo)
         SPACE: -> Moka.focus(@combo)
 
     constructor: (text) ->
-        super Moka.createLabel(text)
+        super
 
         @combo = $('<select>', {class:"moka-value"})
+            .attr("tabindex", -1)
             .bind("change.moka", () => @e.trigger("mokaValueChanged", [@value()]) )
             .appendTo(@e)
+        @focusableElement(@combo)
 
     append: (texts) ->
         for text in arguments
@@ -977,18 +1009,12 @@ class Moka.Combo extends Moka.Input
         return super
 
     onKeyDown: (ev) ->
-        return if ev.isPropagationStopped()
-        keyname = Moka.getKeyName(ev)
-        if Moka.doKey(keyname, @keys, @default_keys, this)
-            return false
-        if ev.target is @e[0] and keyname is "TAB"
-           Moka.focus(@combo)
-           return false
-        else if ev.target is @combo[0]
+        if ev.target is @combo[0]
+            keyname = Moka.getKeyName(ev)
             if ["LEFT", "RIGHT", "UP", "DOWN", "SPACE", "ENTER"].indexOf(keyname) >= 0
                 ev.stopPropagation()
-            else if keyname is "TAB" or keyname is "S-TAB"
-                @focus()
+        else
+            super
 
 class Moka.LineEdit extends Moka.Input
     mainclass: "moka-lineedit "+Moka.Input.prototype.mainclass
@@ -996,8 +1022,7 @@ class Moka.LineEdit extends Moka.Input
     default_keys: {}
 
     constructor: (label_text, text) ->
-        super
-        Moka.createLabel(label_text, @e) if label_text
+        super label_text
         @edit = $("<input>")
             .appendTo(@e)
             .bind( "change.moka", () => @e.trigger("mokaValueChanged", [@value()]) )
@@ -1023,8 +1048,7 @@ class Moka.LineEdit extends Moka.Input
     onKeyDown: (ev) ->
         keyname = Moka.getKeyName(ev)
 
-        if Moka.doKey(keyname, @keys, @default_keys, this)
-            return false
+        return false if @doKey(keyname)
 
         k = keyname.split('-')
         k = k[k.length-1]
@@ -1038,8 +1062,7 @@ class Moka.TextEdit extends Moka.Input
         ENTER: -> Moka.focus(@editor.win)
 
     constructor: (label_text, text) ->
-        super
-        Moka.createLabel(label_text, @e)
+        super label_text
         @text = text or ""
         @textarea = $("<textarea>")
             .appendTo(@e)
@@ -1061,10 +1084,7 @@ class Moka.TextEdit extends Moka.Input
 
     onKeyDown: (ev) ->
         ev.stopPropagation()
-        keyname = Moka.getKeyName(ev)
-
-        if Moka.doKey(keyname, @keys, @default_keys, this)
-            return false
+        return false if @doKey( Moka.getKeyName(ev) )
 
 # TODO: add button icon
 class Moka.Button extends Moka.Input
@@ -1075,7 +1095,7 @@ class Moka.Button extends Moka.Input
         SPACE: -> @press()
 
     constructor: (label_text, onclick, tooltip) ->
-        super Moka.createLabel(label_text)
+        super label_text
         @connect "click.moka", onclick
         @tooltip(tooltip) if tooltip
 
@@ -1099,11 +1119,11 @@ class Moka.ButtonBox extends Moka.WidgetList
         return this
 
 class Moka.Tabs extends Moka.WidgetList
-    mainclass: "moka-tabs "+Moka.WidgetList.prototype.mainclass
-    itemclass: "moka-tab"
+    mainclass: "moka-tabwidget "+Moka.WidgetList.prototype.mainclass
+    itemclass: "moka-tabwidget-item"
 
     default_keys:
-        SPACE: -> @pages.toggle()
+        SPACE: -> @pages.e.slideToggle()
 
         LEFT: ->  if @vertical() then @focusUp() else @prev()
         RIGHT: -> if @vertical() then @focusDown() else @next()
@@ -1117,7 +1137,7 @@ class Moka.Tabs extends Moka.WidgetList
 
         TAB: ->
             return false if @pageHasFocus()
-            page = @pages.at(@current)
+            page = @currentPage()
             if page
                 Moka.focusFirstWidget(page, true)
             else
@@ -1125,67 +1145,89 @@ class Moka.Tabs extends Moka.WidgetList
 
     constructor: ->
         super
-        this
-            .tabindex(-1)
-            .bind "mokaFocusUpRequest", () =>
-                @select(Math.max(0, @current))
-                return false
+
+        @tabs = new Moka.WidgetList()
+            .appendTo(this)
+            .mainClass("moka-tabs")
+            .itemClass("moka-tab")
+            .connect "mokaSelected", (ev, id) =>
+                i = @currentpage
+                if i >= 0
+                    @tab(i).tabindex(-1)
+                    @page(i).hide()
+                @tabs.at(id).tabindex(1)
+                @pages.at(id).show()
+                @currentpage = id
 
         @pages = new Moka.Container()
-            .appendTo(@e)
+            .appendTo(this)
+            .mainClass("moka-pages")
+            .itemClass("moka-page")
 
+        @currentpage = -1
         @vertical(false)
 
-    remove: ->
-        @e.hide()
-        @remove()
-        @pages.remove()
-        return super
+    vertical: (toggle) ->
+        if toggle?
+            @tabs.vertical(toggle)
+            super not toggle
+            return this
+        return @tabs.vertical()
+
+    tab: (i) ->
+        return @tabs.at(i)
+
+    page: (i) ->
+        return @pages.at(i)
+
+    currentPage: ->
+        return @page(@currentpage)
 
     update: ->
         # update active page
-        @pages.at(@current)?.update()
+        @currentPage()?.update()
         return this
 
     pageHasFocus: () ->
-        page = @pages.at(@current)
-        return page and page.hasFocus()
+        return @currentPage()?.hasFocus()
 
     focusUp: () ->
         if @pageHasFocus()
             @select(Math.max(0, @current))
         else
-            @e.parent().trigger("mokaFocusUpRequest")
+            @parent()?.trigger("mokaFocusUpRequest")
         return this
 
     focusDown: () ->
-        Moka.focusFirstWidget( @pages.at(@current) )
+        Moka.focusFirstWidget( @currentPage() )
         return this
 
     append: (tabname, widget) ->
-        tab = new Moka.Input()
-        Moka.createLabel(tabname, tab.e)
+        if tabname instanceof Moka.Widget
+            tmp = tabname; tabname = widget; widget = tmp
+        if not tabname
+            super widget
+            return this
 
-        super tab
-        tab.connect "mokaSelected", (ev, id) =>
-            if @oldid >= 0
-                @pages.at(@oldid).hide()
-                @at(@oldid).tabindex(-1)
-            @at(id).tabindex(1)
-            @pages.at(id).show()
-            @oldid = id
-        tab.tabindex(-1)
-
-        widget
-            .hide()
-            .addClass("moka-page")
-
-        @pages.append(widget)
+        tab = new Moka.Input(tabname)
+            .appendTo(@tabs)
+            .tabindex(-1)
 
         # TODO: select tab if something was programatically focused on the page
+        widget
+            .hide()
+            .appendTo(@pages)
 
         @update()
 
+        return this
+
+    next: ->
+        @tabs.next()
+        return this
+
+    prev: ->
+        @tabs.prev()
         return this
 
 class Moka.Image extends Moka.Widget
@@ -1532,13 +1574,10 @@ class Moka.ImageView extends Moka.Input
             return @z
 
     onKeyDown: (ev) ->
-        return if ev.isPropagationStopped()
-        keyname = Moka.getKeyName(ev)
-        if Moka.doKey(keyname, @keys, @default_keys, this)
-            return false
-        else if (keyname is "LEFT" or keyname is "RIGHT") and @image.width() > @width()
-            ev.stopPropagation()
-        else if (keyname is "UP" or keyname is "DOWN") and @image.height() > @height()
+        return false if super is false
+        k = Moka.getKeyName(ev)
+        if ((k is "LEFT" or k is "RIGHT") and @image.width() > @width()) or
+           ((k is "UP" or k is "DOWN") and @image.height() > @height())
             ev.stopPropagation()
 
 class Moka.Viewer extends Moka.Input
@@ -1640,8 +1679,8 @@ class Moka.Viewer extends Moka.Input
             .css("cursor", "move")
             .tabindex(1)
             .bind( "mokaFocusUpRequest", () => @select(@index + @current); return false )
-            .bind( "mousedown", @onMouseDown.bind(this) )
-            .bind( "dblclick", @onDoubleClick.bind(this) )
+            .bind( "mousedown.moka", @onMouseDown.bind(this) )
+            .bind( "dblclick.moka", @onDoubleClick.bind(this) )
 
 
         Moka.initDragScroll(@e)
@@ -1864,7 +1903,7 @@ class Moka.Viewer extends Moka.Input
 
             @updateVisible()
 
-            @e.trigger("mokaZoomChanged")
+            @trigger("mokaZoomChanged")
             return this
         else
             return if @zhow then @zhow else @z
@@ -1996,7 +2035,7 @@ class Moka.Viewer extends Moka.Input
                     @current = cell.data("itemindex")
 
                     cell.addClass("moka-current")
-                    @e.trigger("mokaSelected", [@index + @current])
+                    @trigger("mokaSelected", [@index + @current])
             )
             .appendTo(td)
 
@@ -2292,40 +2331,41 @@ class Moka.Window extends Moka.Input
         F4: -> @close()
         F2: -> @title.focus()
         F3: ->
-            last_focused = Moka.focused()
-
-            wnd = new Moka.Window("Search")
-            w = new Moka.LineEdit("Find string:")
-            e = w.e
-            edit = w.edit
+            return @searchwnd.focus() if @searchwnd
+            wnd = @searchwnd = new Moka.Window("Search")
+            edit = new Moka.LineEdit("Find string:")
             tofocus = null
             val = ""
-            mainwnd = @e
+            w = this
 
             search = (next) ->
-                newtofocus = Moka.findInput(mainwnd, val, next)
-                if newtofocus
-                    tofocus.removeClass("moka-found") if tofocus
-                    tofocus = newtofocus
-                    tofocus.addClass("moka-found")
+                tofocus.removeClass("moka-found") if tofocus
+                opts = {text:val, next:next is true, prev:next is false}
+                tofocus = Moka.findInput(w.body, opts)
+                tofocus.addClass("moka-found") if tofocus
             wnd.addKey "F3", () ->
                 search(true)
+            wnd.addKey "S-F3", () ->
+                search(false)
             wnd.addKey "ESCAPE", () ->
-                Moka.focus(last_focused)
                 wnd.close()
-            w.change (ev, value) =>
-                val = value
-                search()
+            edit.bind "keyup.moka", (ev) =>
+                v = edit.value()
+                if v isnt val
+                    val = v
+                    search()
             wnd.addKey "ENTER", () =>
-                Moka.focus(if tofocus then tofocus else last_focused)
+                tofocus.focus() if tofocus
                 wnd.close()
             wnd.connect "mokaDestroyed", () =>
                 tofocus.removeClass("moka-found") if tofocus
+                @searchwnd = null
+            w.connect "mokaDestroyed", () -> wnd.remove()
 
             pos = @position()
-            wnd.append(w)
+            wnd.append(edit)
                .appendTo( @e.parent() )
-               .position(pos.left, pos.top)
+               .position(pos.left-50, pos.top-50)
                .show()
                .focus()
         LEFT: ->
@@ -2376,8 +2416,10 @@ class Moka.Window extends Moka.Input
             return false if not @titleHasFocus()
             @body.toggle()
 
-    constructor: (title) ->
-        super
+    constructor: (title, from_element) ->
+        if title instanceof $
+            tmp = title; title = from_element; from_element = tmp
+        super from_element
         self = this
         this
             .tabindex(-1)
@@ -2390,17 +2432,14 @@ class Moka.Window extends Moka.Input
                 @e.parent().children("."+cls).removeClass(cls)
                 @e.addClass("moka-top_window")
 
-        e = @container = $("<div>").css(width:"100%", height:"100%").appendTo(@e)
+        e = @container = new Moka.Container().appendTo(@e)
 
         $(window).bind( "resize.moka", @update.bind(this) )
 
         # title
-        @title = new Moka.Input()
+        @title = new Moka.Input(title)
             .addClass("moka-title")
             .appendTo(e)
-
-        # title name
-        @title_label = new Moka.Label(title).appendTo(@title.e)
 
         # window title buttons
         @noclose = false
@@ -2418,15 +2457,18 @@ class Moka.Window extends Moka.Input
         # body
         body = @body = new Moka.Container()
             .addClass("moka-body").appendTo(e)
-        #@body = body = $("<div>", {class:"moka-body"})
-                      #.bind( "scroll.moka", @update.bind(this) )
-                      #.appendTo(e)
 
-        @widgets = [@title_label, @title, @body]
+        @widgets = [@container]
 
-        @title.dblclick = () -> body.toggle(); Moka.focusFirstWidget(body); return false
-        # prevent selecting text when double-clicking
-        @title.bind "mousedown", (ev) => @focus(); ev.preventDefault()
+        @title
+            .bind "dblclick.moka", () ->
+                body.toggle()
+                Moka.focusFirstWidget(body)
+                return false
+            .bind "mousedown.moka", (ev) =>
+                # prevent selecting text when double-clicking
+                @focus()
+                ev.preventDefault()
 
         # window edges
         edges =
@@ -2451,7 +2493,7 @@ class Moka.Window extends Moka.Input
                     cursor:s[6]+"-resize"
                 )
                 .appendTo(e)
-                .mousedown (ev) ->
+                .bind "mousedown.moka", (ev) ->
                     x = ev.pageX
                     y = ev.pageY
                     $this = $(this)
@@ -2502,6 +2544,13 @@ class Moka.Window extends Moka.Input
             @e_max.show()
         return this
 
+    length: ->
+        return @body.length()+1
+
+    at: (i) ->
+        # last widget is always window title
+        return if i is @body.length() then @title else @body.at(i)
+
     update: ->
         w = @widgets
         $.each( w, (i) -> w[i].update?() )
@@ -2509,8 +2558,8 @@ class Moka.Window extends Moka.Input
 
     append: (widgets) ->
         for widget in arguments
-            widget.parentWidget = this
             @body.append(widget)
+            widget.parentWidget = this
 
         @update()
 
@@ -2544,7 +2593,11 @@ class Moka.Window extends Moka.Input
     position: (x,y) ->
         if x?
             pos = @e.parent().offset()
-            @e.offset({left:pos.left+x, top:pos.top+y}) if pos
+            if pos
+                @e.offset(
+                    left: pos.left + Math.max(0,x),
+                    top: pos.top + Math.max(0,y)
+                )
             return this
         else
             return @e.offset()
@@ -2586,6 +2639,9 @@ class Moka.Window extends Moka.Input
     close: () ->
         return this if @noclose
         @remove()
+
+    onFocus: (ev) ->
+        @focus()
 
 elementToWidget = (e) ->
     w = null

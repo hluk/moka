@@ -20,7 +20,7 @@ a {
     z-index: inherit;
 }
 
-.moka-widgetlist-item.moka-current, .moka-tab.moka-current, .moka-view.moka-current > .moka-widget {
+.moka-widgetlist-item.moka-current, .moka-view.moka-current > .moka-widget {
     color: $widget_current_fg;
     background-color: $widget_current_bg;
 }
@@ -45,7 +45,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 }
 .moka-label {
     color: transparentize($widget_fg, 0.2);
-    padding: 0.5em 0.5em;
+    padding: 0.3em 0.3em;
     @include inset-text();
 }
 .moka-current.moka-label {
@@ -55,6 +55,60 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 .moka-focus.moka-label {
     color: $widget_selected_fg;
     @include inset-text($widget_selected_fg);
+}
+
+.moka-container {
+    &.moka-vertical > .moka-widget{
+        display: block;
+    }
+    &.moka-horizontal > .moka-widget{
+        display: inline-block;
+    }
+}
+
+.moka-widgetlist {
+    margin: auto;
+    padding: 0.2em;
+    text-align: left;
+}
+.moka-widgetlist-item {
+    padding-top: 0.2em;
+    padding-bottom: 0.2em;
+    margin: 0.3em;
+    @include rounded($item_radius);
+
+    &:nth-child(even) {
+        background-color: $widget_bg*1.05;
+    }
+}
+.moka-widgetlist-item, .moka-tab {
+    &.moka-current {
+        background-color: $widget_current_bg;
+    }
+    &.moka-focus {
+        background-color: $widget_selected_bg;
+    }
+    &:hover {
+        background-color: $widget_hover_bg;
+    }
+}
+.moka-viewer, .moka-viewer .moka-table {
+    height: 100%;
+
+    &, &.moka-table {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    // book layout
+    &.moka-layout-2x1 , &.moka-layout-2x1 .moka-table {
+        width: auto;
+        margin: auto;
+        & .moka-view {
+            padding-left: 0;
+            padding-right: 0;
+        }
+    }
 }
 
 .moka-buttonbox {
@@ -82,6 +136,8 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     margin: 6px 2px;
 
     border: 1px solid $widget_bg*0.6;
+
+    @include rounded($button_radius);
 
     @include box-shadow(inset 0 0 10px transparentize($widget_bg*1.5, 0.3));
 
@@ -130,126 +186,68 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         text-shadow: black 0 0 0;
     }
 }
-.moka-container, .moka-widgetlist {
-    &.moka-vertical > .moka-widget{
-        display: block;
-    }
-    &.moka-horizontal > .moka-widget{
-        display: inline-block;
-    }
-}
-.moka-tabs-container {
-    .moka-tab {
-        border: 1px solid $widget_bg*0.7;
-        .moka-focus {
-            color: $widget_selected_fg;
-            background-color: $widget_selected_bg;
-        }
-    }
-    &.moka-horizontal {
-        > .moka-tab {
-            border-bottom: 0;
-            display: inline;
-            vertical-align: top;
-
-            /* don't put tab on multiple lines */
-            display: inline-block;
-            white-space: nowrap;
-
-            padding: 0.1em 0.3em;
-            margin: $tab_pull 0.5em 0 0.5em;
-
-            @include rounded($tab_radius, top, left);
-            @include rounded($tab_radius, top, right);
-            @include box-shadow(0 -2px 4px transparentize($widget_bg*0.4, 0.8));
-
-            padding-bottom: 0.4em;
-
-            &:hover, &.moka-current {
-                margin-top: 0;
-                padding-bottom: 0.4em+$tab_pull;
+.moka-tabs {
+    padding-bottom: 0;
+    padding-right: 0;
+    .moka-tabs-container {
+        .moka-tab {
+            @include rounded($tab_radius);
+            //border: 1px solid $widget_bg*0.7;
+            border: $tab_border;
+            .moka-focus {
+                color: $widget_selected_fg;
+                background-color: $widget_selected_bg;
             }
         }
-    }
-    &.moka-vertical {
-        float: left;
+        &.moka-horizontal {
+            > .moka-tab {
+                border-bottom: 0;
+                vertical-align: top;
 
-        > .moka-tab {
-            border-right:0;
-            display: block;
+                /* don't put tab on multiple lines */
+                display: inline-block;
+                white-space: nowrap;
 
-            margin: 1.2em 0 1.2em $tab_pull;
+                padding: 0.1em 0.3em;
+                margin: $tab_pull 0.5em 0 0.5em;
 
-            @include rounded(0, top, left);
-            @include rounded(0, top, right);
-            @include rounded($tab_radius, top, left);
-            @include rounded($tab_radius, bottom, left);
-            @include box-shadow(-2px 0 4px transparentize($widget_bg*0.4, 0.8));
+                @include rounded(0, bottom, left);
+                @include rounded(0, bottom, right);
+                @include box-shadow(0 -2px 4px transparentize($widget_bg*0.4, 0.7));
 
-            padding: 0.3em;
-            padding-right: 0.4em;
+                padding-bottom: 0.4em;
 
-            &:hover, &.moka-current {
-                margin-left: 0;
-                padding-right: 0.4em + $tab_pull;
+                &:hover, &.moka-current {
+                    margin-top: 0;
+                    padding-bottom: 0.4em+$tab_pull;
+                }
+            }
+        }
+        &.moka-vertical {
+            > .moka-tab {
+                border-right:0;
+                display: block;
+
+                margin: 0.1em 0 1em $tab_pull;
+
+                @include rounded(0, top, right);
+                @include rounded(0, bottom, right);
+                @include box-shadow(-2px 0 4px transparentize($widget_bg*0.4, 0.6));
+
+                padding: 0.3em;
+                padding-right: 0.4em;
+
+                &:hover, &.moka-current {
+                    margin-left: 0;
+                    padding-right: 0.4em + $tab_pull;
+                }
             }
         }
     }
 }
 .moka-pages {
-    float: left;
-}
-.moka-page {
-    border: 1px solid $widget_bg*0.7;
-}
-.moka-widgetlist {
-    margin: auto;
-    padding: 0.2em;
-    text-align: left;
-
-    &.moka-focus .moka-widgetlist-item.moka-current {
-        color: $widget_selected_fg;
-        background-color: $widget_selected_bg;
-    }
-}
-.moka-widgetlist-item {
-    &:nth-child(even) {
-        background-color: $widget_bg*1.05;
-    }
-    &, &:nth-child(even) {
-        padding-top: 0.2em;
-        padding-bottom: 0.2em;
-        margin: 0.3em;
-        @include rounded($item_radius);
-
-        &.moka-focus {
-            background-color: $widget_selected_bg;
-        }
-        &.moka-current {
-            background-color: $widget_current_bg;
-        }
-        &:hover {
-            background-color: $widget_hover_bg;
-        }
-    }
-}
-.moka-viewer, .moka-viewer .moka-table {
-    height: 100%;
-
-    &, &.moka-table {
-        width: 100%;
-        overflow: hidden;
-    }
-
-    // book layout
-    &.moka-layout-2x1 , &.moka-layout-2x1 .moka-table {
-        width: auto;
-        margin: auto;
-        & .moka-view {
-            padding-left: 0;
-            padding-right: 0;
-        }
-    }
+    border: $tab_border;
+    vertical-align: top;
 }
 .moka-view > .moka-widget {
     margin: auto;
@@ -267,6 +265,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     border-collapse: collapse;
 }
 .moka-window {
+    padding: 0;
     border: 1px solid black;
     opacity: $window_opacity;
 
@@ -275,7 +274,6 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     position: absolute;
 
     background-color: $widget_bg;
-    @include rounded(5px);
     @include outset();
     @include rounded($window_radius);
     .moka-body {
