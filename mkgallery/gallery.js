@@ -2,17 +2,19 @@
 	var onLoad, viewer, gotownd, menu, options;
 
     // a_function.bind(object, arg1, ...)
-    Function.prototype.bind = function(thisObj, var_args) {
-      var self = this;
-      var staticArgs = Array.prototype.splice.call(arguments, 1, arguments.length);
+    if (!Function.prototype.bind) {
+        Function.prototype.bind = function(thisObj, var_args) {
+            var self = this;
+            var staticArgs = Array.prototype.splice.call(arguments, 1, arguments.length);
 
-      return function() {
-        var args = staticArgs.concat();
-        for (var i = 0; i < arguments.length; i++) {
-          args.push(arguments[i]);
+            return function() {
+                var args = staticArgs.concat();
+                for (var i = 0; i < arguments.length; i++) {
+                    args.push(arguments[i]);
+                }
+                return self.apply(thisObj, args);
+            }
         }
-        return self.apply(thisObj, args);
-      };
     }
 
     options = {
@@ -29,7 +31,8 @@
             zoom: ["1", "_Zoom factor",
             "Examples: <b>1</b>; <b>1.5</b>; <b>fit</b>; <b>fill</b>; fit to rectangle 100x100: <b>100,100,fit</b>"
                 ],
-            sharpen: [0.0, "_Sharpen factor", "Values from <b>0.0</b> to <b>1.0</b> (slow)"]
+            sharpen: [0.0, "_Sharpen factor", "Values from <b>0.0</b> to <b>1.0</b> (slow)"],
+            invert: [false, "_Invert colors"]
         },
         _Layout: {
             tip: [null, "<b>Tip:</b> Use <b>right top</b> order and <b>2x1</b> layout for Japanese manga."],
@@ -336,13 +339,28 @@
         popup(menu);
     }
 
-    getItem = function(sharpen, i){
-        var item, itempath;
+    getItem = function(opts, i){
+        var item, itempath, filter, filters = [];
+
+        if (opts.invert && Filters.Invert) {
+            f = new Filters.Invert();
+            filters.push({
+                filename: "deps/invert.js",
+                callback: f.apply.bind(f)
+            });
+        }
+        if (opts.sharpen > 0 && Filters.Sharpen) {
+            f = new Filters.Sharpen(opts.sharpen);
+            filters.push({
+                filename: "deps/sharpen.js",
+                callback: f.apply.bind(f)
+            });
+        }
 
         item = ls[i];
         itempath = (item instanceof Array) ? item[0] : item;
-            return (sharpen > 0) ?
-                    ( new Moka.ImageView(itempath, true, sharpen) ) :
+            return filters.length ?
+                    ( new Moka.ImageView(itempath, true, filters) ) :
                     ( new Moka.ImageView(itempath) );
     }
 
@@ -367,7 +385,7 @@
         viewer.orientation(opts.o);
 
         // items on demand
-        viewer.appendFunction(getItem.bind(null, opts.sharpen), ls.length);
+        viewer.appendFunction(getItem.bind(null, opts), ls.length);
 
         // current item
         viewer.select(opts.n);

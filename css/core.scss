@@ -260,6 +260,9 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         img {margin-bottom:-$view_padding;}
     }
 }
+.moka-viewer.moka-layout-1x1 .moka-view {
+    padding: 0;
+}
 .moka-viewer .moka-table {
     margin: auto;
     border-collapse: collapse;

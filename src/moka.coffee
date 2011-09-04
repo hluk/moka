@@ -175,12 +175,11 @@ Moka.initDragScroll = (e) ->
 
 # Moka.dragScroll
 Moka.scrolling = false
-tt = 0
+Moka.tt = 0
 jQuery.extend( jQuery.easing,
     easeOutCubic: (x, t, b, c, d) ->
         # refresh preview every 30ms
-        if ( t>tt )
-            tt = t+30
+        Moka.tt = t+30 if ( t>Moka.tt )
         return (t=t/1000-1)*t*t + 1
 )
 
@@ -240,7 +239,7 @@ Moka.dragScroll = (ev) ->
             vx = dx*accel
             vy = dy*accel
 
-            tt = 100
+            Moka.tt = 100
             w.stop(true).animate(
                 scrollLeft: w.scrollLeft()+vx+"px",
                 scrollTop: w.scrollTop()+vy+"px",
@@ -338,9 +337,11 @@ Moka.toScreen = (e, wnd, o) ->
 
     if not wnd
         wnd = e.parent()
-        while wnd.outerWidth() is wnd[0].scrollWidth and wnd.outerHeight() is wnd[0].scrollHeight
-            return if wnd[0].nodeName is "BODY"
+        ee = wnd[0]
+        while ee and wnd.outerWidth() is ee.scrollWidth and wnd.outerHeight() is ee.scrollHeight
+            return if wnd[0].tagName is "BODY"
             wnd = wnd.parent()
+            ee = wnd[0]
     return if not wnd.length or wnd[0] is e[0]
 
     pos = wnd.offset()
@@ -425,6 +426,157 @@ Moka.scroll = (e, opts) ->
 
 Moka.ensureVisible = (e, wnd) ->
     toScreen(e, wnd)
+
+class Moka.Timer
+    constructor: (options) ->
+        @fn = options.callback
+        @d = options.data
+        @delay = options.delay or 0
+        @t = null
+
+    data: (data) ->
+        if data?
+            @d = data
+            return this
+        return @d
+
+    isRunning: ->
+        return @t isnt null
+
+    start: (delay) ->
+        @kill()
+        @t = window.setTimeout(@run.bind(this), if delay? then delay else @delay)
+        return this
+
+    kill: ->
+        if @isRunning()
+            window.clearTimeout(@t)
+            @t = null
+        return this
+
+    run: ->
+        @fn(@d)
+        @t = null
+        return this
+
+class Moka.Thread
+    constructor: (options) ->
+        # TODO: implement workers
+        # filename for Worker
+        @filename = options.filename
+        # or callback function for Moka.Timer (with delay=0)
+        @fn = options.callback
+        # if browser doesn't support Workers callback is used
+
+        # data argument is passed to callback and changes to return value
+        # of callback every Timer iteration
+        # - invoke Timer only while data is not false
+        @d = options.data
+
+        @ondata = options.ondata
+        @ondone = options.ondone
+        @onerror = options.onerror
+
+        @W = window.Worker
+        @paused = false
+
+    isRunning: ->
+        return not @paused and (@w or @t)
+
+    isPaused: ->
+        return @paused
+
+    onDone: (fn) ->
+        if fn?
+            @ondone = fn
+            return this
+        return @ondone
+
+    data: (data) ->
+        if data?
+            @d = data
+            return this
+        return @d
+
+    kill: ->
+        if @w
+            @w.terminate()
+            @w = null
+            @onerror() if @onerror
+        else if @t
+            @t.kill()
+            @t = null
+            @onerror() if @onerror
+        @paused = false
+        return this
+
+    start: ->
+        return this if @t or @w
+        @paused = false
+        if @filename
+            if @W
+                try
+                    w = @w = new @W(@filename)
+                    w.onmessage = @_onWorkerMessage.bind(this)
+                    w.onerror = @_onWorkerError.bind(this)
+                    w.postMessage(@d)
+                    return this
+                catch error
+                    @w = null
+                    log "Moka.Thread failed to create Worker (\""+@filename+"\")!",error
+            else if not @fn
+                @onerror() if @onerror
+                dbg "Browser doesn't support Web Workers."
+                return this
+        @_runInBackground() if @fn
+        return this
+
+    pause: ->
+        @paused = true
+        if @w
+            @w.postMessage("pause")
+        else if @t
+            @t.kill()
+            @t = null
+        return this
+
+    resume: ->
+        if @paused
+            @paused = false
+            if @w
+                @w.postMessage("resume")
+            else if @fn
+                @_runInBackground()
+        return this
+
+    _onWorkerMessage: (ev) ->
+        d = ev.data
+        if d is false
+            @ondone(@d) if @ondone
+            @w.terminate()
+            @w = null
+        else
+            @d = d
+            @ondata(d) if @ondata
+
+    _onWorkerError: (ev) ->
+        dbg "Worker error: " + ev.message
+        @kill()
+
+    _alarm: ->
+        d = @fn(@d)
+        if d is false
+            @ondone(@d) if @ondone
+            @t = null
+        else
+            @d = d
+            @ondata(d) if @ondata
+            @t.start() if @t isnt null
+
+    _runInBackground: ->
+        if not @t
+            @t = new Moka.Timer( callback: @_alarm.bind(this) )
+        @t.start()
 
 # GUI classes
 # only one widget can can be focused at a time
@@ -580,6 +732,20 @@ class Moka.Widget
         else
             return @e.text()
 
+    html: (html) ->
+        if html?
+            @e.html(html)
+            return this
+        else
+            return @e.html()
+
+    data: (key, value) ->
+        if value?
+            @e.data(key, value)
+            return this
+        else
+            return @e.data(key)
+
     do: (fn) ->
         fn.apply(this, [@e])
         return this
@@ -604,7 +770,7 @@ class Moka.Widget
         return false
 
 class Moka.Label extends Moka.Widget
-    mainclass: "moka-label "+Moka.Widget.prototype.mainclass
+    mainclass: Moka.Widget.prototype.mainclass
 
     constructor: (text, from_element) ->
         if text instanceof $
@@ -613,21 +779,30 @@ class Moka.Label extends Moka.Widget
         else
             e = from_element
         super e
-        @addClass("moka-label")
-        @label(text) if text
+
+        if text
+            @label(text)
 
     label: (text) ->
         if text?
-            # replace _x with underlined character and assign x key
-            keyhint = null
-            html = text.replace /_[a-z]/i, (key) ->
-                        '<span class="moka-keyhint"' +
-                        # delegate click to parent
-                        ' onclick="this.parentNode.click(event)">' +
-                        (keyhint=key[1]) + '</span>'
+            if text.length
+                # replace _x with underlined character and assign x key
+                keyhint = ""
+                html = text.replace /_[a-z]/i, (key) ->
+                    '<span class="moka-keyhint"' +
+                    # delegate click to parent
+                    ' onclick="$(this.parentNode).click()">' +
+                    (keyhint=key[1]) + '</span>'
+                @html(html)
+                    .addClass("moka-label")
+                    .css("cursor","pointer")
+                    .data("keyhint", keyhint.toUpperCase())
+            else
+                @html("")
+                    .removeClass("moka-label")
+                    .css("cursor","")
+                    .data("keyhint", "")
 
-            @e.html(html).css("cursor","pointer")
-            @e.data("keyhint", keyhint.toUpperCase()) if keyhint
             return this
         else
             return @e.text()
@@ -649,8 +824,7 @@ class Moka.Input extends Moka.Label
             .bind( "mokaFocused", @onChildFocus.bind(this) )
             .bind( "mokaBlurred",  @onChildBlur.bind(this) )
             .bind( "keydown.moka", (ev) =>
-                if !ev.isPropagationStopped()
-                    return @onKeyDown(ev)
+                return @onKeyDown(ev) if !ev.isPropagationStopped()
             )
             .bind( "blur.moka", (ev) => @onBlur(ev); return false )
             .css("cursor","pointer")
@@ -707,12 +881,15 @@ class Moka.Input extends Moka.Label
             # focused and current <option> changes when DOWN key is released
             # - so focus to focusableElement (e.g. <select>) after
             # a small delay (can be 0)
-            window.setTimeout( (() =>
-                if Moka.focused()?[0] is @e[0]
+            @t.kill() if @t
+            @t = new Moka.Timer(
+                delay: 200
+                callback: () =>
                     swap_index.apply(null, [@e_focus, @e])
                     @e_focus.one("blur.moka", swap_index.bind(null, @e, @e_focus))
                     Moka.focus(@e_focus)
-            ), 200 )
+            ).start()
+            @e.one "blur.moka", () => @t.kill()
         return this
 
     blur: () ->
@@ -723,7 +900,8 @@ class Moka.Input extends Moka.Label
         ee = @e.parent()
         v = super
         if @hasFocus()
-            Moka.blur(Moka.focused_e)
+            e = Moka.focused()
+            Moka.blur(e) if e
             # focus nearest widget in parent
             while(ee.length)
                 if Moka.focusFirst(ee)
@@ -968,7 +1146,7 @@ class Moka.CheckBox extends Moka.Input
 
     value: (val) ->
         if val?
-            v = if val then true else false
+            v = not not val
             if v isnt @checkbox.is(":checked")
                 @e.trigger("mokaValueChanged", [v])
             @checkbox.attr("checked", v)
@@ -1011,7 +1189,8 @@ class Moka.Combo extends Moka.Input
     onKeyDown: (ev) ->
         if ev.target is @combo[0]
             keyname = Moka.getKeyName(ev)
-            if ["LEFT", "RIGHT", "UP", "DOWN", "SPACE", "ENTER"].indexOf(keyname) >= 0
+            if ["LEFT", "RIGHT", "UP", "DOWN", "SPACE", "ENTER"]
+               .indexOf(keyname) >= 0
                 ev.stopPropagation()
         else
             super
@@ -1274,20 +1453,8 @@ class Moka.Canvas extends Moka.Widget
     constructor: (@src, w, h, onload, onerror) ->
         # try to use WebGL
         e = null
-        if window.fx and window.fx.canvas
-            try
-                @canvas = fx.canvas()
-                e = $(@canvas)
-        else
-            log "Use glfx.js in HTML for WebGL support."
-
-        if e
-            e.width(0)
-            e.height(0)
-            super e
-        else
-            super $("<canvas>", width:0, height:0)
-            @ctx = @e[0].getContext("2d")
+        super $("<canvas>", width:0, height:0)
+        @ctx = @e[0].getContext("2d")
 
         @owidth = @oheight = 0
         @img = $("<img>", width:w, height:h)
@@ -1298,12 +1465,12 @@ class Moka.Canvas extends Moka.Widget
                 @owidth  = img.naturalWidth
                 @oheight = img.naturalHeight
                 @resize(@owidth, @oheight)
-                onload?()
+                onload() if onload
         )
         @img.one( "error",
             () =>
                 @ok = false
-                onerror?()
+                onerror() if onerror
         )
         @img.attr("src", @src)
 
@@ -1313,165 +1480,121 @@ class Moka.Canvas extends Moka.Widget
     originalHeight: () ->
         return @oheight
 
-    hide: () ->
-        if @t_sharpen
-            # cancel sharpening process
-            window.clearTimeout(@t_sharpen)
-            e = @e[0]
-            e.width = e.height = 0
+    show: ->
+        # resume filtering
+        @t_filter.resume() if @t_filter and @t_filter.isPaused()
+        log "SHOW",@src
+        return super
+
+    hide: ->
+        # pause filtering
+        @t_filter.pause() if @t_filter
+        log "HIDE",@src
         return super
 
     resize: (w,h) ->
-        return this if not @ok
+        return this if not @ok or w<=0 or h<=0
         e = @e[0]
-        return this if (e.width is w and e.height is h) or (w<=0 and h<=0)
-        e.width = w
-        e.height = h
-        img = @img[0]
-        if @canvas
-            texture = e.texture(img)
-            e.draw(texture)
-            texture.destroy()
-        else
-            @ctx.clearRect(0,0,e.width,e.height)
-            @ctx.drawImage(img,0,0,e.width,e.height)
-
-        strength = @sharpen_strength
-        @sharpen_strength = null
-        if strength
-            @sharpen(strength)
-        else if @canvas
-            e.update()
-
-        return this
-
-    sharpen: (strength) ->
-        return this if not @ok or @sharpen_strength is strength
-
-        window.clearTimeout(@t_sharpen) if @t_sharpen
-
-        @sharpen_strength = strength
-
-        return this if not strength or strength < 0
-
-        if @canvas
-            @canvas.unsharpMask(32, strength*5).update()
-            return this
-
-        else if strength > 1
-            strength = 1
-
-        e = @e[0]
-        w = Math.ceil(e.width)
-        h = Math.ceil(e.height)
-
-        dataDesc = @ctx.getImageData(0, 0, w, h)
-        data = dataDesc.data
-        dataCopy = @ctx.getImageData(0, 0, w, h).data
-
-        mul = 15
-        mulOther = 1 + 3*strength
-        weight = 1 / (mul - 4 * mulOther)
-
-        mul *= weight
-        mulOther *= weight
-
-        w4 = w*4
-        y = 1
-
-        filter = (miny) ->
-            offsetY = (y-1)*w4
-            nextY = if y == h then y - 1 else y
-            prevY = if y == 1 then 0 else y-2
-            offsetYPrev = prevY*w4
-            offsetYNext = nextY*w4
-
-            while (y < miny)
-                offsetY = (y-1)*w4
-
-                nextY = if (y is h) then y - 1 else y
-                prevY = if (y is 1) then 0 else y-2
-
-                offsetYPrev = prevY*w4
-                offsetYNext = nextY*w4
-
-                x = w
-                offset = offsetY - 4 + w*4
-                offsetPrev = offsetYPrev + (w-2) * 4
-                offsetNext = offsetYNext + (w-1) * 4
-                while (x)
-                    r = dataCopy[offset] * mul - mulOther * (
-                        dataCopy[offsetPrev] +
-                        dataCopy[offset-4] +
-                        dataCopy[offset+4] +
-                        dataCopy[offsetNext])
-
-                    g = dataCopy[offset+1] * mul - mulOther * (
-                        dataCopy[offsetPrev+1] +
-                        dataCopy[offset-3] +
-                        dataCopy[offset+5] +
-                        dataCopy[offsetNext+1])
-
-                    b = dataCopy[offset+2] * mul - mulOther * (
-                        dataCopy[offsetPrev+2] +
-                        dataCopy[offset-2] +
-                        dataCopy[offset+6] +
-                        dataCopy[offsetNext+2])
-
-                    data[offset]   = Math.min( Math.max(r,0), 255 )
-                    data[offset+1] = Math.min( Math.max(g,0), 255 )
-                    data[offset+2] = Math.min( Math.max(b,0), 255 )
-
-                    if x < w
-                        offsetNext -= 4
-                    --x
-                    offset -= 4
-                    if x > 2
-                        offsetPrev -= 4
-
-                ++y
-                offsetY += w4
-                if y != h
-                    ++nextY
-                    offsetYPrev += w4
-                if y > 2
-                    ++prevY
-                    offsetYNext += w4
-            @ctx.putImageData(dataDesc, 0, 0)
-            @t_sharpen = if (y > h) then 0 else
-                window.setTimeout(filter.bind(this, Math.min(y+50, h+1)), 0)
-
-        @t_sharpen = window.setTimeout(filter.bind(this, 50), 0)
+        if e.width isnt w or e.height isnt h
+            log "RESIZE",@src
+            e.width = w
+            e.height = h
+            @clearFilter()
 
         return this
 
     isLoaded: () ->
         return @ok?
 
+    clearFilter: ->
+        @t_filter.kill() if @t_filter
+
+        e = @e[0]
+        w = Math.ceil(e.width)
+        h = Math.ceil(e.height)
+
+        img = @img[0]
+        @ctx.clearRect(0, 0, w, h)
+        @ctx.drawImage(img, 0, 0, w, h)
+
+        return this
+
+    filter: () ->
+        return this if not @ok or not @t_filter_first
+
+        e = @e[0]
+        w = Math.ceil(e.width)
+        h = Math.ceil(e.height)
+
+        @t_filter = @t_filter_first
+            .data(
+                dataDesc: @ctx.getImageData(0, 0, w, h)
+                dataDescCopy: @ctx.getImageData(0, 0, w, h)
+            ).start()
+
+        return this
+
+    addFilter: (filename, callback) ->
+        tt = new Moka.Timer(
+            delay: 50
+            callback: (d) =>
+                @ctx.putImageData(d, 0, 0)
+        )
+        t = new Moka.Thread(
+            callback: callback
+            filename: filename
+            ondata: (d) =>
+                tt.data(d)
+                tt.start() if not tt.isRunning()
+            ondone: (d) =>
+                @t_filter = null
+            onerror: ->
+                tt.kill()
+        )
+
+        if @t_filter_first
+            @t_filter_last.onDone (data) =>
+                tt.kill()
+                @ctx.putImageData(data, 0, 0)
+                e = @e[0]
+                w = Math.ceil(e.width)
+                h = Math.ceil(e.height)
+                @t_filter = t
+                    .data(
+                        dataDesc: data
+                        dataDescCopy: @ctx.getImageData(0, 0, w, h)
+                    ).start()
+        else
+            @t_filter_first = t
+        @t_filter_last = t
+
+        return this
+
 class Moka.ImageView extends Moka.Input
     mainclass: "moka-imageview "+Moka.Input.prototype.mainclass
 
     default_keys: {}
 
-    constructor: (@src, @use_canvas, @sharpen) ->
-        super
+    constructor: (@src, @use_canvas, @filters) ->
+        super()
 
     show: () ->
         if @image
             if @t_remove
-                window.clearTimeout(@t_remove)
+                @t_remove.kill()
                 @t_remove = null
                 @image.show()
             @e.show()
             if @ok?
-                @zoom(@z, @zhow)
+                @zoom(@zhow)
                 @e.trigger("mokaLoaded")
                 @e.trigger("mokaDone", [not @ok])
         else
             onload = () =>
                 @ok = true
 
-                @zoom(@z, @zhow)
+                @zoom(@zhow)
+                log "LOAD",@src
 
                 @e.trigger("mokaLoaded")
                 @e.trigger("mokaDone", [false])
@@ -1480,7 +1603,9 @@ class Moka.ImageView extends Moka.Input
                 @e.trigger("mokaError")
                 @e.trigger("mokaDone", [true])
             if @use_canvas
-                @image = new Moka.Canvas(@src, "", "", onload, onerror)
+                image = @image = new Moka.Canvas(@src, "", "", onload, onerror)
+                for f in @filters
+                    image.addFilter(f.filename, f.callback)
             else
                 @image = new Moka.Image(@src, "", "", onload, onerror)
             @image.appendTo(@e)
@@ -1492,22 +1617,23 @@ class Moka.ImageView extends Moka.Input
         if @image? and not @t_remove
             @image.hide()
             # delay resource removal
-            @t_remove = window.setTimeout(
-                () =>
+            @t_remove = new Moka.Timer(
+                delay: 60000
+                callback: () =>
                     dbg "removing image", @image.img.attr("src")
                     @ok = null
                     @image.img.attr("src", "")
                     @image.remove()
                     @image = null
                     @t_remove = null
-            , 60000 )
+            ).start()
         return super
 
     remove: ->
         @e.hide()
         if @image
             @image.remove()
-            window.clearTimeout(@t_remove) if @t_remove
+            @t_remove.kill() if @t_remove
         return super
 
     isLoaded: () ->
@@ -1521,8 +1647,9 @@ class Moka.ImageView extends Moka.Input
 
     zoom: (how) ->
         if how?
-            @z = how
-            zhow = @zhow = if @z instanceof Array then @z[2] else null
+            return this if @z is how
+            @zhow = how
+            zhow = if how instanceof Array then how[2] else null
 
             if @ok and @e.parent().length
                 width = @image.width()
@@ -1552,9 +1679,9 @@ class Moka.ImageView extends Moka.Input
                             h = Math.floor(mw/d2)
                         mw = mh = ""
                 else
-                    @z = parseFloat(how) or 1
-                    mw = Math.floor(@z*@image.originalWidth())
-                    mh = Math.floor(@z*@image.originalHeight())
+                    z = parseFloat(how) or 1
+                    mw = Math.floor(z*@image.originalWidth())
+                    mh = Math.floor(z*@image.originalHeight())
 
                 if zhow isnt "fit" and zhow isnt "fill"
                     if width/height < mw/mh
@@ -1566,8 +1693,8 @@ class Moka.ImageView extends Moka.Input
                 @e.css('max-width':mw, 'max-height':mh, width:w, height:h)
 
                 @image.resize(w or mw, h or mh)
-                if @image.sharpen
-                    @image.sharpen(@sharpen)
+                @image.filter?()
+                @zhow = @z = how
 
             return this
         else
@@ -2155,8 +2282,11 @@ class Moka.Viewer extends Moka.Input
 
     updateVisible: (now) ->
         if not now
-            window.clearTimeout(@t_update) if @t_update
-            @t_update = window.setTimeout( @updateVisible.bind(this, true), 100 )
+            @t_update.kill() if @t_update
+            @t_update = new Moka.Timer(
+                delay:100
+                callback:@updateVisible.bind(this, true)
+            ).start()
             return
 
         p = @cell(0).parent()
@@ -2219,8 +2349,9 @@ class Moka.Viewer extends Moka.Input
             if not cell and item and topreload > 0
                 --topreload
                 dbg "preloading view", index
-                item.e.one("mokaDone", loaded)
-                item.show()
+                item.unbind("mokaDone.preload")
+                    .one("mokaDone.preload", loaded)
+                    .show()
                 return
             if not item or not cell
                 #if @current >= 0 and not Moka.scrolling
@@ -2256,8 +2387,9 @@ class Moka.Viewer extends Moka.Input
 
             dbg "loading view", index
 
-            item.e.one("mokaDone", loaded)
-            item.show()
+            item.unbind("mokaDone.preload")
+                .one("mokaDone.preload", loaded)
+                .show()
 
         if @current >= 0
             # load current item first
@@ -2309,15 +2441,18 @@ class Moka.Notification extends Moka.Widget
         @e.addClass(notification_class)
           .hide()
           .html(html)
-          .bind( "mouseenter.moka", () => window.clearTimeout(@t_notify) )
-          .bind( "mouseleave.moka", () => @t_notify = window.setTimeout(@remove.bind(this), delay/2) )
+          .bind( "mouseenter.moka", () => @t_notify.kill() )
+          .bind( "mouseleave.moka", () => @t_notify.start(delay/2) )
           .appendTo(Moka.notificationLayer)
           .fadeIn(@animation_speed)
 
-        @t_notify = window.setTimeout( @remove.bind(this), delay )
+        @t_notify = new Moka.Timer(
+            delay:delay
+            callback:@remove.bind(this)
+        ).start()
 
     remove: () ->
-        window.clearTimeout(@t_notify)
+        @t_notify.kill()
         @e.hide( @animation_speed, super )
 
 Moka.clearNotifications = () ->
@@ -2339,9 +2474,10 @@ class Moka.Window extends Moka.Input
             w = this
 
             search = (next) ->
-                tofocus.removeClass("moka-found") if tofocus
+                oldtofocus = tofocus
                 opts = {text:val, next:next is true, prev:next is false}
                 tofocus = Moka.findInput(w.body, opts)
+                oldtofocus.removeClass("moka-found") if oldtofocus
                 tofocus.addClass("moka-found") if tofocus
             wnd.addKey "F3", () ->
                 search(true)
@@ -2579,7 +2715,7 @@ class Moka.Window extends Moka.Input
         if once
             @e.css("opacity",1)
         if not once
-            window.setTimeout(@center.bind(this, true), 0)
+            new Moka.Timer(callback:@center.bind(this, true)).start()
         return this
 
     focus: () ->

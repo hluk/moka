@@ -1,5 +1,5 @@
 (function() {
-  var dbg, elementToWidget, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, mokaInit, tt;
+  var dbg, elementToWidget, keycodes, last_keyname, last_keyname_timestamp, log, logfn, logobj, mokaInit;
   var __indexOf = Array.prototype.indexOf || function(item) {
     for (var i = 0, l = this.length; i < l; i++) {
       if (this[i] === item) return i;
@@ -199,11 +199,11 @@
     return e;
   };
   Moka.scrolling = false;
-  tt = 0;
+  Moka.tt = 0;
   jQuery.extend(jQuery.easing, {
     easeOutCubic: function(x, t, b, c, d) {
-      if (t > tt) {
-        tt = t + 30;
+      if (t > Moka.tt) {
+        Moka.tt = t + 30;
       }
       return (t = t / 1000 - 1) * t * t + 1;
     }
@@ -254,7 +254,7 @@
         accel = 200 / dt;
         vx = dx * accel;
         vy = dy * accel;
-        tt = 100;
+        Moka.tt = 100;
         w.stop(true).animate({
           scrollLeft: w.scrollLeft() + vx + "px",
           scrollTop: w.scrollTop() + vy + "px"
@@ -364,17 +364,19 @@
     }
   };
   Moka.toScreen = function(e, wnd, o) {
-    var a, b, ca, cb, ch, cleft, cpos, ctop, cw, h, left, pos, top, w;
+    var a, b, ca, cb, ch, cleft, cpos, ctop, cw, ee, h, left, pos, top, w;
     if (!o) {
       o = "lt";
     }
     if (!wnd) {
       wnd = e.parent();
-      while (wnd.outerWidth() === wnd[0].scrollWidth && wnd.outerHeight() === wnd[0].scrollHeight) {
-        if (wnd[0].nodeName === "BODY") {
+      ee = wnd[0];
+      while (ee && wnd.outerWidth() === ee.scrollWidth && wnd.outerHeight() === ee.scrollHeight) {
+        if (wnd[0].tagName === "BODY") {
           return;
         }
         wnd = wnd.parent();
+        ee = wnd[0];
       }
     }
     if (!wnd.length || wnd[0] === e[0]) {
@@ -476,6 +478,190 @@
   Moka.ensureVisible = function(e, wnd) {
     return toScreen(e, wnd);
   };
+  Moka.Timer = (function() {
+    function Timer(options) {
+      this.fn = options.callback;
+      this.d = options.data;
+      this.delay = options.delay || 0;
+      this.t = null;
+    }
+    Timer.prototype.data = function(data) {
+      if (data != null) {
+        this.d = data;
+        return this;
+      }
+      return this.d;
+    };
+    Timer.prototype.isRunning = function() {
+      return this.t !== null;
+    };
+    Timer.prototype.start = function(delay) {
+      this.kill();
+      this.t = window.setTimeout(this.run.bind(this), delay != null ? delay : this.delay);
+      return this;
+    };
+    Timer.prototype.kill = function() {
+      if (this.isRunning()) {
+        window.clearTimeout(this.t);
+        this.t = null;
+      }
+      return this;
+    };
+    Timer.prototype.run = function() {
+      this.fn(this.d);
+      this.t = null;
+      return this;
+    };
+    return Timer;
+  })();
+  Moka.Thread = (function() {
+    function Thread(options) {
+      this.filename = options.filename;
+      this.fn = options.callback;
+      this.d = options.data;
+      this.ondata = options.ondata;
+      this.ondone = options.ondone;
+      this.onerror = options.onerror;
+      this.W = window.Worker;
+      this.paused = false;
+    }
+    Thread.prototype.isRunning = function() {
+      return !this.paused && (this.w || this.t);
+    };
+    Thread.prototype.isPaused = function() {
+      return this.paused;
+    };
+    Thread.prototype.onDone = function(fn) {
+      if (fn != null) {
+        this.ondone = fn;
+        return this;
+      }
+      return this.ondone;
+    };
+    Thread.prototype.data = function(data) {
+      if (data != null) {
+        this.d = data;
+        return this;
+      }
+      return this.d;
+    };
+    Thread.prototype.kill = function() {
+      if (this.w) {
+        this.w.terminate();
+        this.w = null;
+        if (this.onerror) {
+          this.onerror();
+        }
+      } else if (this.t) {
+        this.t.kill();
+        this.t = null;
+        if (this.onerror) {
+          this.onerror();
+        }
+      }
+      this.paused = false;
+      return this;
+    };
+    Thread.prototype.start = function() {
+      var w;
+      if (this.t || this.w) {
+        return this;
+      }
+      this.paused = false;
+      if (this.filename) {
+        if (this.W) {
+          try {
+            w = this.w = new this.W(this.filename);
+            w.onmessage = this._onWorkerMessage.bind(this);
+            w.onerror = this._onWorkerError.bind(this);
+            w.postMessage(this.d);
+            return this;
+          } catch (error) {
+            this.w = null;
+            log("Moka.Thread failed to create Worker (\"" + this.filename + "\")!", error);
+          }
+        } else if (!this.fn) {
+          if (this.onerror) {
+            this.onerror();
+          }
+          dbg("Browser doesn't support Web Workers.");
+          return this;
+        }
+      }
+      if (this.fn) {
+        this._runInBackground();
+      }
+      return this;
+    };
+    Thread.prototype.pause = function() {
+      this.paused = true;
+      if (this.w) {
+        this.w.postMessage("pause");
+      } else if (this.t) {
+        this.t.kill();
+        this.t = null;
+      }
+      return this;
+    };
+    Thread.prototype.resume = function() {
+      if (this.paused) {
+        this.paused = false;
+        if (this.w) {
+          this.w.postMessage("resume");
+        } else if (this.fn) {
+          this._runInBackground();
+        }
+      }
+      return this;
+    };
+    Thread.prototype._onWorkerMessage = function(ev) {
+      var d;
+      d = ev.data;
+      if (d === false) {
+        if (this.ondone) {
+          this.ondone(this.d);
+        }
+        this.w.terminate();
+        return this.w = null;
+      } else {
+        this.d = d;
+        if (this.ondata) {
+          return this.ondata(d);
+        }
+      }
+    };
+    Thread.prototype._onWorkerError = function(ev) {
+      dbg("Worker error: " + ev.message);
+      return this.kill();
+    };
+    Thread.prototype._alarm = function() {
+      var d;
+      d = this.fn(this.d);
+      if (d === false) {
+        if (this.ondone) {
+          this.ondone(this.d);
+        }
+        return this.t = null;
+      } else {
+        this.d = d;
+        if (this.ondata) {
+          this.ondata(d);
+        }
+        if (this.t !== null) {
+          return this.t.start();
+        }
+      }
+    };
+    Thread.prototype._runInBackground = function() {
+      if (!this.t) {
+        this.t = new Moka.Timer({
+          callback: this._alarm.bind(this)
+        });
+      }
+      return this.t.start();
+    };
+    return Thread;
+  })();
   Moka.Widget = (function() {
     Widget.prototype.mainclass = "moka-widget";
     function Widget(from_element) {
@@ -639,6 +825,22 @@
         return this.e.text();
       }
     };
+    Widget.prototype.html = function(html) {
+      if (html != null) {
+        this.e.html(html);
+        return this;
+      } else {
+        return this.e.html();
+      }
+    };
+    Widget.prototype.data = function(key, value) {
+      if (value != null) {
+        this.e.data(key, value);
+        return this;
+      } else {
+        return this.e.data(key);
+      }
+    };
     Widget.prototype["do"] = function(fn) {
       fn.apply(this, [this.e]);
       return this;
@@ -670,7 +872,7 @@
   })();
   Moka.Label = (function() {
     __extends(Label, Moka.Widget);
-    Label.prototype.mainclass = "moka-label " + Moka.Widget.prototype.mainclass;
+    Label.prototype.mainclass = Moka.Widget.prototype.mainclass;
     function Label(text, from_element) {
       var e;
       if (text instanceof $) {
@@ -680,7 +882,6 @@
         e = from_element;
       }
       Label.__super__.constructor.call(this, e);
-      this.addClass("moka-label");
       if (text) {
         this.label(text);
       }
@@ -688,13 +889,14 @@
     Label.prototype.label = function(text) {
       var html, keyhint;
       if (text != null) {
-        keyhint = null;
-        html = text.replace(/_[a-z]/i, function(key) {
-          return '<span class="moka-keyhint"' + ' onclick="this.parentNode.click(event)">' + (keyhint = key[1]) + '</span>';
-        });
-        this.e.html(html).css("cursor", "pointer");
-        if (keyhint) {
-          this.e.data("keyhint", keyhint.toUpperCase());
+        if (text.length) {
+          keyhint = "";
+          html = text.replace(/_[a-z]/i, function(key) {
+            return '<span class="moka-keyhint"' + ' onclick="$(this.parentNode).click()">' + (keyhint = key[1]) + '</span>';
+          });
+          this.html(html).addClass("moka-label").css("cursor", "pointer").data("keyhint", keyhint.toUpperCase());
+        } else {
+          this.html("").removeClass("moka-label").css("cursor", "").data("keyhint", "");
         }
         return this;
       } else {
@@ -780,14 +982,20 @@
           a.attr("tabindex", b.attr("tabindex"));
           return b.attr("tabindex", -1);
         };
-        window.setTimeout((__bind(function() {
-          var _ref2;
-          if (((_ref2 = Moka.focused()) != null ? _ref2[0] : void 0) === this.e[0]) {
+        if (this.t) {
+          this.t.kill();
+        }
+        this.t = new Moka.Timer({
+          delay: 200,
+          callback: __bind(function() {
             swap_index.apply(null, [this.e_focus, this.e]);
             this.e_focus.one("blur.moka", swap_index.bind(null, this.e, this.e_focus));
             return Moka.focus(this.e_focus);
-          }
-        }, this)), 200);
+          }, this)
+        }).start();
+        this.e.one("blur.moka", __bind(function() {
+          return this.t.kill();
+        }, this));
       }
       return this;
     };
@@ -796,11 +1004,14 @@
       return this;
     };
     Input.prototype.remove = function() {
-      var ee, v;
+      var e, ee, v;
       ee = this.e.parent();
       v = Input.__super__.remove.apply(this, arguments);
       if (this.hasFocus()) {
-        Moka.blur(Moka.focused_e);
+        e = Moka.focused();
+        if (e) {
+          Moka.blur(e);
+        }
         while (ee.length) {
           if (Moka.focusFirst(ee)) {
             break;
@@ -1116,7 +1327,7 @@
     CheckBox.prototype.value = function(val) {
       var v;
       if (val != null) {
-        v = val ? true : false;
+        v = !!val;
         if (v !== this.checkbox.is(":checked")) {
           this.e.trigger("mokaValueChanged", [v]);
         }
@@ -1512,25 +1723,11 @@
       var e;
       this.src = src;
       e = null;
-      if (window.fx && window.fx.canvas) {
-        try {
-          this.canvas = fx.canvas();
-          e = $(this.canvas);
-        } catch (_e) {}
-      } else {
-        log("Use glfx.js in HTML for WebGL support.");
-      }
-      if (e) {
-        e.width(0);
-        e.height(0);
-        Canvas.__super__.constructor.call(this, e);
-      } else {
-        Canvas.__super__.constructor.call(this, $("<canvas>", {
-          width: 0,
-          height: 0
-        }));
-        this.ctx = this.e[0].getContext("2d");
-      }
+      Canvas.__super__.constructor.call(this, $("<canvas>", {
+        width: 0,
+        height: 0
+      }));
+      this.ctx = this.e[0].getContext("2d");
       this.owidth = this.oheight = 0;
       this.img = $("<img>", {
         width: w,
@@ -1543,11 +1740,15 @@
         this.owidth = img.naturalWidth;
         this.oheight = img.naturalHeight;
         this.resize(this.owidth, this.oheight);
-        return typeof onload === "function" ? onload() : void 0;
+        if (onload) {
+          return onload();
+        }
       }, this));
       this.img.one("error", __bind(function() {
         this.ok = false;
-        return typeof onerror === "function" ? onerror() : void 0;
+        if (onerror) {
+          return onerror();
+        }
       }, this));
       this.img.attr("src", this.src);
     }
@@ -1557,127 +1758,106 @@
     Canvas.prototype.originalHeight = function() {
       return this.oheight;
     };
-    Canvas.prototype.hide = function() {
-      var e;
-      if (this.t_sharpen) {
-        window.clearTimeout(this.t_sharpen);
-        e = this.e[0];
-        e.width = e.height = 0;
+    Canvas.prototype.show = function() {
+      if (this.t_filter && this.t_filter.isPaused()) {
+        this.t_filter.resume();
       }
+      log("SHOW", this.src);
+      return Canvas.__super__.show.apply(this, arguments);
+    };
+    Canvas.prototype.hide = function() {
+      if (this.t_filter) {
+        this.t_filter.pause();
+      }
+      log("HIDE", this.src);
       return Canvas.__super__.hide.apply(this, arguments);
     };
     Canvas.prototype.resize = function(w, h) {
-      var e, img, strength, texture;
-      if (!this.ok) {
+      var e;
+      if (!this.ok || w <= 0 || h <= 0) {
         return this;
       }
       e = this.e[0];
-      if ((e.width === w && e.height === h) || (w <= 0 && h <= 0)) {
-        return this;
+      if (e.width !== w || e.height !== h) {
+        log("RESIZE", this.src);
+        e.width = w;
+        e.height = h;
+        this.clearFilter();
       }
-      e.width = w;
-      e.height = h;
-      img = this.img[0];
-      if (this.canvas) {
-        texture = e.texture(img);
-        e.draw(texture);
-        texture.destroy();
-      } else {
-        this.ctx.clearRect(0, 0, e.width, e.height);
-        this.ctx.drawImage(img, 0, 0, e.width, e.height);
-      }
-      strength = this.sharpen_strength;
-      this.sharpen_strength = null;
-      if (strength) {
-        this.sharpen(strength);
-      } else if (this.canvas) {
-        e.update();
-      }
-      return this;
-    };
-    Canvas.prototype.sharpen = function(strength) {
-      var data, dataCopy, dataDesc, e, filter, h, mul, mulOther, w, w4, weight, y;
-      if (!this.ok || this.sharpen_strength === strength) {
-        return this;
-      }
-      if (this.t_sharpen) {
-        window.clearTimeout(this.t_sharpen);
-      }
-      this.sharpen_strength = strength;
-      if (!strength || strength < 0) {
-        return this;
-      }
-      if (this.canvas) {
-        this.canvas.unsharpMask(32, strength * 5).update();
-        return this;
-      } else if (strength > 1) {
-        strength = 1;
-      }
-      e = this.e[0];
-      w = Math.ceil(e.width);
-      h = Math.ceil(e.height);
-      dataDesc = this.ctx.getImageData(0, 0, w, h);
-      data = dataDesc.data;
-      dataCopy = this.ctx.getImageData(0, 0, w, h).data;
-      mul = 15;
-      mulOther = 1 + 3 * strength;
-      weight = 1 / (mul - 4 * mulOther);
-      mul *= weight;
-      mulOther *= weight;
-      w4 = w * 4;
-      y = 1;
-      filter = function(miny) {
-        var b, g, nextY, offset, offsetNext, offsetPrev, offsetY, offsetYNext, offsetYPrev, prevY, r, x;
-        offsetY = (y - 1) * w4;
-        nextY = y === h ? y - 1 : y;
-        prevY = y === 1 ? 0 : y - 2;
-        offsetYPrev = prevY * w4;
-        offsetYNext = nextY * w4;
-        while (y < miny) {
-          offsetY = (y - 1) * w4;
-          nextY = y === h ? y - 1 : y;
-          prevY = y === 1 ? 0 : y - 2;
-          offsetYPrev = prevY * w4;
-          offsetYNext = nextY * w4;
-          x = w;
-          offset = offsetY - 4 + w * 4;
-          offsetPrev = offsetYPrev + (w - 2) * 4;
-          offsetNext = offsetYNext + (w - 1) * 4;
-          while (x) {
-            r = dataCopy[offset] * mul - mulOther * (dataCopy[offsetPrev] + dataCopy[offset - 4] + dataCopy[offset + 4] + dataCopy[offsetNext]);
-            g = dataCopy[offset + 1] * mul - mulOther * (dataCopy[offsetPrev + 1] + dataCopy[offset - 3] + dataCopy[offset + 5] + dataCopy[offsetNext + 1]);
-            b = dataCopy[offset + 2] * mul - mulOther * (dataCopy[offsetPrev + 2] + dataCopy[offset - 2] + dataCopy[offset + 6] + dataCopy[offsetNext + 2]);
-            data[offset] = Math.min(Math.max(r, 0), 255);
-            data[offset + 1] = Math.min(Math.max(g, 0), 255);
-            data[offset + 2] = Math.min(Math.max(b, 0), 255);
-            if (x < w) {
-              offsetNext -= 4;
-            }
-            --x;
-            offset -= 4;
-            if (x > 2) {
-              offsetPrev -= 4;
-            }
-          }
-          ++y;
-          offsetY += w4;
-          if (y !== h) {
-            ++nextY;
-            offsetYPrev += w4;
-          }
-          if (y > 2) {
-            ++prevY;
-            offsetYNext += w4;
-          }
-        }
-        this.ctx.putImageData(dataDesc, 0, 0);
-        return this.t_sharpen = y > h ? 0 : window.setTimeout(filter.bind(this, Math.min(y + 50, h + 1)), 0);
-      };
-      this.t_sharpen = window.setTimeout(filter.bind(this, 50), 0);
       return this;
     };
     Canvas.prototype.isLoaded = function() {
       return this.ok != null;
+    };
+    Canvas.prototype.clearFilter = function() {
+      var e, h, img, w;
+      if (this.t_filter) {
+        this.t_filter.kill();
+      }
+      e = this.e[0];
+      w = Math.ceil(e.width);
+      h = Math.ceil(e.height);
+      img = this.img[0];
+      this.ctx.clearRect(0, 0, w, h);
+      this.ctx.drawImage(img, 0, 0, w, h);
+      return this;
+    };
+    Canvas.prototype.filter = function() {
+      var e, h, w;
+      if (!this.ok || !this.t_filter_first) {
+        return this;
+      }
+      e = this.e[0];
+      w = Math.ceil(e.width);
+      h = Math.ceil(e.height);
+      this.t_filter = this.t_filter_first.data({
+        dataDesc: this.ctx.getImageData(0, 0, w, h),
+        dataDescCopy: this.ctx.getImageData(0, 0, w, h)
+      }).start();
+      return this;
+    };
+    Canvas.prototype.addFilter = function(filename, callback) {
+      var t, tt;
+      tt = new Moka.Timer({
+        delay: 50,
+        callback: __bind(function(d) {
+          return this.ctx.putImageData(d, 0, 0);
+        }, this)
+      });
+      t = new Moka.Thread({
+        callback: callback,
+        filename: filename,
+        ondata: __bind(function(d) {
+          tt.data(d);
+          if (!tt.isRunning()) {
+            return tt.start();
+          }
+        }, this),
+        ondone: __bind(function(d) {
+          return this.t_filter = null;
+        }, this),
+        onerror: function() {
+          return tt.kill();
+        }
+      });
+      if (this.t_filter_first) {
+        this.t_filter_last.onDone(__bind(function(data) {
+          var e, h, w;
+          tt.kill();
+          this.ctx.putImageData(data, 0, 0);
+          e = this.e[0];
+          w = Math.ceil(e.width);
+          h = Math.ceil(e.height);
+          return this.t_filter = t.data({
+            dataDesc: data,
+            dataDescCopy: this.ctx.getImageData(0, 0, w, h)
+          }).start();
+        }, this));
+      } else {
+        this.t_filter_first = t;
+      }
+      this.t_filter_last = t;
+      return this;
     };
     return Canvas;
   })();
@@ -1685,30 +1865,31 @@
     __extends(ImageView, Moka.Input);
     ImageView.prototype.mainclass = "moka-imageview " + Moka.Input.prototype.mainclass;
     ImageView.prototype.default_keys = {};
-    function ImageView(src, use_canvas, sharpen) {
+    function ImageView(src, use_canvas, filters) {
       this.src = src;
       this.use_canvas = use_canvas;
-      this.sharpen = sharpen;
-      ImageView.__super__.constructor.apply(this, arguments);
+      this.filters = filters;
+      ImageView.__super__.constructor.call(this);
     }
     ImageView.prototype.show = function() {
-      var onerror, onload;
+      var f, image, onerror, onload, _i, _len, _ref;
       if (this.image) {
         if (this.t_remove) {
-          window.clearTimeout(this.t_remove);
+          this.t_remove.kill();
           this.t_remove = null;
           this.image.show();
         }
         this.e.show();
         if (this.ok != null) {
-          this.zoom(this.z, this.zhow);
+          this.zoom(this.zhow);
           this.e.trigger("mokaLoaded");
           this.e.trigger("mokaDone", [!this.ok]);
         }
       } else {
         onload = __bind(function() {
           this.ok = true;
-          this.zoom(this.z, this.zhow);
+          this.zoom(this.zhow);
+          log("LOAD", this.src);
           this.e.trigger("mokaLoaded");
           return this.e.trigger("mokaDone", [false]);
         }, this);
@@ -1718,7 +1899,12 @@
           return this.e.trigger("mokaDone", [true]);
         }, this);
         if (this.use_canvas) {
-          this.image = new Moka.Canvas(this.src, "", "", onload, onerror);
+          image = this.image = new Moka.Canvas(this.src, "", "", onload, onerror);
+          _ref = this.filters;
+          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+            f = _ref[_i];
+            image.addFilter(f.filename, f.callback);
+          }
         } else {
           this.image = new Moka.Image(this.src, "", "", onload, onerror);
         }
@@ -1731,14 +1917,17 @@
       this.e.hide();
       if ((this.image != null) && !this.t_remove) {
         this.image.hide();
-        this.t_remove = window.setTimeout(__bind(function() {
-          dbg("removing image", this.image.img.attr("src"));
-          this.ok = null;
-          this.image.img.attr("src", "");
-          this.image.remove();
-          this.image = null;
-          return this.t_remove = null;
-        }, this), 60000);
+        this.t_remove = new Moka.Timer({
+          delay: 60000,
+          callback: __bind(function() {
+            dbg("removing image", this.image.img.attr("src"));
+            this.ok = null;
+            this.image.img.attr("src", "");
+            this.image.remove();
+            this.image = null;
+            return this.t_remove = null;
+          }, this)
+        }).start();
       }
       return ImageView.__super__.hide.apply(this, arguments);
     };
@@ -1747,7 +1936,7 @@
       if (this.image) {
         this.image.remove();
         if (this.t_remove) {
-          window.clearTimeout(this.t_remove);
+          this.t_remove.kill();
         }
       }
       return ImageView.__super__.remove.apply(this, arguments);
@@ -1762,10 +1951,13 @@
       return this.image.originalHeight();
     };
     ImageView.prototype.zoom = function(how) {
-      var d, d2, h, height, mh, mw, w, width, zhow;
+      var d, d2, h, height, mh, mw, w, width, z, zhow, _base;
       if (how != null) {
-        this.z = how;
-        zhow = this.zhow = this.z instanceof Array ? this.z[2] : null;
+        if (this.z === how) {
+          return this;
+        }
+        this.zhow = how;
+        zhow = how instanceof Array ? how[2] : null;
         if (this.ok && this.e.parent().length) {
           width = this.image.width();
           height = this.image.height();
@@ -1795,9 +1987,9 @@
               mw = mh = "";
             }
           } else {
-            this.z = parseFloat(how) || 1;
-            mw = Math.floor(this.z * this.image.originalWidth());
-            mh = Math.floor(this.z * this.image.originalHeight());
+            z = parseFloat(how) || 1;
+            mw = Math.floor(z * this.image.originalWidth());
+            mh = Math.floor(z * this.image.originalHeight());
           }
           if (zhow !== "fit" && zhow !== "fill") {
             if (width / height < mw / mh) {
@@ -1819,9 +2011,10 @@
             height: h
           });
           this.image.resize(w || mw, h || mh);
-          if (this.image.sharpen) {
-            this.image.sharpen(this.sharpen);
+          if (typeof (_base = this.image).filter === "function") {
+            _base.filter();
           }
+          this.zhow = this.z = how;
         }
         return this;
       } else {
@@ -2622,9 +2815,12 @@
       var current_item, p, topreload, updateItems;
       if (!now) {
         if (this.t_update) {
-          window.clearTimeout(this.t_update);
+          this.t_update.kill();
         }
-        this.t_update = window.setTimeout(this.updateVisible.bind(this, true), 100);
+        this.t_update = new Moka.Timer({
+          delay: 100,
+          callback: this.updateVisible.bind(this, true)
+        }).start();
         return;
       }
       p = this.cell(0).parent();
@@ -2668,8 +2864,7 @@
         if (!cell && item && topreload > 0) {
           --topreload;
           dbg("preloading view", index);
-          item.e.one("mokaDone", loaded);
-          item.show();
+          item.unbind("mokaDone.preload").one("mokaDone.preload", loaded).show();
           return;
         }
         if (!item || !cell) {
@@ -2696,8 +2891,7 @@
           return next();
         }
         dbg("loading view", index);
-        item.e.one("mokaDone", loaded);
-        return item.show();
+        return item.unbind("mokaDone.preload").one("mokaDone.preload", loaded).show();
       }, this);
       if (this.current >= 0) {
         return updateItems(this.index + this.current, 1);
@@ -2759,14 +2953,17 @@
         this.animation_speed = 1000;
       }
       this.e.addClass(notification_class).hide().html(html).bind("mouseenter.moka", __bind(function() {
-        return window.clearTimeout(this.t_notify);
+        return this.t_notify.kill();
       }, this)).bind("mouseleave.moka", __bind(function() {
-        return this.t_notify = window.setTimeout(this.remove.bind(this), delay / 2);
+        return this.t_notify.start(delay / 2);
       }, this)).appendTo(Moka.notificationLayer).fadeIn(this.animation_speed);
-      this.t_notify = window.setTimeout(this.remove.bind(this), delay);
+      this.t_notify = new Moka.Timer({
+        delay: delay,
+        callback: this.remove.bind(this)
+      }).start();
     }
     Notification.prototype.remove = function() {
-      window.clearTimeout(this.t_notify);
+      this.t_notify.kill();
       return this.e.hide(this.animation_speed, Notification.__super__.remove.apply(this, arguments));
     };
     return Notification;
@@ -2799,16 +2996,17 @@
         val = "";
         w = this;
         search = function(next) {
-          var opts;
-          if (tofocus) {
-            tofocus.removeClass("moka-found");
-          }
+          var oldtofocus, opts;
+          oldtofocus = tofocus;
           opts = {
             text: val,
             next: next === true,
             prev: next === false
           };
           tofocus = Moka.findInput(w.body, opts);
+          if (oldtofocus) {
+            oldtofocus.removeClass("moka-found");
+          }
           if (tofocus) {
             return tofocus.addClass("moka-found");
           }
@@ -3117,7 +3315,9 @@
         this.e.css("opacity", 1);
       }
       if (!once) {
-        window.setTimeout(this.center.bind(this, true), 0);
+        new Moka.Timer({
+          callback: this.center.bind(this, true)
+        }).start();
       }
       return this;
     };

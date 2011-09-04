@@ -62,6 +62,7 @@
 @mixin linear-gradient($angle, $colors) {
     background-image: -webkit-linear-gradient(#{$angle}deg, unquote($colors));
     background-image: -moz-linear-gradient(#{$angle}deg, unquote($colors));
+    background-image: -o-linear-gradient(#{$angle}deg, unquote($colors));
     background-image: linear-gradient(#{$angle}deg, unquote($colors));
 
 }

@@ -128,6 +128,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   -o-box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.7);
   background-image: -webkit-linear-gradient(-90deg, #f6ebc1,#e0d6b0,#b3ab8c);
   background-image: -moz-linear-gradient(-90deg, #f6ebc1,#e0d6b0,#b3ab8c);
+  background-image: -o-linear-gradient(-90deg, #f6ebc1,#e0d6b0,#b3ab8c);
   background-image: linear-gradient(-90deg, #f6ebc1,#e0d6b0,#b3ab8c); }
   .moka-button:hover {
     color: black;
@@ -139,6 +140,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
     background-color: rgba(221, 170, 68, 0.5);
     background-image: -webkit-linear-gradient(-90deg, rgba(243, 187, 74, 0.5),rgba(221, 170, 68, 0.5),rgba(176, 136, 54, 0.5));
     background-image: -moz-linear-gradient(-90deg, rgba(243, 187, 74, 0.5),rgba(221, 170, 68, 0.5),rgba(176, 136, 54, 0.5));
+    background-image: -o-linear-gradient(-90deg, rgba(243, 187, 74, 0.5),rgba(221, 170, 68, 0.5),rgba(176, 136, 54, 0.5));
     background-image: linear-gradient(-90deg, rgba(243, 187, 74, 0.5),rgba(221, 170, 68, 0.5),rgba(176, 136, 54, 0.5)); }
     .moka-button.moka-focus.moka-label {
       color: black;
@@ -233,6 +235,9 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
     outline: 4px solid rgba(165, 127, 51, 0.7); }
     .moka-viewer:not(.moka-layout-1x1) .moka-view.moka-current > .moka-widget img {
       margin-bottom: -4px; }
+
+.moka-viewer.moka-layout-1x1 .moka-view {
+  padding: 0; }
 
 .moka-viewer .moka-table {
   margin: auto;
