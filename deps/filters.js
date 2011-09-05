@@ -1,10 +1,9 @@
 var Filters = {};
 
 Filters.startWorker = function(w) {
-    var d, data = w.data;
-    d = data.dataDesc = w.filter.apply(data);
-    self.postMessage(d);
-    if (d === false) return;
+    var data = w.data = w.filter.apply(w.data);
+    self.postMessage(data);
+    if (data === false) return;
     w.timer = setTimeout(function(){Filters.startWorker(w)}, 0);
 }
 

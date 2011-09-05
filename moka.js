@@ -496,20 +496,25 @@
       return this.t !== null;
     };
     Timer.prototype.start = function(delay) {
-      this.kill();
-      this.t = window.setTimeout(this.run.bind(this), delay != null ? delay : this.delay);
+      if (this.t === null) {
+        this.t = window.setTimeout(this.run.bind(this), delay != null ? delay : this.delay);
+      }
       return this;
     };
+    Timer.prototype.restart = function(delay) {
+      this.kill();
+      return this.start(delay);
+    };
     Timer.prototype.kill = function() {
-      if (this.isRunning()) {
+      if (this.t !== null) {
         window.clearTimeout(this.t);
         this.t = null;
       }
       return this;
     };
     Timer.prototype.run = function() {
+      this.kill();
       this.fn(this.d);
-      this.t = null;
       return this;
     };
     return Timer;
@@ -592,6 +597,10 @@
         this._runInBackground();
       }
       return this;
+    };
+    Thread.prototype.restart = function() {
+      this.kill();
+      return this.start();
     };
     Thread.prototype.pause = function() {
       this.paused = true;
@@ -751,6 +760,11 @@
       return this;
     };
     Widget.prototype.one = function(event, fn) {
+      this.e.one(event, fn);
+      return this;
+    };
+    Widget.prototype.once = function(event, fn) {
+      this.unbind(event);
       this.e.one(event, fn);
       return this;
     };
@@ -1728,6 +1742,9 @@
         height: 0
       }));
       this.ctx = this.e[0].getContext("2d");
+      this.t_draw = new Moka.Timer({
+        callback: this.draw.bind(this)
+      });
       this.owidth = this.oheight = 0;
       this.img = $("<img>", {
         width: w,
@@ -1739,7 +1756,6 @@
         img = this.img[0];
         this.owidth = img.naturalWidth;
         this.oheight = img.naturalHeight;
-        this.resize(this.owidth, this.oheight);
         if (onload) {
           return onload();
         }
@@ -1762,14 +1778,12 @@
       if (this.t_filter && this.t_filter.isPaused()) {
         this.t_filter.resume();
       }
-      log("SHOW", this.src);
       return Canvas.__super__.show.apply(this, arguments);
     };
     Canvas.prototype.hide = function() {
       if (this.t_filter) {
         this.t_filter.pause();
       }
-      log("HIDE", this.src);
       return Canvas.__super__.hide.apply(this, arguments);
     };
     Canvas.prototype.resize = function(w, h) {
@@ -1779,20 +1793,34 @@
       }
       e = this.e[0];
       if (e.width !== w || e.height !== h) {
-        log("RESIZE", this.src);
         e.width = w;
         e.height = h;
-        this.clearFilter();
+        if (this.t_filter) {
+          this.t_filter.kill();
+          this.t_filter = null;
+        }
+        this.t_draw.data(0).start();
+      }
+      return this;
+    };
+    Canvas.prototype.draw = function(data) {
+      if (!this.ok) {
+        return this;
+      }
+      if (data) {
+        this.ctx.putImageData(data, 0, 0);
+      } else {
+        this.filter();
       }
       return this;
     };
     Canvas.prototype.isLoaded = function() {
       return this.ok != null;
     };
-    Canvas.prototype.clearFilter = function() {
+    Canvas.prototype.filter = function() {
       var e, h, img, w;
-      if (this.t_filter) {
-        this.t_filter.kill();
+      if (!this.ok) {
+        return this;
       }
       e = this.e[0];
       w = Math.ceil(e.width);
@@ -1800,51 +1828,34 @@
       img = this.img[0];
       this.ctx.clearRect(0, 0, w, h);
       this.ctx.drawImage(img, 0, 0, w, h);
-      return this;
-    };
-    Canvas.prototype.filter = function() {
-      var e, h, w;
-      if (!this.ok || !this.t_filter_first) {
-        return this;
+      if (this.t_filter_first) {
+        if (this.t_filter) {
+          this.t_filter.kill();
+        }
+        this.t_filter = this.t_filter_first.data({
+          dataDesc: this.ctx.getImageData(0, 0, w, h),
+          dataDescCopy: this.ctx.getImageData(0, 0, w, h)
+        }).start();
       }
-      e = this.e[0];
-      w = Math.ceil(e.width);
-      h = Math.ceil(e.height);
-      this.t_filter = this.t_filter_first.data({
-        dataDesc: this.ctx.getImageData(0, 0, w, h),
-        dataDescCopy: this.ctx.getImageData(0, 0, w, h)
-      }).start();
       return this;
     };
     Canvas.prototype.addFilter = function(filename, callback) {
-      var t, tt;
-      tt = new Moka.Timer({
-        delay: 50,
-        callback: __bind(function(d) {
-          return this.ctx.putImageData(d, 0, 0);
-        }, this)
-      });
+      var t;
       t = new Moka.Thread({
         callback: callback,
         filename: filename,
-        ondata: __bind(function(d) {
-          tt.data(d);
-          if (!tt.isRunning()) {
-            return tt.start();
-          }
+        ondata: __bind(function(data) {
+          return this.t_draw.data(data).start(50);
         }, this),
-        ondone: __bind(function(d) {
+        ondone: __bind(function(data) {
+          this.t_draw.data(data).run();
           return this.t_filter = null;
-        }, this),
-        onerror: function() {
-          return tt.kill();
-        }
+        }, this)
       });
       if (this.t_filter_first) {
         this.t_filter_last.onDone(__bind(function(data) {
           var e, h, w;
-          tt.kill();
-          this.ctx.putImageData(data, 0, 0);
+          this.t_draw.data(data).run();
           e = this.e[0];
           w = Math.ceil(e.width);
           h = Math.ceil(e.height);
@@ -1889,7 +1900,6 @@
         onload = __bind(function() {
           this.ok = true;
           this.zoom(this.zhow);
-          log("LOAD", this.src);
           this.e.trigger("mokaLoaded");
           return this.e.trigger("mokaDone", [false]);
         }, this);
@@ -1951,14 +1961,14 @@
       return this.image.originalHeight();
     };
     ImageView.prototype.zoom = function(how) {
-      var d, d2, h, height, mh, mw, w, width, z, zhow, _base;
+      var d, d2, h, height, mh, mw, w, width, z, zhow;
       if (how != null) {
         if (this.z === how) {
           return this;
         }
         this.zhow = how;
         zhow = how instanceof Array ? how[2] : null;
-        if (this.ok && this.e.parent().length) {
+        if (this.ok && this.isVisible()) {
           width = this.image.width();
           height = this.image.height();
           w = h = mw = mh = "";
@@ -2011,9 +2021,6 @@
             height: h
           });
           this.image.resize(w || mw, h || mh);
-          if (typeof (_base = this.image).filter === "function") {
-            _base.filter();
-          }
           this.zhow = this.z = how;
         }
         return this;
@@ -2955,7 +2962,7 @@
       this.e.addClass(notification_class).hide().html(html).bind("mouseenter.moka", __bind(function() {
         return this.t_notify.kill();
       }, this)).bind("mouseleave.moka", __bind(function() {
-        return this.t_notify.start(delay / 2);
+        return this.t_notify.restart(delay / 2);
       }, this)).appendTo(Moka.notificationLayer).fadeIn(this.animation_speed);
       this.t_notify = new Moka.Timer({
         delay: delay,

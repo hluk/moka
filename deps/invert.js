@@ -1,5 +1,5 @@
 if (!self.window) {
-    // worker
+    // worker code
     importScripts('filters.js');
     self.onmessage = function(ev) {
         Filters.workerMessage(ev.data, Filters.Invert);
@@ -13,7 +13,7 @@ Filters.Invert = function(batch_size) {
 Filters.Invert.prototype = {
     apply: function(options) {
         var dataDesc, data, w, h, y, miny;
-        if (this._apply) return this._apply(options);
+        if (!options.dataDesc) return this._apply(options);
 
         dataDesc = options.dataDesc;
         data = dataDesc.data;

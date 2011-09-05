@@ -444,19 +444,26 @@ class Moka.Timer
         return @t isnt null
 
     start: (delay) ->
-        @kill()
-        @t = window.setTimeout(@run.bind(this), if delay? then delay else @delay)
+        if @t is null
+            @t = window.setTimeout(
+                @run.bind(this),
+                if delay? then delay else @delay
+            )
         return this
 
+    restart: (delay) ->
+        @kill()
+        return @start(delay)
+
     kill: ->
-        if @isRunning()
+        if @t isnt null
             window.clearTimeout(@t)
             @t = null
         return this
 
     run: ->
+        @kill()
         @fn(@d)
-        @t = null
         return this
 
 class Moka.Thread
@@ -530,6 +537,10 @@ class Moka.Thread
                 return this
         @_runInBackground() if @fn
         return this
+
+    restart: ->
+        @kill()
+        return @start()
 
     pause: ->
         @paused = true
@@ -663,6 +674,11 @@ class Moka.Widget
         return this
 
     one: (event, fn) ->
+        @e.one(event, fn)
+        return this
+
+    once: (event, fn) ->
+        @unbind(event)
         @e.one(event, fn)
         return this
 
@@ -1456,6 +1472,8 @@ class Moka.Canvas extends Moka.Widget
         super $("<canvas>", width:0, height:0)
         @ctx = @e[0].getContext("2d")
 
+        @t_draw = new Moka.Timer( callback: @draw.bind(this) )
+
         @owidth = @oheight = 0
         @img = $("<img>", width:w, height:h)
         @img.one( "load",
@@ -1464,7 +1482,6 @@ class Moka.Canvas extends Moka.Widget
                 img = @img[0]
                 @owidth  = img.naturalWidth
                 @oheight = img.naturalHeight
-                @resize(@owidth, @oheight)
                 onload() if onload
         )
         @img.one( "error",
@@ -1483,31 +1500,41 @@ class Moka.Canvas extends Moka.Widget
     show: ->
         # resume filtering
         @t_filter.resume() if @t_filter and @t_filter.isPaused()
-        log "SHOW",@src
         return super
 
     hide: ->
         # pause filtering
         @t_filter.pause() if @t_filter
-        log "HIDE",@src
         return super
 
     resize: (w,h) ->
         return this if not @ok or w<=0 or h<=0
         e = @e[0]
         if e.width isnt w or e.height isnt h
-            log "RESIZE",@src
             e.width = w
             e.height = h
-            @clearFilter()
+            if @t_filter
+                @t_filter.kill()
+                @t_filter = null
+            @t_draw.data(0).start()
+
+        return this
+
+    draw: (data) ->
+        return this if not @ok
+
+        if data
+            @ctx.putImageData(data, 0, 0)
+        else
+            @filter()
 
         return this
 
     isLoaded: () ->
         return @ok?
 
-    clearFilter: ->
-        @t_filter.kill() if @t_filter
+    filter: () ->
+        return this if not @ok
 
         e = @e[0]
         w = Math.ceil(e.width)
@@ -1517,45 +1544,30 @@ class Moka.Canvas extends Moka.Widget
         @ctx.clearRect(0, 0, w, h)
         @ctx.drawImage(img, 0, 0, w, h)
 
-        return this
-
-    filter: () ->
-        return this if not @ok or not @t_filter_first
-
-        e = @e[0]
-        w = Math.ceil(e.width)
-        h = Math.ceil(e.height)
-
-        @t_filter = @t_filter_first
-            .data(
-                dataDesc: @ctx.getImageData(0, 0, w, h)
-                dataDescCopy: @ctx.getImageData(0, 0, w, h)
-            ).start()
+        if @t_filter_first
+            @t_filter.kill() if @t_filter
+            @t_filter = @t_filter_first
+                .data(
+                    dataDesc: @ctx.getImageData(0, 0, w, h)
+                    dataDescCopy: @ctx.getImageData(0, 0, w, h)
+                ).start()
 
         return this
 
     addFilter: (filename, callback) ->
-        tt = new Moka.Timer(
-            delay: 50
-            callback: (d) =>
-                @ctx.putImageData(d, 0, 0)
-        )
         t = new Moka.Thread(
             callback: callback
             filename: filename
-            ondata: (d) =>
-                tt.data(d)
-                tt.start() if not tt.isRunning()
-            ondone: (d) =>
+            ondata: (data) =>
+                @t_draw.data(data).start(50)
+            ondone: (data) =>
+                @t_draw.data(data).run()
                 @t_filter = null
-            onerror: ->
-                tt.kill()
         )
 
         if @t_filter_first
             @t_filter_last.onDone (data) =>
-                tt.kill()
-                @ctx.putImageData(data, 0, 0)
+                @t_draw.data(data).run()
                 e = @e[0]
                 w = Math.ceil(e.width)
                 h = Math.ceil(e.height)
@@ -1594,7 +1606,6 @@ class Moka.ImageView extends Moka.Input
                 @ok = true
 
                 @zoom(@zhow)
-                log "LOAD",@src
 
                 @e.trigger("mokaLoaded")
                 @e.trigger("mokaDone", [false])
@@ -1651,7 +1662,7 @@ class Moka.ImageView extends Moka.Input
             @zhow = how
             zhow = if how instanceof Array then how[2] else null
 
-            if @ok and @e.parent().length
+            if @ok and @isVisible()
                 width = @image.width()
                 height = @image.height()
                 w = h = mw = mh = ""
@@ -1693,7 +1704,6 @@ class Moka.ImageView extends Moka.Input
                 @e.css('max-width':mw, 'max-height':mh, width:w, height:h)
 
                 @image.resize(w or mw, h or mh)
-                @image.filter?()
                 @zhow = @z = how
 
             return this
@@ -2442,7 +2452,7 @@ class Moka.Notification extends Moka.Widget
           .hide()
           .html(html)
           .bind( "mouseenter.moka", () => @t_notify.kill() )
-          .bind( "mouseleave.moka", () => @t_notify.start(delay/2) )
+          .bind( "mouseleave.moka", () => @t_notify.restart(delay/2) )
           .appendTo(Moka.notificationLayer)
           .fadeIn(@animation_speed)
 

@@ -1,5 +1,5 @@
 if (!self.window) {
-    // worker
+    // worker code
     importScripts('filters.js');
     self.onmessage = function(ev) {
         Filters.workerMessage(ev.data, Filters.Sharpen);
@@ -14,7 +14,7 @@ Filters.Sharpen = function(strength, batch_size) {
 Filters.Sharpen.prototype = {
     apply: function(options) {
         var dataDesc, data, dataCopy, e, h, mul, mulOther, w, w4, weight, y, miny;
-        if (this._apply) return this._apply(options);
+        if (!options.dataDesc) return this._apply(options);
 
         dataDesc = options.dataDesc;
         data = dataDesc.data;
@@ -32,7 +32,8 @@ Filters.Sharpen.prototype = {
 
         miny = this.batch_size; // batch (lines)
         this._apply = function() {
-            var b, g, nextY, offset, offsetNext, offsetPrev, offsetY, offsetYNext, offsetYPrev, prevY, r, x;
+            var r, g, b, nextY, offset, offsetNext, offsetPrev, offsetY,
+                offsetYNext, offsetYPrev, prevY, x;
 
             if (y > h) {
                 this._apply = null;
@@ -51,9 +52,9 @@ Filters.Sharpen.prototype = {
                 offsetYPrev = prevY * w4;
                 offsetYNext = nextY * w4;
                 x = w;
-                offset = offsetY - 4 + w * 4;
-                offsetPrev = offsetYPrev + (w - 2) * 4;
-                offsetNext = offsetYNext + (w - 1) * 4;
+                offset = offsetY - 4 + w4;
+                offsetPrev = offsetYPrev + w4 - 8;
+                offsetNext = offsetYNext + w4 - 4;
                 while (x) {
                     r = dataCopy[offset] * mul - mulOther * (dataCopy[offsetPrev] + dataCopy[offset - 4] + dataCopy[offset + 4] + dataCopy[offsetNext]);
                     g = dataCopy[offset + 1] * mul - mulOther * (dataCopy[offsetPrev + 1] + dataCopy[offset - 3] + dataCopy[offset + 5] + dataCopy[offsetNext + 1]);
