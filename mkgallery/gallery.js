@@ -1,5 +1,5 @@
 (function() {
-	var onLoad, viewer, gotownd, menu, options;
+	var onLoad, viewer, gotownd, menu, options, t_notify;
 
     // a_function.bind(object, arg1, ...)
     if (!Function.prototype.bind) {
@@ -175,7 +175,7 @@
     notify = function(id) {
         var item, itempath, html, notification, counter, r, w1, w2, e, z;
 
-        item = viewer.at(id);
+        item = viewer.item(id);
 
         it = ls[id];
         if (it instanceof Array) {
@@ -393,7 +393,7 @@
 		viewer.appendTo("body").show();
 
 		// show notification and update URL when viewing new item or changing zoom level
-        viewer.connect("mokaSelected mokaZoomChanged", function(ev, id) {
+        viewer.connect("mokaSelected mokaZoomChanged mokaLayoutChanged", function(ev, id) {
             if (typeof id == "undefined") {
                 id = opts.n;
             }
@@ -404,7 +404,8 @@
             saveOptions(opts);
 
             if (opts.notify) {
-                notify(id);
+                if (!t_notify) t_notify = new Moka.Timer({callback:notify, delay:100});
+                t_notify.data(id).start();
             }
         });
 

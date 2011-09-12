@@ -192,19 +192,15 @@
   };
   Moka.initDragScroll = function(e) {
     e.bind("mousedown.moka.initdragscroll", function(ev) {
-      if (ev.button === 0) {
+      if (ev.which === 1) {
         return Moka.dragScroll(ev);
       }
     });
     return e;
   };
   Moka.scrolling = false;
-  Moka.tt = 0;
   jQuery.extend(jQuery.easing, {
     easeOutCubic: function(x, t, b, c, d) {
-      if (t > Moka.tt) {
-        Moka.tt = t + 30;
-      }
       return (t = t / 1000 - 1) * t * t + 1;
     }
   });
@@ -254,13 +250,14 @@
         accel = 200 / dt;
         vx = dx * accel;
         vy = dy * accel;
-        Moka.tt = 100;
         w.stop(true).animate({
           scrollLeft: w.scrollLeft() + vx + "px",
           scrollTop: w.scrollTop() + vy + "px"
         }, 1000, "easeOutCubic", function() {
           return Moka.scrolling = false;
         });
+      } else {
+        Moka.scrolling = false;
       }
       return false;
     };
@@ -310,16 +307,16 @@
   Moka.blur = function(e) {
     return e.blur();
   };
-  Moka.focusFirstWidget = function(w, only_children) {
+  Moka.focusFirstWidget = function(w, only_children, o) {
     var ww, _i, _len, _ref;
     if (!only_children && w.focus) {
-      w.focus();
+      w.focus(o);
       return true;
     } else if (w.widgets) {
       _ref = w.widgets;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         ww = _ref[_i];
-        if (Moka.focusFirstWidget(ww, false)) {
+        if (Moka.focusFirstWidget(ww, false, o)) {
           return true;
         }
       }
@@ -344,15 +341,13 @@
       return false;
     }
   };
-  Moka.onScreen = function(e, how) {
-    var d, pos, wnd, _ref, _ref2, _ref3, _ref4;
-    if (!how) {
-      return (Moka.onScreen(e, 'r') || Moka.onScreen(e, 'l')) && (Moka.onScreen(e, 't') || Moka.onScreen(e, 'b'));
-    }
+  Moka.onScreen = function(e, how, error) {
+    var d, h, pos, wnd, _ref, _ref2, _ref3, _ref4, _ref5, _ref6;
     pos = e.offset();
     wnd = $(window);
-    d = 8;
-    switch (how[0]) {
+    d = error != null ? error : 8;
+    h = how != null ? how[0] : '';
+    switch (h) {
       case 'b':
         return (-d < (_ref = pos.top + e.height()) && _ref < wnd.height() + d);
       case 't':
@@ -361,6 +356,16 @@
         return (-d < (_ref3 = pos.left + e.width()) && _ref3 < wnd.width() + d);
       case 'l':
         return (-d < (_ref4 = pos.left) && _ref4 < wnd.width() + d);
+      case 'B':
+        return pos.top + e.height() < wnd.height() + d;
+      case 'T':
+        return -d < pos.top;
+      case 'R':
+        return pos.left + e.width() < wnd.width() + d;
+      case 'L':
+        return -d < pos.left;
+      default:
+        return (-e.width() - d < (_ref5 = pos.left) && _ref5 < wnd.width() + d) && (-e.height() - d < (_ref6 = pos.top) && _ref6 < wnd.height() + d);
     }
   };
   Moka.toScreen = function(e, wnd, o) {
@@ -445,7 +450,7 @@
     return Moka.scroll(wnd, {
       left: left,
       top: top,
-      animate: true
+      animate: false
     });
   };
   Moka.scroll = function(e, opts) {
@@ -474,9 +479,6 @@
         return e.scrollTop(a.scrollTop);
       }
     }
-  };
-  Moka.ensureVisible = function(e, wnd) {
-    return toScreen(e, wnd);
   };
   Moka.Timer = (function() {
     function Timer(options) {
@@ -703,7 +705,7 @@
     Widget.prototype.show = function() {
       this.e.show();
       this.update();
-      this.e.trigger("mokaDone", [false]);
+      this.trigger("mokaDone", [false]);
       return this;
     };
     Widget.prototype.hide = function() {
@@ -737,7 +739,7 @@
     };
     Widget.prototype.remove = function() {
       this.e.hide();
-      this.e.trigger("mokaDestroyed");
+      this.trigger("mokaDestroyed");
       return this.e.remove();
     };
     Widget.prototype.parent = function() {
@@ -783,6 +785,15 @@
       } else {
         return this.e.height();
       }
+    };
+    Widget.prototype.resize = function(w, h) {
+      if (w != null) {
+        this.e.width(w);
+      }
+      if (h != null) {
+        this.e.height(h);
+      }
+      return this;
     };
     Widget.prototype.offset = function(x, y) {
       if (x != null) {
@@ -875,8 +886,8 @@
         ++i;
       }
       p = this.parent();
-      if (p && !skip_parent) {
-        if (typeof p.keyHintFocus === "function" ? p.keyHintFocus(hint, false, this) : void 0) {
+      if (p && !skip_parent && p.keyHintFocus) {
+        if (p.keyHintFocus(hint, false, this)) {
           return true;
         }
       }
@@ -986,10 +997,10 @@
         return this.e.attr("tabindex", index);
       }
     };
-    Input.prototype.focus = function() {
+    Input.prototype.focus = function(o) {
       var swap_index, _ref;
       if (((_ref = Moka.focused()) != null ? _ref[0] : void 0) !== this.e[0]) {
-        Moka.focus(this.e);
+        Moka.focus(this.e, o);
       }
       if (this.other_focusable) {
         swap_index = function(a, b) {
@@ -1004,7 +1015,7 @@
           callback: __bind(function() {
             swap_index.apply(null, [this.e_focus, this.e]);
             this.e_focus.one("blur.moka", swap_index.bind(null, this.e, this.e_focus));
-            return Moka.focus(this.e_focus);
+            return Moka.focus(this.e_focus, o);
           }, this)
         }).start();
         this.e.one("blur.moka", __bind(function() {
@@ -1257,7 +1268,8 @@
       bindfocus = __bind(function(widget, id) {
         return widget.bind("mokaFocused", __bind(function() {
           if (this.current >= 0) {
-            this.c.at(this.current).removeClass("moka-current").trigger("mokaDeselected", [this.current]);
+            this.c.at(this.current).removeClass("moka-current");
+            this.trigger("mokaDeselected", [this.current]);
           }
           this.current = id;
           widget.addClass("moka-current");
@@ -1324,7 +1336,7 @@
         type: "checkbox",
         "class": "moka-value"
       }).bind("change.moka", __bind(function() {
-        return this.e.trigger("mokaValueChanged", [this.value()]);
+        return this.trigger("mokaValueChanged", [this.value()]);
       }, this)).prependTo(this.e);
       this.connect("click.moka", this.toggle.bind(this));
       this.addNotFocusableElement(this.checkbox);
@@ -1343,7 +1355,7 @@
       if (val != null) {
         v = !!val;
         if (v !== this.checkbox.is(":checked")) {
-          this.e.trigger("mokaValueChanged", [v]);
+          this.trigger("mokaValueChanged", [v]);
         }
         this.checkbox.attr("checked", v);
         return this;
@@ -1369,7 +1381,7 @@
       this.combo = $('<select>', {
         "class": "moka-value"
       }).attr("tabindex", -1).bind("change.moka", __bind(function() {
-        return this.e.trigger("mokaValueChanged", [this.value()]);
+        return this.trigger("mokaValueChanged", [this.value()]);
       }, this)).appendTo(this.e);
       this.focusableElement(this.combo);
     }
@@ -1413,7 +1425,7 @@
     function LineEdit(label_text, text) {
       LineEdit.__super__.constructor.call(this, label_text);
       this.edit = $("<input>").appendTo(this.e).bind("change.moka", __bind(function() {
-        return this.e.trigger("mokaValueChanged", [this.value()]);
+        return this.trigger("mokaValueChanged", [this.value()]);
       }, this)).keyup(this.update.bind(this));
       if (text != null) {
         this.value(text);
@@ -1462,7 +1474,7 @@
       TextEdit.__super__.constructor.call(this, label_text);
       this.text = text || "";
       this.textarea = $("<textarea>").appendTo(this.e).bind("change.moka", __bind(function() {
-        return this.e.trigger("mokaValueChanged", [this.value()]);
+        return this.trigger("mokaValueChanged", [this.value()]);
       }, this));
       this.focusableElement(this.textarea);
     }
@@ -1710,15 +1722,6 @@
       }, this));
       this.e.attr("src", this.src);
     }
-    Image.prototype.resize = function(w, h) {
-      if (w != null) {
-        this.e.width(w);
-      }
-      if (h != null) {
-        this.e.height(h);
-      }
-      return this;
-    };
     Image.prototype.isLoaded = function() {
       return this.ok != null;
     };
@@ -1737,10 +1740,7 @@
       var e;
       this.src = src;
       e = null;
-      Canvas.__super__.constructor.call(this, $("<canvas>", {
-        width: 0,
-        height: 0
-      }));
+      Canvas.__super__.constructor.call(this, $("<canvas>"));
       this.ctx = this.e[0].getContext("2d");
       this.t_draw = new Moka.Timer({
         callback: this.draw.bind(this)
@@ -1787,7 +1787,9 @@
       return Canvas.__super__.hide.apply(this, arguments);
     };
     Canvas.prototype.resize = function(w, h) {
-      var e;
+      var e, img;
+      w = parseInt(w);
+      h = parseInt(h);
       if (!this.ok || w <= 0 || h <= 0) {
         return this;
       }
@@ -1799,6 +1801,9 @@
           this.t_filter.kill();
           this.t_filter = null;
         }
+        img = this.img[0];
+        this.ctx.clearRect(0, 0, w, h);
+        this.ctx.drawImage(img, 0, 0, w, h);
         this.t_draw.data(0).start();
       }
       return this;
@@ -1818,24 +1823,22 @@
       return this.ok != null;
     };
     Canvas.prototype.filter = function() {
-      var e, h, img, w;
-      if (!this.ok) {
+      var e, h, w;
+      if (!this.ok || !this.t_filter_first) {
         return this;
       }
       e = this.e[0];
-      w = Math.ceil(e.width);
-      h = Math.ceil(e.height);
-      img = this.img[0];
-      this.ctx.clearRect(0, 0, w, h);
-      this.ctx.drawImage(img, 0, 0, w, h);
-      if (this.t_filter_first) {
-        if (this.t_filter) {
-          this.t_filter.kill();
-        }
-        this.t_filter = this.t_filter_first.data({
-          dataDesc: this.ctx.getImageData(0, 0, w, h),
-          dataDescCopy: this.ctx.getImageData(0, 0, w, h)
-        }).start();
+      w = e.width;
+      h = e.height;
+      if (this.t_filter) {
+        this.t_filter.kill();
+      }
+      this.t_filter = this.t_filter_first.data({
+        dataDesc: this.ctx.getImageData(0, 0, w, h),
+        dataDescCopy: this.ctx.getImageData(0, 0, w, h)
+      }).start();
+      if (!this.isVisible()) {
+        this.t_filter.pause();
       }
       return this;
     };
@@ -1883,30 +1886,34 @@
       ImageView.__super__.constructor.call(this);
     }
     ImageView.prototype.show = function() {
-      var f, image, onerror, onload, _i, _len, _ref;
+      var f, image, onerror, onload, p, _i, _len, _ref;
       if (this.image) {
         if (this.t_remove) {
           this.t_remove.kill();
           this.t_remove = null;
           this.image.show();
         }
+        this.zoom(this.zhow);
         this.e.show();
-        if (this.ok != null) {
-          this.zoom(this.zhow);
-          this.e.trigger("mokaLoaded");
-          this.e.trigger("mokaDone", [!this.ok]);
+        p = this.parent();
+        if (p && p.onMokaLoaded) {
+          p.onMokaLoaded(this);
         }
       } else {
         onload = __bind(function() {
           this.ok = true;
           this.zoom(this.zhow);
-          this.e.trigger("mokaLoaded");
-          return this.e.trigger("mokaDone", [false]);
+          p = this.parent();
+          if (p && p.onMokaLoaded) {
+            return p.onMokaLoaded(this);
+          }
         }, this);
         onerror = __bind(function() {
           this.ok = false;
-          this.e.trigger("mokaError");
-          return this.e.trigger("mokaDone", [true]);
+          p = this.parent();
+          if (p && p.onMokaLoaded) {
+            return p.onMokaLoaded(this);
+          }
         }, this);
         if (this.use_canvas) {
           image = this.image = new Moka.Canvas(this.src, "", "", onload, onerror);
@@ -1916,9 +1923,12 @@
             image.addFilter(f.filename, f.callback);
           }
         } else {
-          this.image = new Moka.Image(this.src, "", "", onload, onerror);
+          image = this.image = new Moka.Image(this.src, "", "", onload, onerror);
         }
-        this.image.appendTo(this.e);
+        image.appendTo(this.e).css({
+          'max-width': "100%",
+          'max-height': "100%"
+        });
         this.e.show();
       }
       return this;
@@ -1960,84 +1970,61 @@
     ImageView.prototype.originalHeight = function() {
       return this.image.originalHeight();
     };
+    ImageView.prototype.resize = function(w, h) {
+      ImageView.__super__.resize.apply(this, arguments);
+      if (this.image) {
+        this.image.resize(w, h);
+      }
+      return this;
+    };
     ImageView.prototype.zoom = function(how) {
-      var d, d2, h, height, mh, mw, w, width, z, zhow;
+      var d, d2, h, height, w, width, z, zhow;
       if (how != null) {
         if (this.z === how) {
           return this;
         }
         this.zhow = how;
         zhow = how instanceof Array ? how[2] : null;
-        if (this.ok && this.isVisible()) {
-          width = this.image.width();
-          height = this.image.height();
-          w = h = mw = mh = "";
+        if (this.ok) {
+          width = this.image.originalWidth();
+          height = this.image.originalHeight();
           if (how instanceof Array) {
-            mw = Math.floor(how[0]);
-            mh = Math.floor(how[1]);
-            d = mw / mh;
+            w = how[0];
+            h = how[1];
+            d = w / h;
             d2 = width / height;
             if (zhow === "fill") {
               if (d > d2) {
-                w = mw;
-                h = Math.floor(mw / d2);
+                h = Math.floor(w / d2);
               } else {
-                h = mh;
-                w = Math.floor(mh * d2);
+                w = Math.floor(h * d2);
               }
-              mw = mh = "";
             } else {
               if (d > d2) {
-                h = mh;
-                w = Math.floor(mh * d2);
+                w = Math.floor(h * d2);
               } else {
-                w = mw;
-                h = Math.floor(mw / d2);
+                h = Math.floor(w / d2);
               }
-              mw = mh = "";
             }
           } else {
             z = parseFloat(how) || 1;
-            mw = Math.floor(z * this.image.originalWidth());
-            mh = Math.floor(z * this.image.originalHeight());
+            w = Math.floor(z * this.image.originalWidth());
+            h = Math.floor(z * this.image.originalHeight());
           }
-          if (zhow !== "fit" && zhow !== "fill") {
-            if (width / height < mw / mh) {
-              h = mh;
-            } else {
-              w = mw;
-            }
-          }
-          this.image.css({
-            'max-width': mw,
-            'max-height': mh,
-            width: w,
-            height: h
-          });
-          this.e.css({
-            'max-width': mw,
-            'max-height': mh,
-            width: w,
-            height: h
-          });
-          this.image.resize(w || mw, h || mh);
+          this.resize(w, h);
           this.zhow = this.z = how;
+        } else if (zhow === "fit") {
+          this.css({
+            width: how[0],
+            height: how[1]
+          });
         }
         return this;
       } else {
         return this.z;
       }
     };
-    ImageView.prototype.onKeyDown = function(ev) {
-      var k;
-      if (ImageView.__super__.onKeyDown.apply(this, arguments) === false) {
-        return false;
-      }
-      k = Moka.getKeyName(ev);
-      if (((k === "LEFT" || k === "RIGHT") && this.image.width() > this.width()) || ((k === "UP" || k === "DOWN") && this.image.height() > this.height())) {
-        return ev.stopPropagation();
-      }
-    };
+    ImageView.prototype.onKeyDown = function() {};
     return ImageView;
   })();
   Moka.Viewer = (function() {
@@ -2045,28 +2032,44 @@
     Viewer.prototype.mainclass = "moka-viewer " + Moka.Input.prototype.mainclass;
     Viewer.prototype.default_keys = {
       RIGHT: function() {
-        return Moka.onScreen(Moka.focused(), 'r') && this.focusRight() || Moka.scroll(this.e, {
-          left: 30,
-          relative: true
-        });
+        if (Moka.onScreen(Moka.focused(), 'R')) {
+          return this.focusRight();
+        } else {
+          return Moka.scroll(this.e, {
+            left: 30,
+            relative: true
+          });
+        }
       },
       LEFT: function() {
-        return Moka.onScreen(Moka.focused(), 'l') && this.focusLeft() || Moka.scroll(this.e, {
-          left: -30,
-          relative: true
-        });
+        if (Moka.onScreen(Moka.focused(), 'L')) {
+          return this.focusLeft();
+        } else {
+          return Moka.scroll(this.e, {
+            left: -30,
+            relative: true
+          });
+        }
       },
       UP: function() {
-        return Moka.onScreen(Moka.focused(), 't') && this.focusUp() || Moka.scroll(this.e, {
-          top: -30,
-          relative: true
-        });
+        if (Moka.onScreen(Moka.focused(), 'T')) {
+          return this.focusUp();
+        } else {
+          return Moka.scroll(this.e, {
+            top: -30,
+            relative: true
+          });
+        }
       },
       DOWN: function() {
-        return Moka.onScreen(Moka.focused(), 'b') && this.focusDown() || Moka.scroll(this.e, {
-          top: 30,
-          relative: true
-        });
+        if (Moka.onScreen(Moka.focused(), 'B')) {
+          return this.focusDown();
+        } else {
+          return Moka.scroll(this.e, {
+            top: 30,
+            relative: true
+          });
+        }
       },
       KP6: function() {
         if (__indexOf.call(this.orientation(), 'l') >= 0) {
@@ -2082,14 +2085,14 @@
           return this.prev();
         }
       },
-      KP8: function() {
+      KP2: function() {
         if (__indexOf.call(this.orientation(), 't') >= 0) {
           return this.next();
         } else {
           return this.prev();
         }
       },
-      KP2: function() {
+      KP8: function() {
         if (__indexOf.call(this.orientation(), 'b') >= 0) {
           return this.next();
         } else {
@@ -2097,7 +2100,7 @@
         }
       },
       TAB: function() {
-        if (this.index + this.current + 1 < this.length() && this.currentcell + 1 < this.cellCount()) {
+        if (this.index + this.current + 1 < this.itemCount() && this.currentcell + 1 < this.length()) {
           return this.next();
         } else {
           return false;
@@ -2177,7 +2180,7 @@
         }
       },
       ENTER: function() {
-        return this.next();
+        return this.onDoubleClick();
       },
       '*': function() {
         this.layout([1, 1]);
@@ -2210,14 +2213,14 @@
         return this.select(0);
       },
       KP1: function() {
-        return this.select(this.length() - 1);
+        return this.select(this.itemCount() - 1);
       },
       END: function() {
-        return this.select(this.length() - 1);
+        return this.select(this.itemCount() - 1);
       },
       PAGEUP: function() {
         var c;
-        c = this.cellCount();
+        c = this.length();
         if (this.currentcell % c === 0) {
           return this.select(this.index - c);
         } else {
@@ -2226,7 +2229,7 @@
       },
       PAGEDOWN: function() {
         var c;
-        c = this.cellCount();
+        c = this.length();
         if ((this.currentcell + 1) % c === 0) {
           return this.select(this.index + c);
         } else {
@@ -2248,7 +2251,12 @@
     };
     function Viewer() {
       Viewer.__super__.constructor.apply(this, arguments);
-      this.css("cursor", "move").tabindex(1).bind("mokaFocusUpRequest", __bind(function() {
+      this.t_update = new Moka.Timer({
+        delay: 100,
+        callback: this.updateVisible.bind(this, true)
+      });
+      this.preload_session = 0;
+      this.bind("scroll.moka", this.onScroll.bind(this)).css("cursor", "move").tabindex(1).bind("mokaFocusUpRequest", __bind(function() {
         this.select(this.index + this.current);
         return false;
       }, this)).bind("mousedown.moka", this.onMouseDown.bind(this)).bind("dblclick.moka", this.onDoubleClick.bind(this));
@@ -2265,7 +2273,7 @@
       this.index = -1;
       this.current = -1;
       this.currentcell = -1;
-      this.preload_offset = 200;
+      this.preload_offset = 400;
       this.layout([1, 1]);
       this.orientation("lt");
       this.zoom(1);
@@ -2276,19 +2284,26 @@
       }
       return this;
     };
+    Viewer.prototype.appendTo = function(w_or_e) {
+      Viewer.__super__.appendTo.apply(this, arguments);
+      this.zoom(this.zoom());
+      return this;
+    };
     Viewer.prototype.focus = function(ev) {
       var cell;
-      cell = this.cells[this.currentcell] || this.cells[0];
-      Moka.focusFirst(cell.children(), this.o) || Moka.focus(cell, this.o);
+      cell = this.cell(this.current) || this.cell(0);
+      if (cell) {
+        Moka.focusFirst(cell.children(), this.o) || Moka.focus(cell, this.o);
+      }
       return this;
     };
     Viewer.prototype.appendFunction = function(fn, length) {
       var i, itemfn, l, last;
-      last = this.length();
+      last = this.itemCount();
       itemfn = function(index) {
         return fn(index - last);
       };
-      i = this.items.length;
+      i = last;
       l = i + length;
       while (i < l) {
         this.items.push(itemfn);
@@ -2302,7 +2317,7 @@
     };
     Viewer.prototype.append = function(widget) {
       var id;
-      id = this.length();
+      id = this.itemCount();
       widget.parentWidget = this;
       this.items.push(widget);
       if (this.lay[0] <= 0 || this.lay[1] <= 0) {
@@ -2311,7 +2326,7 @@
       this.update();
       return this;
     };
-    Viewer.prototype.at = function(index) {
+    Viewer.prototype.item = function(index) {
       var x;
       x = this.items[index];
       if (x instanceof Function) {
@@ -2323,7 +2338,7 @@
     Viewer.prototype.clean = function() {
       var i, l, x;
       i = 0;
-      l = this.length();
+      l = this.itemCount();
       while (i < l) {
         x = this.items[i];
         if (!(x instanceof Function)) {
@@ -2361,24 +2376,24 @@
       var i;
       i = this.currentIndex();
       if (i >= 0) {
-        return this.at(i);
+        return this.item(i);
       } else {
         return null;
       }
     };
-    Viewer.prototype.length = function() {
+    Viewer.prototype.itemCount = function() {
       return this.items.length;
     };
     Viewer.prototype.clear = function() {
       var i, item, len, _results;
-      i = 0;
-      len = this.cellCount();
+      i = -1;
+      len = this.length() + 1;
       _results = [];
       while (i < len) {
-        item = this.at(this.index + i);
-        if (item) {
-          item.e.detach();
+        item = this.items[this.index + i];
+        if (item && !(item instanceof Function)) {
           item.hide();
+          item.e.detach();
         }
         _results.push(++i);
       }
@@ -2386,21 +2401,18 @@
     };
     Viewer.prototype.view = function(id) {
       var cell, i, item, len;
-      if (id >= this.length() || id < 0) {
+      if (id >= this.itemCount() || id < 0) {
         return this;
-      }
-      if (id < 0) {
-        id = 0;
       }
       this.table.hide();
       this.clear();
       i = 0;
-      len = this.cellCount();
+      len = this.length();
       this.index = Math.floor(id / len) * len;
       dbg("displaying views", this.index + ".." + (this.index + len - 1));
       while (i < len) {
         cell = this.cell(i);
-        item = this.at(this.index + i);
+        item = this.item(this.index + i);
         cell.data("itemindex", i);
         if (item) {
           cell.attr("tabindex", -1);
@@ -2417,27 +2429,26 @@
     };
     Viewer.prototype.select = function(id) {
       var cell, count;
-      if (id < 0 || id >= this.length()) {
+      if (id < 0 || id >= this.itemCount()) {
         return this;
       }
       dbg("selecting view", id);
       cell = this.cell(this.current) || this.cell(0);
       Moka.blur(cell.children()) || Moka.blur(cell);
-      count = this.cellCount();
+      count = this.length();
       this.current = id % count;
-      if (id < this.index || id >= this.index + count) {
+      if (this.index === -1 || id < this.index || id >= this.index + count) {
         this.view(id);
       }
-      cell = this.cell(id % count);
-      Moka.focusFirst(cell.children(), this.o) || Moka.focus(cell, this.o);
+      this.item(id).show();
+      Moka.focus(this.cell(this.current), this.o);
       return this;
     };
     Viewer.prototype.zoom = function(how) {
-      var c, d, factor, h, i, item, layout, len, offset, pos, w, wnd;
+      var c, cell, d, factor, fit, h, i, j, l, len, offset, pos, w, wnd, _base;
       if (how != null) {
         this.zhow = null;
         if (how === "fit" || how === "fill") {
-          layout = this.layout();
           wnd = this.e.parent();
           offset = wnd.offset() || {
             top: 0,
@@ -2449,11 +2460,10 @@
           if (wnd[0] === window.document.body) {
             wnd = $(window);
           }
-          w = (wnd.width() - pos.left) / layout[0];
-          h = (wnd.height() - pos.top) / layout[1];
+          l = this.layout();
           c = this.cells[0];
-          w -= c.outerWidth(true) - c.width();
-          h -= c.outerHeight(true) - c.height();
+          w = Math.floor((wnd.width() - pos.left) / l[0]) - c.outerWidth(true) + c.width();
+          h = Math.floor((wnd.height() - pos.top) / l[1]) - c.outerHeight(true) + c.height();
           this.z = [w, h, how];
           this.zhow = how;
         } else if (how === "+" || how === "-") {
@@ -2462,8 +2472,9 @@
           }
           if (this.z instanceof Array) {
             d = how === "-" ? 0.889 : 1.125;
-            this.z[0] *= d;
-            this.z[1] *= d;
+            w = Math.ceil(this.z[0] * d);
+            h = Math.ceil(this.z[1] * d);
+            this.z = [w, h, this.z[2]];
           } else {
             this.z += how === "-" ? -0.125 : 0.125;
           }
@@ -2474,21 +2485,33 @@
           this.z = factor;
         }
         if (this.index < 0) {
-          return;
+          return this;
         }
         i = this.index;
-        len = i + this.cellCount();
-        len = Math.min(len, this.length());
-        dbg("zooming views", i + ".." + (len - 1), "using method", this.z);
-        while (i < len) {
-          item = this.at(i);
-          if (typeof item.zoom === "function") {
-            item.zoom(this.z);
-          }
-          ++i;
+        j = 0;
+        len = Math.min(i + this.length(), this.itemCount());
+        fit = this.z[2] === "fit";
+        if (fit) {
+          w = this.z[0] + "px";
+          h = this.z[1] + "px";
         }
+        dbg("zooming views", i + ".." + (len - 1), "using method", this.z);
+        this.table.hide();
+        while (i < len) {
+          cell = this.cells[j++];
+          cell.css({
+            width: fit ? w : cell.width() || "",
+            height: fit ? h : cell.height() || "",
+            'max-width': fit ? w : "",
+            'max-height': fit ? h : ""
+          });
+          if (typeof (_base = this.item(i++)).zoom === "function") {
+            _base.zoom(this.z);
+          }
+        }
+        this.table.show();
         if (this.current >= 0) {
-          Moka.toScreen(this.at(this.index + this.current).e, this.e, this.o);
+          Moka.toScreen(this.item(this.index + this.current).e, this.e, this.o);
         }
         this.updateVisible();
         this.trigger("mokaZoomChanged");
@@ -2501,15 +2524,15 @@
         }
       }
     };
-    Viewer.prototype.cellCount = function() {
+    Viewer.prototype.length = function() {
       return this.cells.length;
     };
-    Viewer.prototype.next = function() {
-      this.select(this.index + this.current + 1);
+    Viewer.prototype.next = function(skip) {
+      this.select(this.index + this.current + (skip ? skip : 1));
       return this;
     };
-    Viewer.prototype.prev = function() {
-      this.select(this.index + this.current - 1);
+    Viewer.prototype.prev = function(skip) {
+      this.select(this.index + this.current - (skip ? skip : 1));
       return this;
     };
     Viewer.prototype.nextRow = function() {
@@ -2521,11 +2544,11 @@
       return this;
     };
     Viewer.prototype.nextPage = function() {
-      this.select(this.index + this.cellCount());
+      this.select(this.index + this.length());
       return this;
     };
     Viewer.prototype.prevPage = function() {
-      this.select(this.index - this.cellCount());
+      this.select(this.index - this.length());
       return this;
     };
     Viewer.prototype.focusLeft = function() {
@@ -2536,7 +2559,7 @@
         cell = this.cells[id + h];
         if (cell && cell.width() - 8 <= this.e.width()) {
           id = cell.data("itemindex");
-          how = -this.cellCount();
+          how = -this.length();
           if (__indexOf.call(this.o, "r") >= 0) {
             how = -how;
           }
@@ -2559,11 +2582,11 @@
         cell = this.cells[id - h];
         if (cell && cell.width() - 8 <= this.e.width()) {
           id = cell.data("itemindex");
-          how = this.cellCount();
+          how = this.length();
           if (__indexOf.call(this.o, "r") >= 0) {
             how = -how;
           }
-          this.select(Math.min(this.index + id + how, this.length() - 1));
+          this.select(Math.min(this.index + id + how, this.itemCount() - 1));
         }
       } else {
         cell = this.cells[id];
@@ -2579,11 +2602,11 @@
       h = this.layout()[0];
       id = this.currentcell - h;
       if (id < 0) {
-        len = this.cellCount();
+        len = this.length();
         cell = this.cells[id + len];
         if (cell && cell.height() - 8 <= this.e.height()) {
           id = cell.data("itemindex");
-          how = -this.cellCount();
+          how = -this.length();
           if (__indexOf.call(this.o, "b") >= 0) {
             how = -how;
           }
@@ -2601,17 +2624,17 @@
     Viewer.prototype.focusDown = function() {
       var cell, h, how, id, len;
       h = this.layout()[0];
-      len = this.cellCount();
+      len = this.length();
       id = this.currentcell + h;
       if (id >= len) {
         cell = this.cells[id - len];
         if (cell && cell.height() - 8 <= this.e.height()) {
           id = cell.data("itemindex");
-          how = this.cellCount();
+          how = this.length();
           if (__indexOf.call(this.o, "b") >= 0) {
             how = -how;
           }
-          this.select(Math.min(this.index + id + how, this.length() - 1));
+          this.select(Math.min(this.index + id + how, this.itemCount() - 1));
         }
       } else {
         cell = this.cells[id];
@@ -2629,32 +2652,39 @@
     };
     Viewer.prototype.appendCell = function(row) {
       var cell, id, td;
-      td = $("<td>").appendTo(row);
-      cell = $("<div>");
-      id = this.cellCount();
-      cell.data("moka-cell-id", id);
-      cell.css({
-        "overflow": "hidden"
-      });
-      cell.addClass("moka-view").bind("mokaFocused", __bind(function(ev) {
-        var _ref;
-        if (this.currentcell === id && this.currentindex === this.index + id) {
+      td = $("<td align='center'>").appendTo(row);
+      id = this.length();
+      cell = $("<div>").data("moka-cell-id", id).addClass("moka-view").css({
+        overflow: "hidden"
+      }).bind("mokaFocused", __bind(function(ev) {
+        var i, item, oldcell;
+        if (this.currentindex === this.index + id && this.currentcell === id) {
           return;
         }
-        if (ev.target === cell[0] && Moka.focusFirst(cell.children(), this.o)) {
-          return;
+        i = cell.data("itemindex");
+        if (ev.target === cell[0]) {
+          item = this.item(this.index + i);
+          if (Moka.focusFirstWidget(item)) {
+            Moka.toScreen(item, this.e, this.o);
+            return;
+          }
         }
-        if ((_ref = this.cells[this.currentcell]) != null) {
-          _ref.removeClass("moka-current").trigger("mokaDeselected", [this.index + this.current]);
+        oldcell = this.cells[this.currentcell];
+        if (oldcell) {
+          oldcell.removeClass("moka-current");
+          this.trigger("mokaDeselected", [this.index + this.current]);
         }
         this.currentindex = this.index + id;
         this.currentcell = id;
-        this.current = cell.data("itemindex");
+        this.current = i;
         cell.addClass("moka-current");
         return this.trigger("mokaSelected", [this.index + this.current]);
       }, this)).appendTo(td);
       this.cells.push(cell);
       return cell;
+    };
+    Viewer.prototype.at = function(index) {
+      return this.items[this.index + index];
     };
     Viewer.prototype.cell = function(index) {
       return this.cells[this.indexfn(index)];
@@ -2669,6 +2699,7 @@
         cell.remove();
       }
       this.cells = [];
+      this.index = -1;
       layout = this.layout();
       ilen = layout[0];
       jlen = layout[1];
@@ -2684,7 +2715,7 @@
       return this.table.show();
     };
     Viewer.prototype.layout = function(layout) {
-      var i, id, j, x, y;
+      var cell, focused, i, id, j, x, y;
       if (layout) {
         x = Math.max(0, Number(layout[0]));
         y = Math.max(0, Number(layout[1]));
@@ -2697,18 +2728,27 @@
         this.lay = [x, y];
         this.e.addClass("moka-layout-" + this.lay.join("x"));
         dbg("setting layout", this.lay);
-        id = this.index + this.currentcell;
+        focused = this.hasFocus();
+        id = this.current > -1 ? this.index + this.current : this.index;
         this.updateTable();
-        this.view(this.index);
-        this.select(id);
+        cell = this.cells[this.currentcell];
+        if (cell) {
+          cell.addClass("moka-current");
+        }
+        this.currentindex = 0;
+        this.view(id);
+        if (focused) {
+          this.select(id);
+        }
+        this.trigger("mokaLayoutChanged");
         return this;
       } else {
         i = this.lay[0];
         j = this.lay[1];
         if (i <= 0) {
-          i = Math.ceil(this.length() / j);
+          i = Math.ceil(this.itemCount() / j);
         } else if (j <= 0) {
-          j = Math.ceil(this.length() / i);
+          j = Math.ceil(this.itemCount() / i);
         }
         return [i, j];
       }
@@ -2803,108 +2843,105 @@
         return this.o;
       }
     };
-    Viewer.prototype.hideItem = function(index) {
-      var cell, h, item, w;
-      item = this.at(index);
-      cell = this.cell(index % this.cellCount());
-      if (item.e.is(":visible")) {
-        dbg("hiding item", index);
-        h = cell.height() + "px";
-        w = cell.width() + "px";
-        cell.css({
-          width: w,
-          height: h
-        });
-        return item.hide();
+    Viewer.prototype._preloadItems = function(index, direction, session) {
+      var cell, item, z;
+      if (session !== this.preload_session) {
+        dbg("  loading CANCELED for views", this.current + this.index, "...", index);
+        return this;
       }
+      item = this.item(index);
+      cell = item && item.e.parent();
+      if (!(cell && cell.length) || !item || !Moka.onScreen(cell.parent().parent())) {
+        if (item) {
+          dbg("  preloading view", index);
+          item.show();
+        }
+        dbg("  loading DONE for views", this.current + this.index, "...", index);
+        return this;
+      }
+      z = this.zoom();
+      if ((!(z instanceof Array) || z[2] !== "fit") && z !== "fit") {
+        cell.css({
+          width: cell.width() + "px",
+          height: cell.height() + "px"
+        });
+      }
+      if (Moka.onScreen(cell, null, this.preload_offset)) {
+        dbg("  loading view", index);
+        if (item.zoom) {
+          item.zoom(this.z);
+        }
+        item.show();
+      } else {
+        dbg("  hiding view", index);
+        item.hide();
+      }
+      window.setTimeout(this._preloadItems.bind(this, index + direction, direction, session), 0);
+      return this;
     };
     Viewer.prototype.updateVisible = function(now) {
-      var current_item, p, topreload, updateItems;
+      var index, session;
+      if (this.index === -1) {
+        return this;
+      }
+      this.t_update.kill();
       if (!now) {
-        if (this.t_update) {
-          this.t_update.kill();
-        }
-        this.t_update = new Moka.Timer({
-          delay: 100,
-          callback: this.updateVisible.bind(this, true)
-        }).start();
+        this.t_update.start();
         return;
       }
-      p = this.cell(0).parent();
-      topreload = 2;
-      if (this.current >= 0) {
-        current_item = this.at(this.index + this.current).e;
+      index = this.index + this.current;
+      dbg("loading views starting from " + index + " ...");
+      session = ++this.preload_session;
+      this._preloadItems(index, 1, session);
+      this._preloadItems(index - 1, -1, session);
+      return this;
+    };
+    Viewer.prototype.onMokaLoaded = function(item) {
+      var c, cell, col, current_item, i, id, left, max, pos1, pos2, row, top, x, z;
+      cell = item.e.parent();
+      if (cell.length) {
+        z = this.zoom();
+        if ((!(z instanceof Array) || z[2] !== "fit") && z !== "fit") {
+          id = cell.data("moka-cell-id");
+          if (this.current >= 0) {
+            current_item = this.item(this.index + this.current).e;
+            pos1 = current_item.offset();
+          }
+          this.table.hide();
+          cell.css({
+            width: "",
+            height: ""
+          });
+          x = this.layout()[0];
+          col = id % x;
+          row = Math.floor(id / x);
+          i = row * x;
+          max = i + x;
+          while (i < max && (c = this.cells[i])) {
+            c.height("auto");
+            ++i;
+          }
+          i = col;
+          while (c = this.cells[i]) {
+            c.width("auto");
+            i += x;
+          }
+          this.table.show();
+          if (current_item) {
+            pos2 = current_item.offset();
+            left = this.e.scrollLeft();
+            top = this.e.scrollTop();
+            return Moka.scroll(this.e, {
+              left: left + pos2.left - pos1.left,
+              top: top + pos2.top - pos1.top,
+              animate: false
+            });
+          }
+        }
       }
-      updateItems = __bind(function(index, direction) {
-        var cell, d, h, item, loaded, next, pos, w, wndbottom, wndleft, wndright, wndtop;
-        loaded = __bind(function() {
-          var c, col, i, id, max, row, x;
-          if (cell) {
-            dbg("view", index, "loaded");
-            id = cell.data("moka-cell-id");
-            x = this.layout()[0];
-            col = id % x;
-            row = Math.floor(id / x);
-            i = row * x;
-            max = i + x;
-            while (i < max && (c = this.cells[i])) {
-              c.height("auto");
-              ++i;
-            }
-            i = col;
-            while (c = this.cells[i]) {
-              c.width("auto");
-              i += x;
-            }
-          } else {
-            dbg("view", index, "preloaded");
-            item.hide();
-          }
-          if (typeof item.zoom === "function") {
-            item.zoom(this.z, this.zhow);
-          }
-          return next();
-        }, this);
-        next = updateItems.bind(this, index + direction, direction);
-        cell = this.cell(index - this.index);
-        item = this.at(index);
-        if (!cell && item && topreload > 0) {
-          --topreload;
-          dbg("preloading view", index);
-          item.unbind("mokaDone.preload").one("mokaDone.preload", loaded).show();
-          return;
-        }
-        if (!item || !cell) {
-          dbg("updateItems finished for direction", direction);
-          if (direction > 0) {
-            updateItems.call(this, this.index + this.current - direction, -direction);
-          }
-          this.update();
-          return;
-        }
-        if (item.e.is(":visible")) {
-          return next();
-        }
-        w = p.width();
-        h = p.height();
-        pos = cell.parent().offset();
-        d = this.preload_offset;
-        wndleft = pos.left;
-        wndtop = pos.top;
-        wndright = wndleft + this.e.width();
-        wndbottom = wndtop + this.e.height();
-        if (pos.left + w + d < wndleft || pos.left - d > wndright || pos.top + h + d < wndtop || pos.top - d > wndbottom) {
-          item.hide();
-          return next();
-        }
-        dbg("loading view", index);
-        return item.unbind("mokaDone.preload").one("mokaDone.preload", loaded).show();
-      }, this);
-      if (this.current >= 0) {
-        return updateItems(this.index + this.current, 1);
-      } else {
-        return updateItems(this.index, 1);
-      }
+    };
+    Viewer.prototype.onFocus = function() {
+      return this.focus();
     };
     Viewer.prototype.onScroll = function(ev) {
       var lay;
@@ -2932,13 +2969,13 @@
         z = 1;
       }
       this.oldlay = this.layout();
-      this.oldzoom = this.zhow;
+      this.oldzoom = this.zoom();
       if (lay[0] === this.oldlay[0] && lay[1] === this.oldlay[1] && z === this.oldzoom) {
         lay = [1, 1];
         z = 1;
       }
-      this.zoom(z);
-      return this.layout(lay);
+      this.layout(lay);
+      return this.zoom(z);
     };
     return Viewer;
   })();

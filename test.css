@@ -241,7 +241,8 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
 
 .moka-viewer .moka-table {
   margin: auto;
-  border-collapse: collapse; }
+  border-collapse: collapse;
+  background: #444444 url("img/bg.png") repeat; }
 
 .moka-window {
   padding: 0;
@@ -336,6 +337,10 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {
   border-radius: 50px;
   -moz-border-radius: 50px;
   -webkit-border-radius: 50px;
+  -webkit-transition: -webkit-opacity 0.5s ease-in-out, background-color 1.5s ease-in-out;
+  -moz-transition: -moz-opacity 0.5s ease-in-out, background-color 1.5s ease-in-out;
+  -o-transition: -o-opacity 0.5s ease-in-out, background-color 1.5s ease-in-out;
+  transition: opacity 0.5s ease-in-out, background-color 1.5s ease-in-out;
   opacity: 0.85; }
   .moka-notification:hover {
     opacity: 1; }

@@ -168,18 +168,16 @@ Moka.initDraggable = (e, handle_e) ->
 
 Moka.initDragScroll = (e) ->
     e.bind "mousedown.moka.initdragscroll", (ev) ->
-        if ev.button is 0
+        if ev.which is 1
             Moka.dragScroll(ev)
 
     return e
 
 # Moka.dragScroll
 Moka.scrolling = false
-Moka.tt = 0
 jQuery.extend( jQuery.easing,
     easeOutCubic: (x, t, b, c, d) ->
         # refresh preview every 30ms
-        Moka.tt = t+30 if ( t>Moka.tt )
         return (t=t/1000-1)*t*t + 1
 )
 
@@ -239,12 +237,13 @@ Moka.dragScroll = (ev) ->
             vx = dx*accel
             vy = dy*accel
 
-            Moka.tt = 100
             w.stop(true).animate(
                 scrollLeft: w.scrollLeft()+vx+"px",
                 scrollTop: w.scrollTop()+vy+"px",
                 1000, "easeOutCubic",
                 () -> Moka.scrolling = false)
+        else
+            Moka.scrolling = false
 
         return false
 
@@ -293,13 +292,13 @@ Moka.focus = (e, o) ->
 
 Moka.blur = (e) -> e.blur()
 
-Moka.focusFirstWidget = (w, only_children) ->
+Moka.focusFirstWidget = (w, only_children, o) ->
     if not only_children and w.focus
-        w.focus()
+        w.focus(o)
         return true
     else if w.widgets
         for ww in w.widgets
-            if Moka.focusFirstWidget(ww, false)
+            if Moka.focusFirstWidget(ww, false, o)
                 return true
     return false
 
@@ -318,19 +317,21 @@ Moka.focusFirst = (e, o) ->
     else
         return false
 
-Moka.onScreen = (e, how) ->
-    if not how
-        return (Moka.onScreen(e, 'r') or Moka.onScreen(e, 'l')) and
-               (Moka.onScreen(e, 't') or Moka.onScreen(e, 'b'))
-
+Moka.onScreen = (e, how, error) ->
     pos = e.offset()
     wnd = $(window)
-    d = 8
-    switch how[0]
+    d = if error? then error else 8
+    h = if how? then how[0] else ''
+    switch h
         when 'b' then return -d < pos.top+e.height() < wnd.height()+d
         when 't' then return -d < pos.top < wnd.height()+d
         when 'r' then return -d < pos.left+e.width() < wnd.width()+d
         when 'l' then return -d < pos.left < wnd.width()+d
+        when 'B' then return pos.top+e.height() < wnd.height()+d
+        when 'T' then return -d < pos.top
+        when 'R' then return pos.left+e.width() < wnd.width()+d
+        when 'L' then return -d < pos.left
+        else return -e.width()-d < pos.left < wnd.width()+d and -e.height()-d < pos.top < wnd.height()+d
 
 Moka.toScreen = (e, wnd, o) ->
     o = "lt" if not o
@@ -398,7 +399,7 @@ Moka.toScreen = (e, wnd, o) ->
             else
                 top = ca
 
-    Moka.scroll(wnd, {left:left, top:top, animate:true})
+    Moka.scroll(wnd, {left:left, top:top, animate:false})
 
 Moka.scroll = (e, opts) ->
     l = opts.left
@@ -423,9 +424,6 @@ Moka.scroll = (e, opts) ->
             e.scrollLeft(a.scrollLeft)
         else if t
             e.scrollTop(a.scrollTop)
-
-Moka.ensureVisible = (e, wnd) ->
-    toScreen(e, wnd)
 
 class Moka.Timer
     constructor: (options) ->
@@ -622,7 +620,7 @@ class Moka.Widget
     show: ->
         @e.show()
         @update()
-        @e.trigger("mokaDone", [false])
+        @trigger("mokaDone", [false])
         return this
 
     hide: () ->
@@ -655,7 +653,7 @@ class Moka.Widget
 
     remove: () ->
         @e.hide()
-        @e.trigger("mokaDestroyed")
+        @trigger("mokaDestroyed")
         @e.remove()
 
     parent: () ->
@@ -695,6 +693,11 @@ class Moka.Widget
             return this
         else
             return @e.height()
+
+    resize: (w, h) ->
+        @e.width(w) if w?
+        @e.height(h) if h?
+        return this
 
     offset: (x, y) ->
         if x?
@@ -780,8 +783,8 @@ class Moka.Widget
             ++i
 
         p = @parent()
-        if p and not skip_parent
-            return true if p.keyHintFocus?(hint, false, this)
+        if p and not skip_parent and p.keyHintFocus
+            return true if p.keyHintFocus(hint, false, this)
 
         return false
 
@@ -887,8 +890,8 @@ class Moka.Input extends Moka.Label
         else
             return @e.attr("tabindex", index)
 
-    focus: () ->
-        Moka.focus(@e) if Moka.focused()?[0] isnt @e[0]
+    focus: (o) ->
+        Moka.focus(@e, o) if Moka.focused()?[0] isnt @e[0]
         if @other_focusable
             swap_index = (a, b) ->
                 a.attr("tabindex", b.attr("tabindex"))
@@ -903,7 +906,7 @@ class Moka.Input extends Moka.Label
                 callback: () =>
                     swap_index.apply(null, [@e_focus, @e])
                     @e_focus.one("blur.moka", swap_index.bind(null, @e, @e_focus))
-                    Moka.focus(@e_focus)
+                    Moka.focus(@e_focus, o)
             ).start()
             @e.one "blur.moka", () => @t.kill()
         return this
@@ -1089,9 +1092,8 @@ class Moka.WidgetList extends Moka.Input
             widget
                 .bind "mokaFocused", () =>
                     if @current >= 0
-                        @c.at(@current)
-                            .removeClass("moka-current")
-                            .trigger("mokaDeselected", [@current])
+                        @c.at(@current).removeClass("moka-current")
+                        @trigger("mokaDeselected", [@current])
                     @current = id
                     widget.addClass("moka-current")
                     @trigger("mokaSelected", [id])
@@ -1144,7 +1146,7 @@ class Moka.CheckBox extends Moka.Input
         super text
 
         @checkbox = $('<input>', {type:"checkbox", class:"moka-value"})
-            .bind("change.moka", () => @e.trigger("mokaValueChanged", [@value()]) )
+            .bind("change.moka", () => @trigger("mokaValueChanged", [@value()]) )
             .prependTo(@e)
 
         @connect "click.moka", @toggle.bind(this)
@@ -1164,7 +1166,7 @@ class Moka.CheckBox extends Moka.Input
         if val?
             v = not not val
             if v isnt @checkbox.is(":checked")
-                @e.trigger("mokaValueChanged", [v])
+                @trigger("mokaValueChanged", [v])
             @checkbox.attr("checked", v)
             return this
         else
@@ -1182,7 +1184,7 @@ class Moka.Combo extends Moka.Input
 
         @combo = $('<select>', {class:"moka-value"})
             .attr("tabindex", -1)
-            .bind("change.moka", () => @e.trigger("mokaValueChanged", [@value()]) )
+            .bind("change.moka", () => @trigger("mokaValueChanged", [@value()]) )
             .appendTo(@e)
         @focusableElement(@combo)
 
@@ -1220,7 +1222,7 @@ class Moka.LineEdit extends Moka.Input
         super label_text
         @edit = $("<input>")
             .appendTo(@e)
-            .bind( "change.moka", () => @e.trigger("mokaValueChanged", [@value()]) )
+            .bind( "change.moka", () => @trigger("mokaValueChanged", [@value()]) )
             .keyup( @update.bind(this) )
         @value(text) if text?
         @focusableElement(@edit)
@@ -1261,7 +1263,7 @@ class Moka.TextEdit extends Moka.Input
         @text = text or ""
         @textarea = $("<textarea>")
             .appendTo(@e)
-            .bind( "change.moka", () => @e.trigger("mokaValueChanged", [@value()]) )
+            .bind( "change.moka", () => @trigger("mokaValueChanged", [@value()]) )
         @focusableElement(@textarea)
 
     remove: () ->
@@ -1449,11 +1451,6 @@ class Moka.Image extends Moka.Widget
         )
         @e.attr("src", @src)
 
-    resize: (w, h) ->
-        @e.width(w) if w?
-        @e.height(h) if h?
-        return this
-
     isLoaded: () ->
         return @ok?
 
@@ -1469,7 +1466,7 @@ class Moka.Canvas extends Moka.Widget
     constructor: (@src, w, h, onload, onerror) ->
         # try to use WebGL
         e = null
-        super $("<canvas>", width:0, height:0)
+        super $("<canvas>")
         @ctx = @e[0].getContext("2d")
 
         @t_draw = new Moka.Timer( callback: @draw.bind(this) )
@@ -1507,7 +1504,9 @@ class Moka.Canvas extends Moka.Widget
         @t_filter.pause() if @t_filter
         return super
 
-    resize: (w,h) ->
+    resize: (w, h) ->
+        w = parseInt(w)
+        h = parseInt(h)
         return this if not @ok or w<=0 or h<=0
         e = @e[0]
         if e.width isnt w or e.height isnt h
@@ -1516,6 +1515,9 @@ class Moka.Canvas extends Moka.Widget
             if @t_filter
                 @t_filter.kill()
                 @t_filter = null
+            img = @img[0]
+            @ctx.clearRect(0, 0, w, h)
+            @ctx.drawImage(img, 0, 0, w, h)
             @t_draw.data(0).start()
 
         return this
@@ -1534,23 +1536,19 @@ class Moka.Canvas extends Moka.Widget
         return @ok?
 
     filter: () ->
-        return this if not @ok
+        return this if not @ok or not @t_filter_first
 
         e = @e[0]
-        w = Math.ceil(e.width)
-        h = Math.ceil(e.height)
+        w = e.width
+        h = e.height
 
-        img = @img[0]
-        @ctx.clearRect(0, 0, w, h)
-        @ctx.drawImage(img, 0, 0, w, h)
-
-        if @t_filter_first
-            @t_filter.kill() if @t_filter
-            @t_filter = @t_filter_first
-                .data(
-                    dataDesc: @ctx.getImageData(0, 0, w, h)
-                    dataDescCopy: @ctx.getImageData(0, 0, w, h)
-                ).start()
+        @t_filter.kill() if @t_filter
+        @t_filter = @t_filter_first
+            .data(
+                dataDesc: @ctx.getImageData(0, 0, w, h)
+                dataDescCopy: @ctx.getImageData(0, 0, w, h)
+            ).start()
+        @t_filter.pause() if not @isVisible()
 
         return this
 
@@ -1596,30 +1594,28 @@ class Moka.ImageView extends Moka.Input
                 @t_remove.kill()
                 @t_remove = null
                 @image.show()
+            @zoom(@zhow)
             @e.show()
-            if @ok?
-                @zoom(@zhow)
-                @e.trigger("mokaLoaded")
-                @e.trigger("mokaDone", [not @ok])
+            p = @parent()
+            p.onMokaLoaded(this) if p and p.onMokaLoaded
         else
             onload = () =>
                 @ok = true
-
                 @zoom(@zhow)
-
-                @e.trigger("mokaLoaded")
-                @e.trigger("mokaDone", [false])
+                p = @parent()
+                p.onMokaLoaded(this) if p and p.onMokaLoaded
             onerror = () =>
                 @ok = false
-                @e.trigger("mokaError")
-                @e.trigger("mokaDone", [true])
+                p = @parent()
+                p.onMokaLoaded(this) if p and p.onMokaLoaded
             if @use_canvas
                 image = @image = new Moka.Canvas(@src, "", "", onload, onerror)
                 for f in @filters
                     image.addFilter(f.filename, f.callback)
             else
-                @image = new Moka.Image(@src, "", "", onload, onerror)
-            @image.appendTo(@e)
+                image = @image = new Moka.Image(@src, "", "", onload, onerror)
+            image.appendTo(@e)
+                .css('max-width':"100%", 'max-height':"100%")
             @e.show()
         return this
 
@@ -1656,86 +1652,83 @@ class Moka.ImageView extends Moka.Input
     originalHeight: () ->
         return @image.originalHeight()
 
+    resize: (w, h) ->
+        super
+        @image.resize(w, h) if @image
+        return this
+
     zoom: (how) ->
         if how?
             return this if @z is how
             @zhow = how
             zhow = if how instanceof Array then how[2] else null
 
-            if @ok and @isVisible()
-                width = @image.width()
-                height = @image.height()
-                w = h = mw = mh = ""
-
+            if @ok
+                width = @image.originalWidth()
+                height = @image.originalHeight()
                 if how instanceof Array
-                    mw = Math.floor(how[0])
-                    mh = Math.floor(how[1])
+                    w = how[0]
+                    h = how[1]
 
-                    d = mw/mh
+                    d = w/h
                     d2 = width/height
                     if zhow is "fill"
                         if d > d2
-                            w = mw
-                            h = Math.floor(mw/d2)
+                            h = Math.floor(w/d2)
                         else
-                            h = mh
-                            w = Math.floor(mh*d2)
-                        mw = mh = ""
+                            w = Math.floor(h*d2)
                     else
                         if d > d2
-                            h = mh
-                            w = Math.floor(mh*d2)
+                            w = Math.floor(h*d2)
                         else
-                            w = mw
-                            h = Math.floor(mw/d2)
-                        mw = mh = ""
+                            h = Math.floor(w/d2)
                 else
                     z = parseFloat(how) or 1
-                    mw = Math.floor(z*@image.originalWidth())
-                    mh = Math.floor(z*@image.originalHeight())
+                    w = Math.floor(z*@image.originalWidth())
+                    h = Math.floor(z*@image.originalHeight())
 
-                if zhow isnt "fit" and zhow isnt "fill"
-                    if width/height < mw/mh
-                        h = mh
-                    else
-                        w = mw
-
-                @image.css('max-width':mw, 'max-height':mh, width:w, height:h)
-                @e.css('max-width':mw, 'max-height':mh, width:w, height:h)
-
-                @image.resize(w or mw, h or mh)
+                @resize(w, h)
                 @zhow = @z = how
+            else if zhow is "fit"
+                @css(width:how[0], height:how[1])
 
             return this
         else
             return @z
 
-    onKeyDown: (ev) ->
-        return false if super is false
-        k = Moka.getKeyName(ev)
-        if ((k is "LEFT" or k is "RIGHT") and @image.width() > @width()) or
-           ((k is "UP" or k is "DOWN") and @image.height() > @height())
-            ev.stopPropagation()
+    onKeyDown: -> return
 
 class Moka.Viewer extends Moka.Input
     mainclass: "moka-viewer "+Moka.Input.prototype.mainclass
 
     default_keys:
-        RIGHT: -> Moka.onScreen(Moka.focused(), 'r') and @focusRight() or
-            Moka.scroll(@e, {left:30, relative:true})
-        LEFT: -> Moka.onScreen(Moka.focused(), 'l') and @focusLeft() or
-            Moka.scroll(@e, {left:-30, relative:true})
-        UP: -> Moka.onScreen(Moka.focused(), 't') and @focusUp() or
-            Moka.scroll(@e, {top:-30, relative:true})
-        DOWN: -> Moka.onScreen(Moka.focused(), 'b') and @focusDown() or
-            Moka.scroll(@e, {top:30, relative:true})
+        RIGHT: ->
+            if Moka.onScreen(Moka.focused(), 'R')
+                @focusRight()
+            else
+                Moka.scroll(@e, {left:30, relative:true})
+        LEFT: ->
+            if Moka.onScreen(Moka.focused(), 'L')
+                @focusLeft()
+            else
+                Moka.scroll(@e, {left:-30, relative:true})
+        UP: ->
+            if Moka.onScreen(Moka.focused(), 'T')
+                @focusUp()
+            else
+                Moka.scroll(@e, {top:-30, relative:true})
+        DOWN: ->
+            if Moka.onScreen(Moka.focused(), 'B')
+                @focusDown()
+            else
+                Moka.scroll(@e, {top:30, relative:true})
         KP6: -> if 'l' in @orientation() then @next() else @prev()
         KP4: -> if 'r' in @orientation() then @next() else @prev()
-        KP8: -> if 't' in @orientation() then @next() else @prev()
-        KP2: -> if 'b' in @orientation() then @next() else @prev()
+        KP2: -> if 't' in @orientation() then @next() else @prev()
+        KP8: -> if 'b' in @orientation() then @next() else @prev()
 
         TAB: ->
-            if @index + @current + 1 < @length() and @currentcell + 1 < @cellCount()
+            if @index + @current + 1 < @itemCount() and @currentcell + 1 < @length()
                 @next()
             else
                 return false
@@ -1778,7 +1771,7 @@ class Moka.Viewer extends Moka.Input
                     opts.top = val*0.9*@e.parent().height()
                 Moka.scroll(@e, opts)
 
-        ENTER: -> @next()
+        ENTER: -> @onDoubleClick()
 
         '*': -> @layout([1,1]); @zoom(1)
         '/': -> if @zhow is "fit" then @zoom(1) else @zoom("fit")
@@ -1788,16 +1781,16 @@ class Moka.Viewer extends Moka.Input
 
         KP7: -> @select(0)
         HOME: -> @select(0)
-        KP1: -> @select(@length()-1)
-        END: -> @select(@length()-1)
+        KP1: -> @select(@itemCount()-1)
+        END: -> @select(@itemCount()-1)
         PAGEUP: ->
-            c=@cellCount()
+            c=@length()
             if @currentcell%c is 0
                 @select(@index-c)
             else
                 @select(@index)
         PAGEDOWN: ->
-            c=@cellCount()
+            c=@length()
             if (@currentcell+1)%c is 0
                 @select(@index+c)
             else
@@ -1810,15 +1803,21 @@ class Moka.Viewer extends Moka.Input
 
     constructor: () ->
         super
+
+        @t_update = new Moka.Timer(
+            delay:100
+            callback:@updateVisible.bind(this, true)
+        )
+        @preload_session = 0
+
         this
             #.bind( "resize.moka", @update.bind(this) )
-            #.bind( "scroll.moka", @onScroll.bind(this) )
+            .bind( "scroll.moka", @onScroll.bind(this) )
             .css("cursor", "move")
             .tabindex(1)
             .bind( "mokaFocusUpRequest", () => @select(@index + @current); return false )
             .bind( "mousedown.moka", @onMouseDown.bind(this) )
             .bind( "dblclick.moka", @onDoubleClick.bind(this) )
-
 
         Moka.initDragScroll(@e)
 
@@ -1838,7 +1837,7 @@ class Moka.Viewer extends Moka.Input
         @currentcell = -1
 
         # preload item if it is less than preload_offset pixels away
-        @preload_offset = 200
+        @preload_offset = 400
 
         @layout([1,1])
         @orientation("lt")
@@ -1849,16 +1848,22 @@ class Moka.Viewer extends Moka.Input
 
         return this
 
+    appendTo: (w_or_e) ->
+        super
+        @zoom(@zoom())
+        return this
+
     focus: (ev) ->
-        cell = @cells[@currentcell] or @cells[0]
-        Moka.focusFirst( cell.children(), @o ) or Moka.focus(cell, @o)
+        cell = @cell(@current) or @cell(0)
+        if cell
+            Moka.focusFirst( cell.children(), @o ) or Moka.focus(cell, @o)
         return this
 
     appendFunction: (fn, length) ->
-        last = @length()
+        last = @itemCount()
         itemfn = (index) -> return fn(index-last)
 
-        i = @items.length
+        i = last
         l = i+length
         while i<l
             @items.push(itemfn)
@@ -1872,7 +1877,7 @@ class Moka.Viewer extends Moka.Input
         return this
 
     append: (widget) ->
-        id = @length()
+        id = @itemCount()
         widget.parentWidget = this
         @items.push(widget)
         if @lay[0] <= 0 or @lay[1] <= 0
@@ -1882,7 +1887,7 @@ class Moka.Viewer extends Moka.Input
 
         return this
 
-    at: (index) ->
+    item: (index) ->
         x = @items[index]
         if x instanceof Function
             x = @items[index] = x(index)
@@ -1891,7 +1896,7 @@ class Moka.Viewer extends Moka.Input
 
     clean: () ->
         i = 0
-        l = @length()
+        l = @itemCount()
         while i < l
             x = @items[i]
             if x not instanceof Function
@@ -1914,40 +1919,38 @@ class Moka.Viewer extends Moka.Input
     currentItem: () ->
         i = @currentIndex()
         if i >= 0
-            return @at(i)
+            return @item(i)
         else
             return null
 
-    length: () ->
+    itemCount: () ->
         return @items.length
 
     clear: () ->
-        i = 0
-        len = @cellCount()
+        # clear items with preloaded
+        i = -1
+        len = @length()+1
         while i < len
-            item = @at(@index+i)
-            if item
-                item.e.detach()
+            item = @items[@index+i]
+            if item and item not instanceof Function
                 item.hide()
+                item.e.detach()
             ++i
 
     view: (id) ->
-        return this if id >= @length() or id < 0
-        id = 0 if id < 0
+        return this if id >= @itemCount() or id < 0
 
         @table.hide()
 
         @clear()
 
         i = 0
-        len = @cellCount()
+        len = @length()
         @index = Math.floor(id/len)*len
         dbg "displaying views", @index+".."+(@index+len-1)
         while i < len
             cell = @cell(i)
-
-            item = @at(@index+i)
-
+            item = @item(@index+i)
             cell.data("itemindex", i)
             if item
                 cell.attr("tabindex", -1)
@@ -1966,22 +1969,21 @@ class Moka.Viewer extends Moka.Input
         return this
 
     select: (id) ->
-        return this if id < 0 or id >= @length()
+        return this if id < 0 or id >= @itemCount()
 
         dbg "selecting view", id
 
         cell = @cell(@current) or @cell(0)
         Moka.blur( cell.children() ) or Moka.blur(cell)
 
-        count = @cellCount()
+        count = @length()
         @current = id%count
 
-        if id < @index or id >= @index+count
+        if @index is -1 or id < @index or id >= @index+count
             @view(id)
 
-        cell = @cell(id%count)
-        Moka.focusFirst( cell.children(), @o ) or Moka.focus(cell, @o)
-        #@update()
+        @item(id).show()
+        Moka.focus(@cell(@current), @o)
 
         return this
 
@@ -1989,24 +1991,19 @@ class Moka.Viewer extends Moka.Input
         if how?
             @zhow = null
             if how is "fit" or how is "fill"
-                layout = @layout()
-
                 wnd = @e.parent()
-
                 offset = wnd.offset() or {top:0, left:0}
                 pos = @e.offset()
                 pos.top -= offset.top
                 pos.left -= offset.left
+                wnd = $(window) if wnd[0] is window.document.body
 
-                if wnd[0] is window.document.body
-                    wnd = $(window)
-
-                w = (wnd.width()-pos.left)/layout[0]
-                h = (wnd.height()-pos.top)/layout[1]
-
+                l = @layout()
                 c = @cells[0]
-                w -= c.outerWidth(true)-c.width()
-                h -= c.outerHeight(true)-c.height()
+                w = Math.floor( (wnd.width()-pos.left)/l[0] ) -
+                    c.outerWidth(true) + c.width()
+                h = Math.floor( (wnd.height()-pos.top)/l[1] ) -
+                    c.outerHeight(true) + c.height()
 
                 @z = [w, h, how]
                 @zhow = how
@@ -2016,8 +2013,9 @@ class Moka.Viewer extends Moka.Input
 
                 if @z instanceof Array
                     d = if how is "-" then 0.889 else 1.125
-                    @z[0] *= d
-                    @z[1] *= d
+                    w = Math.ceil(@z[0]*d)
+                    h = Math.ceil(@z[1]*d)
+                    @z = [w, h, @z[2]]
                 else
                     @z += if how is "-" then -0.125 else 0.125
             else if how instanceof Array
@@ -2026,34 +2024,44 @@ class Moka.Viewer extends Moka.Input
                 factor = parseFloat(how) or 1
                 @z = factor
 
-            return if @index < 0
+            return this if @index < 0
             i = @index
-            len =i+@cellCount()
-            len = Math.min(len, @length())
+            j = 0
+            len = Math.min(i+@length(), @itemCount())
+            fit = @z[2] is "fit"
+            if fit
+                w = @z[0]+"px"
+                h = @z[1]+"px"
             dbg "zooming views", i+".."+(len-1), "using method", @z
+            @table.hide()
             while i < len
-                item = @at(i)
-                item.zoom?(@z)
-                ++i
-            if @current >= 0
-                Moka.toScreen( @at(@index+@current).e, @e, @o )
+                cell = @cells[j++]
+                cell.css(
+                    width: if fit then w else (cell.width() or "")
+                    height: if fit then h else (cell.height() or "")
+                    'max-width': if fit then w else ""
+                    'max-height': if fit then h else ""
+                )
+                @item(i++).zoom?(@z)
+            @table.show()
 
+            Moka.toScreen( @item(@index+@current).e, @e, @o ) if @current >= 0
             @updateVisible()
-
             @trigger("mokaZoomChanged")
+
             return this
         else
             return if @zhow then @zhow else @z
 
-    cellCount: () ->
+    length: () ->
         return @cells.length
 
-    next: () ->
-        @select(@index + @current + 1)
+    next: (skip) ->
+        @select(@index + @current + (if skip then skip else 1))
         return this
 
-    prev: () ->
-        @select(@index + @current - 1)
+    prev: (skip) ->
+        @select(@index + @current - (if skip then skip else 1))
         return this
 
     nextRow: () ->
@@ -2065,11 +2073,11 @@ class Moka.Viewer extends Moka.Input
         return this
 
     nextPage: () ->
-        @select(@index + @cellCount())
+        @select(@index + @length())
         return this
 
     prevPage: () ->
-        @select(@index - @cellCount())
+        @select(@index - @length())
         return this
 
     focusLeft: () ->
@@ -2079,7 +2087,7 @@ class Moka.Viewer extends Moka.Input
             cell = @cells[id+h]
             if cell and cell.width()-8 <= @e.width()
                 id = cell.data("itemindex")
-                how = -@cellCount()
+                how = -@length()
                 if "r" in @o
                     how = -how
                 @select(@index + id + how)
@@ -2097,10 +2105,10 @@ class Moka.Viewer extends Moka.Input
             cell = @cells[id-h]
             if cell and cell.width()-8 <= @e.width()
                 id = cell.data("itemindex")
-                how = @cellCount()
+                how = @length()
                 if "r" in @o
                     how = -how
-                @select( Math.min(@index + id + how, @length()-1) )
+                @select( Math.min(@index + id + how, @itemCount()-1) )
         else
             cell = @cells[id]
             if cell
@@ -2112,11 +2120,11 @@ class Moka.Viewer extends Moka.Input
         h = @layout()[0]
         id = @currentcell - h
         if id < 0
-            len = @cellCount()
+            len = @length()
             cell = @cells[id+len]
             if cell and cell.height()-8 <= @e.height()
                 id = cell.data("itemindex")
-                how = -@cellCount()
+                how = -@length()
                 if "b" in @o
                     how = -how
                 @select(@index + id + how)
@@ -2129,16 +2137,16 @@ class Moka.Viewer extends Moka.Input
 
     focusDown: () ->
         h = @layout()[0]
-        len = @cellCount()
+        len = @length()
         id = @currentcell + h
         if id >= len
             cell = @cells[id-len]
             if cell and cell.height()-8 <= @e.height()
                 id = cell.data("itemindex")
-                how = @cellCount()
+                how = @length()
                 if "b" in @o
                     how = -how
-                @select( Math.min(@index + id + how, @length()-1) )
+                @select( Math.min(@index + id + how, @itemCount()-1) )
         else
             cell = @cells[id]
             if cell
@@ -2146,39 +2154,47 @@ class Moka.Viewer extends Moka.Input
                 @select(@index + id)
         return this
 
+
     appendRow: () ->
         return $("<tr>", class:"moka-row")
               .height(@e.height)
               .appendTo(@table)
 
     appendCell: (row) ->
-        td = $("<td>").appendTo(row)
-
+        td = $("<td align='center'>").appendTo(row)
+        id = @length()
         cell = $("<div>")
-        id = @cellCount()
-        cell.data("moka-cell-id", id)
-        cell.css("overflow":"hidden")
-        cell.addClass("moka-view")
+            .data("moka-cell-id", id)
+            .addClass("moka-view")
+            .css(overflow:"hidden")
             .bind("mokaFocused",
                 (ev) =>
-                    return if @currentcell is id and @currentindex is @index+id
-                    if ev.target is cell[0] and Moka.focusFirst(cell.children(), @o)
-                        return
+                    return if @currentindex is @index+id and @currentcell is id
+                    i = cell.data("itemindex")
+                    if ev.target is cell[0]
+                        item = @item(@index+i)
+                        if Moka.focusFirstWidget(item)
+                            Moka.toScreen(item, @e, @o)
+                            return
 
-                    @cells[@currentcell]?.removeClass("moka-current")
-                                         .trigger("mokaDeselected", [@index + @current])
+                    oldcell = @cells[@currentcell]
+                    if oldcell
+                        oldcell.removeClass("moka-current")
+                        @trigger("mokaDeselected", [@index + @current])
                     @currentindex = @index+id
                     @currentcell = id
-                    @current = cell.data("itemindex")
+                    @current = i
 
                     cell.addClass("moka-current")
                     @trigger("mokaSelected", [@index + @current])
             )
             .appendTo(td)
-
         @cells.push(cell)
 
         return cell
+
+    at: (index) ->
+        return @items[@index+index]
 
     cell: (index) ->
         return @cells[ @indexfn(index) ]
@@ -2188,6 +2204,7 @@ class Moka.Viewer extends Moka.Input
         @clear()
         cell.remove() for cell in @cells
         @cells = []
+        @index = -1
 
         layout = @layout()
         ilen = layout[0]
@@ -2214,19 +2231,25 @@ class Moka.Viewer extends Moka.Input
 
             dbg "setting layout", @lay
 
-            id = @index+@currentcell
+            focused = @hasFocus()
+            id = if @current > -1 then @index+@current else @index
             @updateTable()
-            @view(@index)
-            @select(id)
+            cell = @cells[@currentcell]
+            cell.addClass("moka-current") if cell
+            @currentindex = 0
+            @view(id)
+            @select(id) if focused
+
+            @trigger("mokaLayoutChanged")
 
             return this
         else
             i = @lay[0]
             j = @lay[1]
             if i <= 0
-                i = Math.ceil( @length()/j )
+                i = Math.ceil( @itemCount()/j )
             else if j <= 0
-                j = Math.ceil( @length()/i )
+                j = Math.ceil( @itemCount()/i )
             return [i, j]
 
     orientation: (o) ->
@@ -2280,134 +2303,113 @@ class Moka.Viewer extends Moka.Input
         else
             return @o
 
-    hideItem: (index) ->
-        item = @at(index)
-        cell = @cell( index % @cellCount() )
-        if item.e.is(":visible")
-            dbg "hiding item", index
-            h = cell.height()+"px"
-            w = cell.width()+"px"
-            cell.css(width:w, height:h)
+    _preloadItems: (index, direction, session) ->
+        if session isnt @preload_session
+            dbg "  loading CANCELED for views", @current+@index, "...", index
+            return this
+
+        item = @item(index)
+        cell = item and item.e.parent()
+
+        # done?
+        if not (cell and cell.length) or # item not in table
+           not item or # no more items
+           not Moka.onScreen(cell.parent().parent()) # row is not on screen
+            # preload one item
+            if item
+                dbg "  preloading view", index
+                item.show()
+            dbg "  loading DONE for views", @current+@index, "...", index
+            return this
+
+        # set fixed size for cell if zoom isn't 'fit'
+        z = @zoom()
+        if (z not instanceof Array or z[2] isnt "fit") and z isnt "fit"
+            cell.css(
+                width: cell.width()+"px",
+                height: cell.height()+"px"
+            )
+
+        # is item on screen or should it be preloaded?
+        if Moka.onScreen(cell, null, @preload_offset)
+            dbg "  loading view", index
+            item.zoom(@z) if item.zoom
+            item.show()
+        else
+            dbg "  hiding view", index
             item.hide()
 
+        window.setTimeout( @_preloadItems.bind(this, index + direction, direction, session), 0 )
+
+        return this
+
     updateVisible: (now) ->
+        return this if @index is -1
+
+        @t_update.kill()
         if not now
-            @t_update.kill() if @t_update
-            @t_update = new Moka.Timer(
-                delay:100
-                callback:@updateVisible.bind(this, true)
-            ).start()
+            @t_update.start()
             return
 
-        p = @cell(0).parent()
-        topreload = 2
+        index = @index+@current
+        dbg "loading views starting from "+index+" ..."
+        session = ++@preload_session
+        @_preloadItems(index, 1, session)
+        @_preloadItems(index-1, -1, session)
 
-        if @current >= 0
-            current_item = @at(@index+@current).e
+        return this
 
-        updateItems = (index, direction) =>
-            loaded = () =>
-                # resize cells
-                if cell
-                    dbg "view", index, "loaded"
-                    id = cell.data("moka-cell-id")
+    onMokaLoaded: (item) ->
+        cell = item.e.parent()
 
-                    x = @layout()[0]
-                    col = id%x
-                    row = Math.floor(id/x)
+        # resize cells
+        if cell.length
+            z = @zoom()
+            if (z not instanceof Array or z[2] isnt "fit") and z isnt "fit"
+                id = cell.data("moka-cell-id")
 
-                    # set row height
-                    i = row*x
-                    max = i+x
-                    while i < max and c = @cells[i]
-                        c.height("auto")
-                        ++i
+                # save relative scroll offset
+                if @current >= 0
+                    current_item = @item(@index+@current).e
+                    pos1 = current_item.offset()
 
-                    # set column width
-                    i = col
-                    while c = @cells[i]
-                        c.width("auto")
-                        i+=x
-                else
-                    dbg "view", index, "preloaded"
-                    # remove preloaded item after timeout
-                    item.hide()
+                @table.hide()
+                cell.css(
+                    width:"",
+                    height:""
+                )
 
-                item.zoom?(@z, @zhow)
+                x = @layout()[0]
+                col = id%x
+                row = Math.floor(id/x)
 
-                # keep relative scroll offset after image is loaded
-                #left = @e.scrollLeft()
-                #top = @e.scrollTop()
-                #if left or top
-                    #ww = p.width()
-                    #hh = p.height()
-                    #if current_item
-                        #Moka.toScreen(current_item, @e, @o)
-                    #else
-                        #pos = @e.offset()
-                        #if pos.left < wndleft+@e.width()/2 and ww > w
-                            #@e.scrollLeft( left + (ww-w)/2 )
-                        #if pos.top < wndtop+@e.height()/2 and hh > h
-                            #@e.scrollTop( top + (hh-h)/2 )
+                # set row height
+                i = row*x
+                max = i+x
+                while i < max and c = @cells[i]
+                    c.height("auto")
+                    ++i
 
-                next()
+                # set column width
+                i = col
+                while c = @cells[i]
+                    c.width("auto")
+                    i+=x
+                @table.show()
 
-            next = updateItems.bind(this, index+direction, direction)
+                # restore relative scroll offset
+                if current_item
+                    pos2 = current_item.offset()
+                    left = @e.scrollLeft()
+                    top = @e.scrollTop()
+                    Moka.scroll(@e, {
+                        left:left+pos2.left-pos1.left,
+                        top:top+pos2.top-pos1.top,
+                        animate:false
+                    })
 
-            cell = @cell(index-@index)
-            item = @at(index)
-            if not cell and item and topreload > 0
-                --topreload
-                dbg "preloading view", index
-                item.unbind("mokaDone.preload")
-                    .one("mokaDone.preload", loaded)
-                    .show()
-                return
-            if not item or not cell
-                #if @current >= 0 and not Moka.scrolling
-                    #@select(@index + @current)
-                dbg "updateItems finished for direction", direction
-                if direction > 0
-                    updateItems.call(this, @index+@current-direction, -direction)
-                @update()
-                return
-
-            if item.e.is(":visible")
-                return next()
-
-            # is item on screen or should it be preloaded?
-            w = p.width()
-            h = p.height()
-            pos = cell.parent().offset()
-            d = @preload_offset
-
-            # FIXME: check if item is visible
-            wndleft   = pos.left
-            wndtop    = pos.top
-            wndright  = wndleft + @e.width()
-            wndbottom = wndtop + @e.height()
-
-            if pos.left + w + d < wndleft or
-               pos.left - d > wndright or
-               pos.top + h + d < wndtop or
-               pos.top - d > wndbottom
-                # TODO: remove resource if necessary
-                item.hide()
-                return next()
-
-            dbg "loading view", index
-
-            item.unbind("mokaDone.preload")
-                .one("mokaDone.preload", loaded)
-                .show()
-
-        if @current >= 0
-            # load current item first
-            updateItems(@index+@current, 1)
-            # calling updateItems multiple times here breaks layout
-            #updateItems(@index+@current, -1)
-        else
-            updateItems(@index, 1)
+    onFocus: ->
+        @focus()
 
     onScroll: (ev) ->
         lay = @layout()
@@ -2427,14 +2429,14 @@ class Moka.Viewer extends Moka.Input
             z = 1
 
         @oldlay = @layout()
-        @oldzoom = @zhow
+        @oldzoom = @zoom()
 
         if lay[0] is @oldlay[0] and lay[1] is @oldlay[1] and z is @oldzoom
             lay = [1,1]
             z = 1
 
-        @zoom(z)
         @layout(lay)
+        @zoom(z)
 
 class Moka.Notification extends Moka.Widget
     mainclass: "moka-notification "+Moka.Widget.prototype.mainclass
@@ -2463,7 +2465,7 @@ class Moka.Notification extends Moka.Widget
 
     remove: () ->
         @t_notify.kill()
-        @e.hide( @animation_speed, super )
+        @e.hide(@animation_speed, super)
 
 Moka.clearNotifications = () ->
     Moka.notificationLayer?.empty()

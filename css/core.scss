@@ -100,6 +100,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         overflow: hidden;
     }
 
+
     // book layout
     &.moka-layout-2x1 , &.moka-layout-2x1 .moka-table {
         width: auto;
@@ -266,6 +267,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 .moka-viewer .moka-table {
     margin: auto;
     border-collapse: collapse;
+    background: $bg;
 }
 .moka-window {
     padding: 0;
@@ -382,7 +384,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 
     @include box-shadow(2px 2px 5px rgba(0,0,0,0.3));
     @include rounded($notification_radius);
-    //@include transitionsx("opacity 0.5s ease-in-out, background-color 1.5s ease-in-out");
+    @include transitionsx("opacity 0.5s ease-in-out, background-color 1.5s ease-in-out");
 
     opacity: $notification_opacity;
     &:hover {opacity:1}
