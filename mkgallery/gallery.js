@@ -379,18 +379,18 @@
         }
 
 		// layout
-        viewer.layout( opts.layout.split("x") );
+        viewer.layout(opts.layout.split("x"));
 
         // orientation
         viewer.orientation(opts.o);
 
         // items on demand
-        viewer.appendFunction(getItem.bind(null, opts), ls.length);
+        viewer.append(getItem.bind(null, opts), ls.length);
+
+		viewer.appendTo("body").show();
 
         // current item
         viewer.select(opts.n);
-
-		viewer.appendTo("body").show();
 
 		// show notification and update URL when viewing new item or changing zoom level
         viewer.connect("mokaSelected mokaZoomChanged mokaLayoutChanged", function(ev, id) {
