@@ -16,10 +16,13 @@ $font_header: 11pt $font_sans
 // monospaced font
 $font_mono: Inconsolata, Consolas, monospace
 
+$transitions: true
+//$transitions: false
+
 $bg: #444 url('img/bg.png') repeat
 $fg: #eee
 
-$url_fg: #620
+$link_fg: #620
 
 $use_inset_text: true
 //$use_inset_text: false
@@ -40,7 +43,7 @@ $widget_hover_bg: transparentize($widget_selected_bg, 0.4)
 $selection_bg: $widget_selected_bg
 
 // button
-$button_selected_fg: black
+$button_selected_fg: $widget_selected_fg
 $button_selected_bg: transparentize($widget_selected_bg, 0.2)
 $button_hover_fg: black
 $button_hover_bg: transparentize($button_selected_bg, 0.2)
@@ -53,13 +56,14 @@ $font_edit: 11pt $font_mono
 $edit_bg: opacify($widget_bg, 1)*1.2
 $edit_fg: #444
 // focused
-$edit_focused_bg: $edit_bg*1.2
+$edit_focused_bg: ($edit_bg+#111)*1.2
 $edit_focused_fg: #222
 
 // window
 $window_buttons_right: true
 $window_layer:3
-$window_radius: 0px
+$window_radius: 6px
+$window_border: 3px
 $top_window_layer:999
 $window_opacity: 0.4
 $focused_window_opacity: 1
@@ -68,7 +72,7 @@ $top_window_opacity: 0.7
 // window title
 $title_fg: white
 $title_bg: black
-$title_selected_fg: black
+$title_selected_fg: $widget_selected_fg
 $title_selected_bg: $widget_selected_bg
 $title_focused_fg: $title_selected_fg
 $title_focused_bg: opacify($widget_selected_bg, 1)+#444
@@ -87,6 +91,7 @@ $view_padding: 4px
 $view_selected_bg: $title_selected_bg*0.75
 
 $viewer_bg: #444 url('img/bg.png') repeat
+$viewer_scrollbars: false
 
 // notifications
 $notification_layer:9999

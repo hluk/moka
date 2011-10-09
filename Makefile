@@ -5,6 +5,7 @@ SASS = /usr/bin/sass
 
 NAME = test
 CSS_CONFIG = css/default.sass
+#CSS_CONFIG = css/dark.sass
 CSS_CORE = css/core.scss
 CSS_LIBS = css/utils.scss
 DEST = $(PWD)

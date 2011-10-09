@@ -54,16 +54,14 @@
         if (el) {
             ctx.clearRect(0,0,el.width,el.height)
         }
-        pi = 3.1415;
+        pi = Math.PI;
         angle = len ? 2*pi*n/len : 0;
-        x = r+blur;
-        y = r+blur;
-        w = r+blur;
-        h = r+blur;
+        //blur *= 2*n/len;
+        w2 = Math.max(2, w2*n/len);
+        x = y = w = h = r+Math.max(shadow,blur);
 
         e[0].setAttribute("width", 2*w);
         e[0].setAttribute("height", 2*h);
-        e.css("margin","auto")
 
         ctx.save();
 
@@ -73,7 +71,7 @@
         ctx.shadowBlur = shadow;
         ctx.shadowColor = "black";
         ctx.lineWidth = w1;
-        ctx.strokeStyle = bg;
+        ctx.strokeStyle = bg || "rgba(0,0,0,0.8)";
         ctx.moveTo(x, y);
         ctx.beginPath();
         ctx.arc(x, y, r-w1/2, 0, 2*pi, false);
@@ -89,6 +87,7 @@
         ctx.arc(x, y, r-w1/2, -pi/2, angle-pi/2, false);
         ctx.stroke();
 
+        ctx.shadowBlur = 0;
         ctx.font = (r*0.7)+"px serif";
         ctx.textAlign = "center";
         ctx.fillText(n, w, h);
@@ -187,25 +186,24 @@
         // escape anchor and html
         html += "URL: <a href='"+itempath+"'>" + itempath.replace(/^items\//,"") + "</a></i><br/>";
         if ( item.isLoaded() ) {
-            html += "size: <i>" + item.originalWidth() + "x" + item.originalHeight() + "</i></br>";
+            z = viewer.zoom();
+            html += "size: <i>" +
+                item.originalWidth() + "x" + item.originalHeight() + "</i>" +
+                ((z !== 1) ? " <small>zoom:"+(typeof z === "number" ? (Math.floor(100*z)+"%") : z)+"</small>" : "") +
+                "</br>";
         } else {
             item.one("mokaLoaded", notify.bind(null,id))
-        }
-        z = viewer.zoom();
-        if ( z !== 1 ) {
-            html += "zoom: <i>" +
-                (typeof z == "number" ? (Math.floor(100*z)+"%") : z) +
-                "</i>";
         }
 
         Moka.clearNotifications()
         if (html) {
             notification = new Moka.Notification("<table><tr><td valign='middle'></div></td><td>"+html, "", opts.notify_delay, 300);
-            e = notification.element().find('td:first');
+            e = notification.element()
+            td = notification.element().find('td:first');
 
-            counter = createCounter(id+1, ls.length, 24, 6, 4, "rgba(100,50,20,0.4)", "white", 12, 10);
-            counter.css("margin", "-12px -10px -12px -24px");
-            counter.appendTo(e);
+            createCounter(id+1, ls.length, 24, 4, 4, null, "white", 8, 0)
+                .css("margin", "-12px -8px -12px -24px")
+                .appendTo(td);
 
             return notification;
         }
@@ -442,6 +440,8 @@
             return start(opts);
         }
 
+        wnd = new Moka.Window("<b>"+title+"</b> gallery");
+
         select = function(i, e){
             opts.n = i;
             if (opts.n < 0) {
@@ -450,7 +450,8 @@
             if (opts.n >= ls.length) {
                 opts.n = 0;
             }
-            return createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8, e);
+            //return createCounter(opts.n, ls.length, 80, 4, 6, "rgba(100,50,20,0.4)", "white", 16, 8, e);
+            return createCounter(opts.n, ls.length, 80, 4, 6, null, "white", 16, 8, e);
         }
 
         next = function(i, e){
@@ -462,8 +463,6 @@
             opts.n -= i;
             select(opts.n, e);
         }
-
-        wnd = new Moka.Window("<b>"+title+"</b> gallery");
 
         counter = new Moka.Input( select(opts.n) );
 

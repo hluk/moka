@@ -1,5 +1,4 @@
 @import "config";
-//@import "default";
 @import "utils";
 
 body {
@@ -12,7 +11,7 @@ body {
 
 a {
     font-weight: inherit;
-    color: $url_fg;
+    color: $link_fg;
 }
 
 .moka-widget {
@@ -40,6 +39,8 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         background-color: $widget_hover_bg;
     }
 }
+
+// Moka.Label
 .moka-focus .moka-keyhint {
     text-decoration: underline;
 }
@@ -57,6 +58,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     @include inset-text($widget_selected_fg);
 }
 
+// Moka.Container
 .moka-container {
     &.moka-vertical > .moka-widget{
         display: block;
@@ -66,6 +68,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     }
 }
 
+// Moka.WidgetList
 .moka-widgetlist {
     margin: auto;
     padding: 0.2em;
@@ -92,26 +95,8 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         background-color: $widget_hover_bg;
     }
 }
-.moka-viewer, .moka-viewer .moka-table {
-    height: 100%;
 
-    &, &.moka-table {
-        width: 100%;
-        overflow: hidden;
-    }
-
-
-    // book layout
-    &.moka-layout-2x1 , &.moka-layout-2x1 .moka-table {
-        width: auto;
-        margin: auto;
-        & .moka-view {
-            padding-left: 0;
-            padding-right: 0;
-        }
-    }
-}
-
+// Moka.ButtonBox
 .moka-buttonbox {
     width: 95%;
     text-align: right;
@@ -130,6 +115,8 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     padding: 0.15em 0.4em;
     @include inset-text()
 }
+
+// Moka.Button
 .moka-button {
     cursor: pointer;
     display: inline-block;
@@ -166,9 +153,13 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         );
     }
 }
+
+// Moka.TextEdit
 .moka-textedit textarea {
     vertical-align: top;
 }
+
+// Moka.LineEdit
 .moka-lineedit input, .moka-textedit textarea, .moka-combo select {
     color: $edit_fg;
     background-color: $edit_bg;
@@ -187,6 +178,8 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         text-shadow: black 0 0 0;
     }
 }
+
+// Moka.Tabs
 .moka-tabs {
     padding-bottom: 0;
     padding-right: 0;
@@ -250,6 +243,24 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     border: $tab_border;
     vertical-align: top;
 }
+
+// Moka.Viewer
+.moka-viewer {
+    height: 100%;
+    width: 100%;
+    @if $viewer_scrollbars {
+        overflow: scroll;
+    } @else {
+        overflow: hidden;
+    }
+}
+.moka-viewer .moka-table {
+    margin: auto;
+    height: 100%;
+    width: 100%;
+    border-collapse: collapse;
+    background: $bg;
+}
 .moka-view > .moka-widget {
     margin: auto;
 }
@@ -264,11 +275,17 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 .moka-viewer.moka-layout-1x1 .moka-view {
     padding: 0;
 }
-.moka-viewer .moka-table {
+// book layout
+.moka-viewer.moka-layout-2x1 .moka-table {
+    width: auto;
     margin: auto;
-    border-collapse: collapse;
-    background: $bg;
+    & .moka-view {
+        padding-left: 0;
+        padding-right: 0;
+    }
 }
+
+// Moka.Window
 .moka-window {
     padding: 0;
     border: 1px solid black;
@@ -285,7 +302,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         overflow: auto;
     }
     .moka-title, .moka-body {
-        margin: 3px 3px;
+        margin: $window_border;
     }
     .moka-title {
         font: $font_header;
@@ -294,7 +311,9 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 
         color: $title_fg;
         background-color: $title_bg;
-        @include rounded($title_radius);
+        //@include rounded($title_radius);
+        @include rounded($window_radius - $window_border, top, left);
+        @include rounded($window_radius - $window_border, top, right);
         @include inset();
 
         .moka-label {
@@ -355,6 +374,7 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
     }
 }
 
+// Moka.Notification
 #moka-notification-layer {
     position: fixed;
     z-index: $notification_layer;
@@ -369,7 +389,6 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
         top: 0;
     }
 }
-
 .moka-notification {
     margin: 0.5em;
     white-space: nowrap;
@@ -384,12 +403,13 @@ input, textarea, .moka-tabs, .moka-input, .moka-close, .moka-title {outline: 0}
 
     @include box-shadow(2px 2px 5px rgba(0,0,0,0.3));
     @include rounded($notification_radius);
-    @include transitionsx("opacity 0.5s ease-in-out, background-color 1.5s ease-in-out");
+    //@include transitions("opacity 0.5s ease-in-out, background-color 1.5s ease-in-out");
 
     opacity: $notification_opacity;
     &:hover {opacity:1}
 }
 
+// widget searching
 .moka-found {
     outline: $found_outline;
 }
