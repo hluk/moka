@@ -188,7 +188,7 @@ Moka.initDraggable = (e, handle_e) ->
         handle_e = e
     return handle_e
       .css('cursor', "pointer")
-      .bind "mousedown", (ev) ->
+      .on "mousedown", (ev) ->
           if ev.button is 0
               stop = false
               $(document).one( "mouseup", () -> stop = true )
@@ -201,14 +201,14 @@ Moka.initDraggable = (e, handle_e) ->
 
               move = (ev) ->
                   if stop
-                      $(document).unbind("mousemove.moka")
+                      $(document).off("mousemove.moka")
                   else
                       e.offset({left:ev.pageX-x, top:ev.pageY-y})
-              $(document).bind( "mousemove.moka", move)
+              $(document).on( "mousemove.moka", move)
               move(ev)
 
 Moka.initDragScroll = (e) ->
-    e.bind "mousedown.moka.initdragscroll", (ev) ->
+    e.on "mousedown.moka.initdragscroll", (ev) ->
         if ev.which is 1
             Moka.dragScroll(ev)
 
@@ -267,7 +267,7 @@ Moka.dragScroll = (ev) ->
     stopDragScroll = (ev) ->
         stop = true
 
-        $(window).unbind("mousemove.moka.dragscroll")
+        $(window).off("mousemove.moka.dragscroll")
 
         # if not scrolled: try to focus target element
         if not Moka.scrolling
@@ -302,7 +302,7 @@ Moka.dragScroll = (ev) ->
         return
 
     $(window).one("mouseup.moka.dragscroll", stopDragScroll)
-             .bind("mousemove.moka.dragscroll", continueDragScroll)
+             .on("mousemove.moka.dragscroll", continueDragScroll)
 
     ev.preventDefault()
 
@@ -724,15 +724,15 @@ class Moka.Widget
         return @parentWidget
 
     connect: (event, fn) ->
-        @e.bind(event, (ev) => if ev.target is @e[0] then fn.apply(this,arguments))
+        @e.on(event, (ev) => if ev.target is @e[0] then fn.apply(this,arguments))
         return this
 
-    unbind: (event) ->
-        @e.unbind(event)
+    off: (event) ->
+        @e.unoff(event)
         return this
 
-    bind: (event, fn) ->
-        @e.bind(event, fn)
+    on: (event, fn) ->
+        @e.on(event, fn)
         return this
 
     one: (event, fn) ->
@@ -740,7 +740,7 @@ class Moka.Widget
         return this
 
     once: (event, fn) ->
-        @unbind(event)
+        @off(event)
         @e.one(event, fn)
         return this
 
@@ -897,10 +897,10 @@ class Moka.Input extends Moka.Label
     constructor: (text, from_element) ->
         super
         this
-            .bind( "focus.moka", (ev) => @onChildFocus(ev); @onFocus(ev); return false )
-            .bind( "blur.moka",  (ev) => @onChildBlur(ev); @onBlur(ev);  return false )
-            .bind( "mokaFocusUpRequest", () => @focus(); return false )
-            .bind( "keydown.moka", (ev) =>
+            .on( "focus.moka", (ev) => @onChildFocus(ev); @onFocus(ev); return false )
+            .on( "blur.moka",  (ev) => @onChildBlur(ev); @onBlur(ev);  return false )
+            .on( "mokaFocusUpRequest", () => @focus(); return false )
+            .on( "keydown.moka", (ev) =>
                 return @onKeyDown(ev) if !ev.isPropagationStopped()
             )
             .css("cursor","pointer")
@@ -917,13 +917,13 @@ class Moka.Input extends Moka.Label
             if other
                 e
                     .attr("tabindex", -1)
-                    .unbind(".moka.focusable .moka.notfocusable")
-                    .bind( "focus.moka.focusable", (ev) =>
+                    .off(".moka.focusable .moka.notfocusable")
+                    .on( "focus.moka.focusable", (ev) =>
                         Moka.focused( $(ev.target) )
                         @onChildFocus(ev)
                         return false
                     )
-                    .bind( "blur.moka.focusable", (ev) =>
+                    .on( "blur.moka.focusable", (ev) =>
                         Moka.unfocused()
                         @onChildBlur(ev)
                         return false
@@ -936,8 +936,8 @@ class Moka.Input extends Moka.Label
     addNotFocusableElement: (e) ->
         # steal focus from all non-focusable elements
         e
-            .unbind(".moka.focusable .moka.notfocusable")
-            .bind( "focus.moka.notfocusable", (ev) =>
+            .off(".moka.focusable .moka.notfocusable")
+            .on( "focus.moka.notfocusable", (ev) =>
                 @focus()
                 return false
             )
@@ -945,7 +945,7 @@ class Moka.Input extends Moka.Label
         return this
 
     removeNotFocusableElement: (e) ->
-        e.unbind(".notfocusable")
+        e.off(".notfocusable")
         return this
 
     tabindex: (index) ->
@@ -997,7 +997,7 @@ class Moka.Input extends Moka.Label
         return v
 
     change: (fn) ->
-        return @e.bind("mokaValueChanged", fn)
+        return @bind("mokaValueChanged", fn)
 
     addKey: (keyname, fn) ->
         @keys = {} if not @keys
@@ -1095,7 +1095,7 @@ class Moka.Container extends Moka.Widget
             widget.addClass(@itemclass+" moka-last")
 
             widget.appendTo(@e)
-                .bind("mokaSizeChanged", @update.bind(this) )
+                .on("mokaSizeChanged", @update.bind(this) )
                 #.children().focus( @update.bind(this) )
 
         @update()
@@ -1116,9 +1116,9 @@ class Moka.WidgetList extends Moka.Input
         super
         this
             .tabindex(-1)
-            .bind( "mokaFocusUpRequest", () => @select(Math.max(0, @current)); return false )
-            .bind( "mokaFocusNextRequest", () => @next(); return false )
-            .bind( "mokaFocusPrevRequest", () => @prev(); return false )
+            .on( "mokaFocusUpRequest", () => @select(Math.max(0, @current)); return false )
+            .on( "mokaFocusNextRequest", () => @next(); return false )
+            .on( "mokaFocusPrevRequest", () => @prev(); return false )
 
         c = @c = new Moka.Container(false)
             .mainClass("moka-widgetlist-container moka-container")
@@ -1161,7 +1161,7 @@ class Moka.WidgetList extends Moka.Input
             @c.append(widget)
             widget.parentWidget = this
             widget.data("widget-index", id)
-                #.bind "mousedown.moka", () ->
+                #.on "mousedown.moka", () ->
                     #Moka.focusFirstWidget(widget)
                     #return
 
@@ -1214,7 +1214,7 @@ class Moka.CheckBox extends Moka.Input
         super text
 
         @checkbox = $('<input>', {type:"checkbox", class:"moka-value"})
-            .bind("change.moka", () => @trigger("mokaValueChanged", [@value()]) )
+            .on("change.moka", () => @trigger("mokaValueChanged", [@value()]) )
             .prependTo(@e)
 
         @connect "click.moka", @toggle.bind(this)
@@ -1252,7 +1252,7 @@ class Moka.Combo extends Moka.Input
 
         @combo = $('<select>', {class:"moka-value"})
             .attr("tabindex", -1)
-            .bind("change.moka", () => @trigger("mokaValueChanged", [@value()]) )
+            .on("change.moka", () => @trigger("mokaValueChanged", [@value()]) )
             .appendTo(@e)
         @focusableElement(@combo)
 
@@ -1290,7 +1290,7 @@ class Moka.LineEdit extends Moka.Input
         super label_text
         @edit = $("<input>")
             .appendTo(@e)
-            .bind( "change.moka", () => @trigger("mokaValueChanged", [@value()]) )
+            .on( "change.moka", () => @trigger("mokaValueChanged", [@value()]) )
             .keyup( @update.bind(this) )
         @value(text) if text?
         @focusableElement(@edit)
@@ -1331,7 +1331,7 @@ class Moka.TextEdit extends Moka.Input
         @text = text or ""
         @textarea = $("<textarea>")
             .appendTo(@e)
-            .bind( "change.moka", () => @trigger("mokaValueChanged", [@value()]) )
+            .on( "change.moka", () => @trigger("mokaValueChanged", [@value()]) )
         @focusableElement(@textarea)
 
     remove: () ->
@@ -1532,8 +1532,6 @@ class Moka.Canvas extends Moka.Widget
     mainclass: "moka-canvas "+Moka.Widget.prototype.mainclass
 
     constructor: (@src, w, h, onload, onerror) ->
-        # try to use WebGL
-        e = null
         super $("<canvas>")
         @ctx = @e[0].getContext("2d")
 
@@ -1543,7 +1541,7 @@ class Moka.Canvas extends Moka.Widget
         @img = $("<img>", width:w, height:h)
         @img.one( "load.moka",
             () =>
-                @img.unbind("error.moka")
+                @img.off("error.moka")
                 @ok = true
                 img = @img[0]
                 @owidth  = img.naturalWidth
@@ -1889,25 +1887,25 @@ class Moka.Viewer extends Moka.Input
         @h = 0
 
         this
-            #.bind( "resize.moka", @update.bind(this) )
-            .bind( "scroll.moka", @onScroll.bind(this) )
+            #.on( "resize.moka", @update.bind(this) )
+            .on( "scroll.moka", @onScroll.bind(this) )
             .css("cursor", "move")
             .tabindex(1)
-            .bind( "mokaFocusUpRequest", () => @select(@index + @current); return false )
-            .bind( "mousedown.moka", @onMouseDown.bind(this) )
-            .bind( "dblclick.moka", @onDoubleClick.bind(this) )
+            .on( "mokaFocusUpRequest", () => @select(@index + @current); return false )
+            .on( "mousedown.moka", @onMouseDown.bind(this) )
+            .on( "dblclick.moka", @onDoubleClick.bind(this) )
 
         # FIXME: firefox: scroll is restored on page refresh
         #        - this misbehaves if items are not yet loaded
-        $(window).bind( "unload.moka", () =>
-            @e.unbind("scroll.moka")
+        $(window).on( "unload.moka", () =>
+            @e.off("scroll.moka")
             Moka.scroll(@e, {left:0, top:0})
             @e.hide()
         )
 
         Moka.initDragScroll(@e)
 
-        $(window).bind("resize.moka", @update.bind(this) )
+        $(window).on("resize.moka", @update.bind(this) )
 
         @table = $("<table>", class:"moka-table", border:0, cellSpacing:0, cellPadding:0)
                 .appendTo(@e)
@@ -2592,8 +2590,8 @@ class Moka.Notification extends Moka.Widget
         @e.addClass(notification_class)
           .hide()
           .html(html)
-          .bind( "mouseenter.moka", () => @t_notify.kill() )
-          .bind( "mouseleave.moka", () => @t_notify.restart(delay/2) )
+          .on( "mouseenter.moka", () => @t_notify.kill() )
+          .on( "mouseleave.moka", () => @t_notify.restart(delay/2) )
           .appendTo(Moka.notificationLayer)
           .fadeIn(@animation_speed)
 
@@ -2636,7 +2634,7 @@ class Moka.Window extends Moka.Input
                 search(false)
             wnd.addKey "ESCAPE", () ->
                 wnd.close()
-            edit.bind "keyup.moka", (ev) =>
+            edit.on "keyup.moka", (ev) =>
                 v = edit.value()
                 if v isnt val
                     val = v
@@ -2711,13 +2709,13 @@ class Moka.Window extends Moka.Input
         this
             .tabindex(-1)
             .hide()
-            .bind "mokaFocusUpRequest", () =>
+            .on "mokaFocusUpRequest", () =>
                 @title.focus()
                 return false
 
         e = @container = new Moka.Container().appendTo(@e)
 
-        $(window).bind( "resize.moka", @update.bind(this) )
+        $(window).on( "resize.moka", @update.bind(this) )
 
         # title
         titlebar = @title = new Moka.Input(title)
@@ -2746,11 +2744,11 @@ class Moka.Window extends Moka.Input
         @widgets = [@container]
 
         titlebar
-            .bind "dblclick.moka", () ->
+            .on "dblclick.moka", () ->
                 body.toggle()
                 Moka.focusFirstWidget(body)
                 return false
-            .bind "mousedown.moka", (ev) =>
+            .on "mousedown.moka", (ev) =>
                 # prevent selecting text when double-clicking
                 @focus()
                 ev.preventDefault()
@@ -2778,11 +2776,11 @@ class Moka.Window extends Moka.Input
                     cursor:s[6]+"-resize"
                 )
                 .appendTo(e)
-                .bind "mousedown.moka", (ev) ->
+                .on "mousedown.moka", (ev) ->
                     x = ev.pageX
                     y = ev.pageY
                     $this = $(this)
-                    $(document).bind("mousemove.moka", (ev) ->
+                    $(document).on("mousemove.moka", (ev) ->
                         dx = ev.pageX-x
                         dy = ev.pageY-y
                         x += dx
@@ -2801,7 +2799,7 @@ class Moka.Window extends Moka.Input
                         self.position(pos.left, pos.top)
                         self.update()
                     )
-                    $(document).one("mouseup", () -> $(document).unbind("mousemove.moka"))
+                    $(document).one("mouseup", () -> $(document).off("mousemove.moka"))
                     return false
 
         Moka.initDraggable(@e, @title.e)
@@ -2997,7 +2995,7 @@ mokaInit = () ->
     perf_begin()
 
     $("body")
-        .bind("keydown.moka", (ev) ->
+        .on("keydown.moka", (ev) ->
             perf_begin()
             w = Moka.keyhintwidget
             if w

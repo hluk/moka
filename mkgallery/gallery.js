@@ -25,6 +25,7 @@
         _General: {
             skiptitle: [false, "Skip _title dialog on start"],
             notify: [true, "Show item _info while browsing"],
+            background: ["transparent", "Item _background color"],
             notify_delay: [4000, "Item info _delay in milliseconds"]
         },
         _Images: {
@@ -429,6 +430,9 @@
 		if (typeof title != "undefined" && title !== null) {
 			document.title = title;
 		}
+
+        $("<style type='text/css'>.moka-view img{background:"+opts.background+"}</style>")
+            .appendTo("head");
 
         if (opts.skiptitle_once) {
             delete opts.skiptitle_once;

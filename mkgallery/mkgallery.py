@@ -356,7 +356,8 @@ def clean_gallery():#{{{
             srcdir+"moka.js":dstdir+"moka.js",
             srcdir+"mkgallery"+S+"gallery.js":dstdir+"gallery.js",
             srcdir+"mkgallery"+S+"gallery.css":dstdir+"gallery.css",
-            srcdir+"mkgallery"+S+"template.html":dstdir+"index.html"
+            srcdir+"mkgallery"+S+"template.html":dstdir+"index.html",
+            srcdir+"mkgallery"+S+"favicon.png":dstdir+"favicon.png"
             }
     for f in links:
         link = links[f]
@@ -612,14 +613,14 @@ def gallery_items(files, allitems):#{{{
                     if not os.path.isdir(fdir):
                         os.makedirs(fdir)
                     cp( os.path.abspath(f), fdir +S+ basename )
-                    f = "items" +S+ (destdir and destdir+S or "") + os.path.basename(f)
+                    itempath = "items" +S+ (destdir and destdir+S or "") + os.path.basename(f)
 
                 # TODO: fetch remote PDF before rendering
                 if t == Type.PDF:
                     for page in renderPDF(f):
-                        items["items" +S+ page] = {'.link':"items" +S+ f}
+                        items["items" +S+ page] = {'.link':itempath}
                 else:
-                    items[f] = {}
+                    items[itempath] = {}
 
         add_sorted(items, allitems)
 #}}}

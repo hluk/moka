@@ -205,7 +205,7 @@
     if (!handle_e) {
       handle_e = e;
     }
-    return handle_e.css('cursor', "pointer").bind("mousedown", function(ev) {
+    return handle_e.css('cursor', "pointer").on("mousedown", function(ev) {
       var move, pos, self, stop, x, y;
       if (ev.button === 0) {
         stop = false;
@@ -219,7 +219,7 @@
         y = ev.pageY - pos.top;
         move = function(ev) {
           if (stop) {
-            return $(document).unbind("mousemove.moka");
+            return $(document).off("mousemove.moka");
           } else {
             return e.offset({
               left: ev.pageX - x,
@@ -227,13 +227,13 @@
             });
           }
         };
-        $(document).bind("mousemove.moka", move);
+        $(document).on("mousemove.moka", move);
         return move(ev);
       }
     });
   };
   Moka.initDragScroll = function(e) {
-    e.bind("mousedown.moka.initdragscroll", function(ev) {
+    e.on("mousedown.moka.initdragscroll", function(ev) {
       if (ev.which === 1) {
         return Moka.dragScroll(ev);
       }
@@ -288,7 +288,7 @@
     stopDragScroll = function(ev) {
       var accel, vx, vy;
       stop = true;
-      $(window).unbind("mousemove.moka.dragscroll");
+      $(window).off("mousemove.moka.dragscroll");
       if (!Moka.scrolling) {
         Moka.focus($(ev.target).parents(".moka-input:first"));
         return;
@@ -315,7 +315,7 @@
     if (mouseX + 24 > pos.left + w.width() || mouseY + 24 > pos.top + w.outerHeight()) {
       return;
     }
-    $(window).one("mouseup.moka.dragscroll", stopDragScroll).bind("mousemove.moka.dragscroll", continueDragScroll);
+    $(window).one("mouseup.moka.dragscroll", stopDragScroll).on("mousemove.moka.dragscroll", continueDragScroll);
     return ev.preventDefault();
   };
   Moka.focused_e = null;
@@ -832,19 +832,19 @@
       return this.parentWidget;
     };
     Widget.prototype.connect = function(event, fn) {
-      this.e.bind(event, __bind(function(ev) {
+      this.e.on(event, __bind(function(ev) {
         if (ev.target === this.e[0]) {
           return fn.apply(this, arguments);
         }
       }, this));
       return this;
     };
-    Widget.prototype.unbind = function(event) {
-      this.e.unbind(event);
+    Widget.prototype.off = function(event) {
+      this.e.unoff(event);
       return this;
     };
-    Widget.prototype.bind = function(event, fn) {
-      this.e.bind(event, fn);
+    Widget.prototype.on = function(event, fn) {
+      this.e.on(event, fn);
       return this;
     };
     Widget.prototype.one = function(event, fn) {
@@ -852,7 +852,7 @@
       return this;
     };
     Widget.prototype.once = function(event, fn) {
-      this.unbind(event);
+      this.off(event);
       this.e.one(event, fn);
       return this;
     };
@@ -1020,18 +1020,18 @@
     Input.prototype.default_keys = {};
     function Input(text, from_element) {
       Input.__super__.constructor.apply(this, arguments);
-      this.bind("focus.moka", __bind(function(ev) {
+      this.on("focus.moka", __bind(function(ev) {
         this.onChildFocus(ev);
         this.onFocus(ev);
         return false;
-      }, this)).bind("blur.moka", __bind(function(ev) {
+      }, this)).on("blur.moka", __bind(function(ev) {
         this.onChildBlur(ev);
         this.onBlur(ev);
         return false;
-      }, this)).bind("mokaFocusUpRequest", __bind(function() {
+      }, this)).on("mokaFocusUpRequest", __bind(function() {
         this.focus();
         return false;
-      }, this)).bind("keydown.moka", __bind(function(ev) {
+      }, this)).on("keydown.moka", __bind(function(ev) {
         if (!ev.isPropagationStopped()) {
           return this.onKeyDown(ev);
         }
@@ -1046,11 +1046,11 @@
         ee = this.e_focus;
         other = this.other_focusable = this.e[0] !== e[0];
         if (other) {
-          e.attr("tabindex", -1).unbind(".moka.focusable .moka.notfocusable").bind("focus.moka.focusable", __bind(function(ev) {
+          e.attr("tabindex", -1).off(".moka.focusable .moka.notfocusable").on("focus.moka.focusable", __bind(function(ev) {
             Moka.focused($(ev.target));
             this.onChildFocus(ev);
             return false;
-          }, this)).bind("blur.moka.focusable", __bind(function(ev) {
+          }, this)).on("blur.moka.focusable", __bind(function(ev) {
             Moka.unfocused();
             this.onChildBlur(ev);
             return false;
@@ -1063,7 +1063,7 @@
       }
     };
     Input.prototype.addNotFocusableElement = function(e) {
-      e.unbind(".moka.focusable .moka.notfocusable").bind("focus.moka.notfocusable", __bind(function(ev) {
+      e.off(".moka.focusable .moka.notfocusable").on("focus.moka.notfocusable", __bind(function(ev) {
         this.focus();
         return false;
       }, this));
@@ -1073,7 +1073,7 @@
       return this;
     };
     Input.prototype.removeNotFocusableElement = function(e) {
-      e.unbind(".notfocusable");
+      e.off(".notfocusable");
       return this;
     };
     Input.prototype.tabindex = function(index) {
@@ -1137,7 +1137,7 @@
       return v;
     };
     Input.prototype.change = function(fn) {
-      return this.e.bind("mokaValueChanged", fn);
+      return this.bind("mokaValueChanged", fn);
     };
     Input.prototype.addKey = function(keyname, fn) {
       var k;
@@ -1262,7 +1262,7 @@
           this.at(id - 1).removeClass("moka-last");
         }
         widget.addClass(this.itemclass + " moka-last");
-        widget.appendTo(this.e).bind("mokaSizeChanged", this.update.bind(this));
+        widget.appendTo(this.e).on("mokaSizeChanged", this.update.bind(this));
       }
       this.update();
       return this;
@@ -1306,13 +1306,13 @@
     function WidgetList() {
       var c;
       WidgetList.__super__.constructor.apply(this, arguments);
-      this.tabindex(-1).bind("mokaFocusUpRequest", __bind(function() {
+      this.tabindex(-1).on("mokaFocusUpRequest", __bind(function() {
         this.select(Math.max(0, this.current));
         return false;
-      }, this)).bind("mokaFocusNextRequest", __bind(function() {
+      }, this)).on("mokaFocusNextRequest", __bind(function() {
         this.next();
         return false;
-      }, this)).bind("mokaFocusPrevRequest", __bind(function() {
+      }, this)).on("mokaFocusPrevRequest", __bind(function() {
         this.prev();
         return false;
       }, this));
@@ -1422,7 +1422,7 @@
       this.checkbox = $('<input>', {
         type: "checkbox",
         "class": "moka-value"
-      }).bind("change.moka", __bind(function() {
+      }).on("change.moka", __bind(function() {
         return this.trigger("mokaValueChanged", [this.value()]);
       }, this)).prependTo(this.e);
       this.connect("click.moka", this.toggle.bind(this));
@@ -1467,7 +1467,7 @@
       Combo.__super__.constructor.apply(this, arguments);
       this.combo = $('<select>', {
         "class": "moka-value"
-      }).attr("tabindex", -1).bind("change.moka", __bind(function() {
+      }).attr("tabindex", -1).on("change.moka", __bind(function() {
         return this.trigger("mokaValueChanged", [this.value()]);
       }, this)).appendTo(this.e);
       this.focusableElement(this.combo);
@@ -1511,7 +1511,7 @@
     LineEdit.prototype.default_keys = {};
     function LineEdit(label_text, text) {
       LineEdit.__super__.constructor.call(this, label_text);
-      this.edit = $("<input>").appendTo(this.e).bind("change.moka", __bind(function() {
+      this.edit = $("<input>").appendTo(this.e).on("change.moka", __bind(function() {
         return this.trigger("mokaValueChanged", [this.value()]);
       }, this)).keyup(this.update.bind(this));
       if (text != null) {
@@ -1560,7 +1560,7 @@
     function TextEdit(label_text, text) {
       TextEdit.__super__.constructor.call(this, label_text);
       this.text = text || "";
-      this.textarea = $("<textarea>").appendTo(this.e).bind("change.moka", __bind(function() {
+      this.textarea = $("<textarea>").appendTo(this.e).on("change.moka", __bind(function() {
         return this.trigger("mokaValueChanged", [this.value()]);
       }, this));
       this.focusableElement(this.textarea);
@@ -1824,9 +1824,7 @@
     __extends(Canvas, Moka.Widget);
     Canvas.prototype.mainclass = "moka-canvas " + Moka.Widget.prototype.mainclass;
     function Canvas(src, w, h, onload, onerror) {
-      var e;
       this.src = src;
-      e = null;
       Canvas.__super__.constructor.call(this, $("<canvas>"));
       this.ctx = this.e[0].getContext("2d");
       this.t_draw = new Moka.Timer({
@@ -1839,7 +1837,7 @@
       });
       this.img.one("load.moka", __bind(function() {
         var img;
-        this.img.unbind("error.moka");
+        this.img.off("error.moka");
         this.ok = true;
         img = this.img[0];
         this.owidth = img.naturalWidth;
@@ -2350,12 +2348,12 @@
       this.cache = {};
       this.w = 0;
       this.h = 0;
-      this.bind("scroll.moka", this.onScroll.bind(this)).css("cursor", "move").tabindex(1).bind("mokaFocusUpRequest", __bind(function() {
+      this.on("scroll.moka", this.onScroll.bind(this)).css("cursor", "move").tabindex(1).on("mokaFocusUpRequest", __bind(function() {
         this.select(this.index + this.current);
         return false;
-      }, this)).bind("mousedown.moka", this.onMouseDown.bind(this)).bind("dblclick.moka", this.onDoubleClick.bind(this));
-      $(window).bind("unload.moka", __bind(function() {
-        this.e.unbind("scroll.moka");
+      }, this)).on("mousedown.moka", this.onMouseDown.bind(this)).on("dblclick.moka", this.onDoubleClick.bind(this));
+      $(window).on("unload.moka", __bind(function() {
+        this.e.off("scroll.moka");
         Moka.scroll(this.e, {
           left: 0,
           top: 0
@@ -2363,7 +2361,7 @@
         return this.e.hide();
       }, this));
       Moka.initDragScroll(this.e);
-      $(window).bind("resize.moka", this.update.bind(this));
+      $(window).on("resize.moka", this.update.bind(this));
       this.table = $("<table>", {
         "class": "moka-table",
         border: 0,
@@ -3158,9 +3156,9 @@
       if (!(this.animation_speed != null)) {
         this.animation_speed = 1000;
       }
-      this.e.addClass(notification_class).hide().html(html).bind("mouseenter.moka", __bind(function() {
+      this.e.addClass(notification_class).hide().html(html).on("mouseenter.moka", __bind(function() {
         return this.t_notify.kill();
-      }, this)).bind("mouseleave.moka", __bind(function() {
+      }, this)).on("mouseleave.moka", __bind(function() {
         return this.t_notify.restart(delay / 2);
       }, this)).appendTo(Moka.notificationLayer).fadeIn(this.animation_speed);
       this.t_notify = new Moka.Timer({
@@ -3226,7 +3224,7 @@
         wnd.addKey("ESCAPE", function() {
           return wnd.close();
         });
-        edit.bind("keyup.moka", __bind(function(ev) {
+        edit.on("keyup.moka", __bind(function(ev) {
           var v;
           v = edit.value();
           if (v !== val) {
@@ -3352,12 +3350,12 @@
       }
       Window.__super__.constructor.call(this, from_element);
       self = this;
-      this.tabindex(-1).hide().bind("mokaFocusUpRequest", __bind(function() {
+      this.tabindex(-1).hide().on("mokaFocusUpRequest", __bind(function() {
         this.title.focus();
         return false;
       }, this));
       e = this.container = new Moka.Container().appendTo(this.e);
-      $(window).bind("resize.moka", this.update.bind(this));
+      $(window).on("resize.moka", this.update.bind(this));
       titlebar = this.title = new Moka.Input(title).addClass("moka-title").appendTo(e);
       titlebar.parentWidget = this;
       this.noclose = false;
@@ -3371,11 +3369,11 @@
       body = this.body = new Moka.Container().addClass("moka-body").appendTo(e);
       body.parentWidget = this;
       this.widgets = [this.container];
-      titlebar.bind("dblclick.moka", function() {
+      titlebar.on("dblclick.moka", function() {
         body.toggle();
         Moka.focusFirstWidget(body);
         return false;
-      }).bind("mousedown.moka", __bind(function(ev) {
+      }).on("mousedown.moka", __bind(function(ev) {
         this.focus();
         return ev.preventDefault();
       }, this));
@@ -3402,12 +3400,12 @@
           width: s[4] && "8px" || "",
           height: s[5] && "8px" || "",
           cursor: s[6] + "-resize"
-        }).appendTo(e).bind("mousedown.moka", function(ev) {
+        }).appendTo(e).on("mousedown.moka", function(ev) {
           var $this, x, y;
           x = ev.pageX;
           y = ev.pageY;
           $this = $(this);
-          $(document).bind("mousemove.moka", function(ev) {
+          $(document).on("mousemove.moka", function(ev) {
             var dx, dy, pos;
             dx = ev.pageX - x;
             dy = ev.pageY - y;
@@ -3432,7 +3430,7 @@
             return self.update();
           });
           $(document).one("mouseup", function() {
-            return $(document).unbind("mousemove.moka");
+            return $(document).off("mousemove.moka");
           });
           return false;
         });
@@ -3681,7 +3679,7 @@
   mokaInit = function() {
     perf_end("page ready");
     perf_begin();
-    $("body").bind("keydown.moka", function(ev) {
+    $("body").on("keydown.moka", function(ev) {
       var hint, keyname, w;
       perf_begin();
       w = Moka.keyhintwidget;
